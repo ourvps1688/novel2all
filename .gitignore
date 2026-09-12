@@ -12,7 +12,7 @@ build/
 # uv
 .venv/
 venv/
-uv.lock
+# 注意：uv.lock 必须提交，CI 的 setup-uv 缓存依赖它
 
 # pytest
 .pytest_cache/
@@ -45,6 +45,26 @@ scripts/__pycache__/
 .test*.py
 *.test.log
 FINAL-*.log
+.ssh-test.log
+.outbound.log
+.perms.log
+.api-info.log
+.api-test.log
+.api-info.py
+.token-check.py
+.token-check.log
+.github-info.log
+.github-info.py
+.push.py
+.push-result.log
+.push-verbose.log
+.push-trace.log
+.remote.log
+.add.log
+.add2.log
+.commit.log
+.status.log
+.status2.log
 
 # 用户项目
 # 用户用 novel2all 创建的小说项目目录由用户自己管理 .gitignore

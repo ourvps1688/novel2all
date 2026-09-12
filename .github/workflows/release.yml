@@ -48,7 +48,7 @@ jobs:
   docker:
     name: Build Docker image
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    # 注意：test/lint 定义在 ci.yml，跨 workflow 的 needs 无效；release 由 tag 触发，依赖其自身步骤即可
     steps:
       - uses: actions/checkout@v4
 
