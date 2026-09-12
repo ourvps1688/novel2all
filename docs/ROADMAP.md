@@ -1,6 +1,36 @@
 # novel2all 路线图
 
-## v0.20 — 基础架构（当前）
+## v0.21 — 检索 + 摘要 + LLM 真写（进行中）
+
+**目标**：解决"漏掉历史"问题，端到端跑通最小可用闭环
+
+### Step 1 — L4 检索 + L3 早期压缩 ✅（已完成 2026-09-12）
+
+- [x] `core/memory/retriever.py` —— MemoryRetriever（chromadb → TF-IDF → keyword 三层降级）
+- [x] `core/memory/summarizer.py` —— ChapterSummarizer（1-10 全量、11-30 每5章、31+ 每10章）
+- [x] `manager.py` 接入 retriever（`search_relevant_events` 真用向量检索）
+- [x] `manager.py` `load_recent_chapters` 按档位压缩早期章节
+- [x] `manager.py` `_index_chapter_events` 自动入库新事件
+- [x] 单元测试 51 个 + 集成测试 10 个，全过（沙箱 chromadb 7 个 skip，Linux CI 跑）
+- [x] ruff 检查全过
+- [x] 单章摘要 token 下降 ≥ 50%（V0.21 工程目标达成）
+
+### Step 2 — 完整 skill pipeline + LLM 真写（待开始）
+
+- [ ] `core/pipeline.py` —— Pipeline 编排（load memory → prompt → LLM → save）
+- [ ] CLI `write chapter` 接入真实 LLM
+- [ ] 单章生成（≥2000 字，自动 extract + merge tracking）
+- [ ] 流式输出到 console
+
+### Step 3 — Web SSE 流式 + 50 章模拟测试（待开始）
+
+- [ ] `web/app.py` `/api/write/stream` SSE 端点
+- [ ] `tests/e2e/test_50_chapters.py` 长记忆模拟
+- [ ] 角色 / 伏笔零丢失验证
+
+---
+
+## v0.20 — 基础架构（已完成）
 
 **目标**：跑通核心引擎 + 5 层 memory 框架 + 13 skill + 7 role 全部到位
 

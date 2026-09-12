@@ -15,29 +15,24 @@ dependencies = [
     "anthropic>=0.39.0",
     "openai>=1.65.0",
     "litellm>=1.55.0",
-
     # 类型 / 数据验证
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "instructor>=1.7.0",
-
     # Markdown 解析
     "python-frontmatter>=1.1.0",
     "markdown-it-py>=3.0.0",
     "mdit-py-plugins>=0.4.2",
-
     # Agent / Memory
     "networkx>=3.4.0",
     "chromadb>=0.5.23",
     "tiktoken>=0.8.0",
-
     # CLI / API
     "typer>=0.15.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "httpx>=0.28.0",
     "anyio>=4.7.0",
-
     # 文件 / 配置
     "platformdirs>=4.3.0",
     "python-dotenv>=1.0.1",
@@ -55,6 +50,7 @@ dev = [
     "freezegun>=1.5.0",
     "build>=1.2.0",      # CI: uv run python -m build
     "twine>=6.0.0",      # CI: uv run twine check dist/*
+    "pyyaml>=6.0.3",
 ]
 
 [project.scripts]
@@ -80,9 +76,11 @@ target-version = "py312"
 [tool.ruff.lint]
 # B008: typer.Option / typer.Argument 在参数默认值中是 idiomatic 写法
 # BLE001: skill/role 单文件失败不影响全局加载，是有意为之
+# S110: retriever.clear() 内的清理失败是 fail-silent 设计
 extend-ignore = [
     "B008",
     "BLE001",
+    "S110",
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.21.0] - 2026-09-12
+
+### 🚧 v0.21 — Step 1：L4 检索 + L3 早期压缩
+
+#### Added
+
+- **`core/memory/retriever.py`** —— MemoryRetriever
+  - 主路径：chromadb 语义检索
+  - 降级路径 1：TF-IDF（纯 Python，无依赖）
+  - 降级路径 2：keyword 匹配
+  - API：`add_event` / `add_events` / `query` / `delete_chapter` / `count` / `wipe_disk`
+  - 支持 chapter_range 与 event_type 过滤
+  - 持久化到项目根 `.chroma/`
+- **`core/memory/summarizer.py`** —— ChapterSummarizer
+  - 滑动窗口压缩：1-10 全量、11-30 每 5 章、31+ 每 10 章
+  - `extractive_summary` 不依赖 LLM，前 2 句 + 末 1 句 + 关键词句
+  - `compress_range` 支持可选 LLM 滚动摘要（llm=None 时降级 extractive）
+  - tiktoken 精确 token 计数
+- **`manager.py` 升级**：
+  - `search_relevant_events` 真正接入 retriever
+  - `load_recent_chapters` 按档位折叠早期章节
+  - `update_after_writing` 自动入库本章事件到 retriever
+  - 暴露 `manager.retriever` / `manager.summarizer` 属性
+
+#### Tests
+
+- `tests/unit/test_retriever.py` —— 18 个测试（chromadb 模式 7 个 skip 在沙箱，TF-IDF/keyword 11 个全过）
+- `tests/unit/test_summarizer.py` —— 22 个测试全过
+- `tests/unit/test_memory_integration.py` —— 10 个测试全过
+- **全套 101 个测试通过 + 7 个 skip**（沙箱 chromadb DLL 缺失，Linux CI 跑）
+- 单章摘要 token 下降 ≥ 50%（V0.21 工程目标达成）
+- ruff: All checks passed
+
+#### Fixed
+
+- pyyaml 6.0.3 namespace package 在 uv 安装时的 `__init__.py` 缺失（用 `uv pip install --force-reinstall --no-cache pyyaml` 修复）
+
 ## [0.20.0] - 2026-09-12
 
 ### 🎉 首发
