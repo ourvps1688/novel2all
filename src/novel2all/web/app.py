@@ -141,6 +141,28 @@ def create_app() -> FastAPI:
             )
         return result
 
+    @app.get("/api/chapter/{chapter}/content")
+    async def get_chapter_content(
+        chapter: int,
+        project_root: str = Query(".", description="项目根目录"),
+    ) -> dict:
+        """获取指定章节的完整内容。"""
+        root = Path(project_root).resolve()
+        project = ProjectStructure(root=root)
+        if not project.exists():
+            raise HTTPException(status_code=404, detail="Project not initialized")
+        prose_path = project.chapter_prose(chapter)
+        if not prose_path.exists():
+            raise HTTPException(status_code=404, detail=f"Chapter {chapter} not found")
+        text_content = prose_path.read_text(encoding="utf-8")
+        return {
+            "chapter": chapter,
+            "filename": prose_path.name,
+            "content": text_content,
+            "char_count": len(text_content),
+            "first_line": text_content.split("\n", 1)[0].strip()[:120],
+        }
+
     @app.get("/api/outlines")
     async def list_outlines(project_root: str = ".") -> list[dict]:
         """列出项目下已有细纲。"""
@@ -354,6 +376,7 @@ INDEX_HTML = """<!DOCTYPE html>
         .container { max-width: 1200px; margin: 0 auto; }
         h1 { font-size: 2rem; margin-bottom: 1.5rem; color: #67e8f9; }
         h2 { font-size: 1.25rem; margin: 1.5rem 0 0.75rem; color: #93c5fd; }
+        h3 { font-size: 1rem; margin: 1rem 0 0.5rem; color: #cbd5e1; font-weight: 600; }
         .card {
             background: #1e293b;
             border-radius: 8px;
@@ -370,6 +393,11 @@ INDEX_HTML = """<!DOCTYPE html>
             font-size: 0.875rem;
             margin-right: 0.5rem;
         }
+        .badge.active { background: #10b981; color: #0f172a; }
+        .badge.advanced { background: #f59e0b; color: #0f172a; }
+        .badge.revealed { background: #8b5cf6; color: #f1f5f9; }
+        .badge.abandoned { background: #64748b; color: #f1f5f9; }
+        .badge.dead { background: #ef4444; color: #f1f5f9; }
         .skill-item, .role-item {
             background: #0f172a;
             padding: 1rem;
@@ -395,70 +423,42 @@ INDEX_HTML = """<!DOCTYPE html>
         }
         .stat-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
         .stat-value { font-size: 1.5rem; color: #67e8f9; margin-top: 0.25rem; }
-        /* === Step 3: 写章节 UI === */
-        .writer-controls {
-            display: flex;
-            gap: 0.75rem;
-            align-items: end;
-            flex-wrap: wrap;
-            margin-bottom: 1rem;
-        }
-        .form-group { display: flex; flex-direction: column; gap: 0.25rem; }
-        .form-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
-        .form-group input, .form-group select {
+
+        /* === Step E: 角色 / 伏笔 / 章节详情 === */
+        .character-card {
             background: #0f172a;
-            border: 1px solid #334155;
-            color: #e2e8f0;
-            padding: 0.5rem 0.75rem;
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: 1rem;
-        }
-        button {
-            background: #06b6d4;
-            color: #0f172a;
-            border: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 1rem;
-        }
-        button:disabled {
-            background: #334155;
-            color: #64748b;
-            cursor: not-allowed;
-        }
-        button:hover:not(:disabled) { background: #67e8f9; }
-        #progress-log {
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 6px;
             padding: 1rem;
-            margin: 1rem 0;
-            font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
-            font-size: 0.875rem;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        #progress-log .log-line { padding: 0.125rem 0; }
-        #progress-log .log-line.info { color: #93c5fd; }
-        #progress-log .log-line.success { color: #34d399; }
-        #progress-log .log-line.error { color: #f87171; }
-        #chapter-content {
-            background: #0f172a;
-            border: 1px solid #334155;
             border-radius: 6px;
-            padding: 1.5rem;
-            margin-top: 1rem;
-            white-space: pre-wrap;
-            font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
-            font-size: 0.95rem;
-            line-height: 1.8;
-            min-height: 200px;
-            max-height: 600px;
-            overflow-y: auto;
+            border-left: 3px solid #06b6d4;
         }
+        .character-card.dead { border-left-color: #ef4444; opacity: 0.7; }
+        .character-name { color: #67e8f9; font-weight: bold; font-size: 1.1rem; }
+        .character-meta { color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem; }
+        .character-meta strong { color: #cbd5e1; }
+        .character-desc { color: #cbd5e1; font-size: 0.9rem; margin-top: 0.5rem; }
+
+        .foreshadowing-item {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 3px solid #06b6d4;
+            margin-bottom: 0.5rem;
+        }
+        .foreshadowing-item.advanced { border-left-color: #f59e0b; }
+        .foreshadowing-item.revealed { border-left-color: #8b5cf6; }
+        .foreshadowing-item.abandoned { border-left-color: #64748b; opacity: 0.6; }
+        .fs-title { color: #cbd5e1; font-weight: 600; }
+        .fs-desc { color: #94a3b8; font-size: 0.875rem; margin-top: 0.5rem; }
+        .fs-meta { color: #64748b; font-size: 0.75rem; margin-top: 0.5rem; }
+        .fs-filter { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+        .fs-filter button {
+            background: #334155;
+            color: #cbd5e1;
+            font-size: 0.875rem;
+            padding: 0.4rem 0.8rem;
+        }
+        .fs-filter button.active { background: #06b6d4; color: #0f172a; }
+
         .chapter-list-item {
             background: #0f172a;
             padding: 0.75rem;
@@ -468,8 +468,72 @@ INDEX_HTML = """<!DOCTYPE html>
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
+            transition: background 0.15s;
         }
+        .chapter-list-item:hover { background: #1e293b; }
         .chapter-list-item .ch-meta { color: #94a3b8; font-size: 0.875rem; }
+        .chapter-list-item .ch-arrow { color: #64748b; }
+
+        /* 章节详情弹窗 */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #1e293b;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #334155;
+        }
+        .modal-title { color: #67e8f9; font-size: 1.25rem; font-weight: bold; }
+        .modal-close {
+            background: transparent; color: #94a3b8;
+            font-size: 1.5rem; padding: 0 0.5rem;
+        }
+        .modal-close:hover { color: #e2e8f0; background: transparent; }
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            flex: 1;
+        }
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #334155;
+            color: #94a3b8;
+            font-size: 0.875rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-footer button { font-size: 0.875rem; padding: 0.4rem 0.8rem; }
+
+        .empty-state {
+            color: #64748b;
+            font-style: italic;
+            text-align: center;
+            padding: 1.5rem 0;
+        }
     </style>
 </head>
 <body>
@@ -482,44 +546,58 @@ INDEX_HTML = """<!DOCTYPE html>
         </div>
 
         <div class="card">
-            <h2>📝 写章节（实时 SSE）</h2>
-            <div class="writer-controls">
-                <div class="form-group">
-                    <label for="chapter-input">章节号</label>
-                    <input id="chapter-input" type="number" min="1" value="1" style="width: 100px;" />
-                </div>
-                <div class="form-group">
-                    <label for="skill-select">Skill</label>
-                    <select id="skill-select" style="width: 220px;">
-                        <option value="story-long-write">story-long-write（默认）</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="min-chars-input">最低字数</label>
-                    <input id="min-chars-input" type="number" min="0" value="2000" style="width: 100px;" />
-                </div>
-                <div class="form-group">
-                    <label for="project-root-input">项目根目录</label>
-                    <input id="project-root-input" type="text" value="." style="width: 200px;" />
-                </div>
-                <div class="form-group">
-                    <label for="skip-pre-write-checkbox">跳过 pre-write check</label>
-                    <input id="skip-pre-write-checkbox" type="checkbox" />
-                </div>
-                <button id="start-btn" onclick="startWriting()">开始写</button>
-                <button id="stop-btn" onclick="stopWriting()" disabled style="background:#ef4444;">停止</button>
-            </div>
-
-            <div id="progress-log"></div>
-
-            <div id="chapter-content" placeholder="章节内容将在这里实时显示..."></div>
-
-            <div id="writer-result" style="margin-top: 1rem;"></div>
+            <h2>👥 角色 (<span id="character-count">0</span>)</h2>
+            <div id="characters" class="grid"><div class="empty-state">加载中...</div></div>
         </div>
 
         <div class="card">
-            <h2>已写章节 (<span id="chapter-count">0</span>)</h2>
-            <div id="chapter-list">加载中...</div>
+            <h2>🔮 伏笔 (<span id="foreshadowing-count">0</span>)</h2>
+            <div class="fs-filter" id="fs-filter">
+                <button data-filter="all" class="active">全部</button>
+                <button data-filter="active">active</button>
+                <button data-filter="advanced">advanced</button>
+                <button data-filter="revealed">revealed</button>
+                <button data-filter="abandoned">abandoned</button>
+            </div>
+            <div id="foreshadowing"><div class="empty-state">加载中...</div></div>
+        </div>
+
+        <div class="card">
+            <h2>📝 写章节（实时 SSE）</h2>
+            <div style="display:flex; gap:0.75rem; align-items:end; flex-wrap:wrap; margin-bottom:1rem;">
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase;">章节号</label>
+                    <input id="chapter-input" type="number" min="1" value="1" style="width:100px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; padding:0.5rem 0.75rem; border-radius:4px; font-family:inherit; font-size:1rem;" />
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase;">Skill</label>
+                    <select id="skill-select" style="width:220px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; padding:0.5rem 0.75rem; border-radius:4px; font-family:inherit; font-size:1rem;">
+                        <option value="story-long-write">story-long-write（默认）</option>
+                    </select>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase;">最低字数</label>
+                    <input id="min-chars-input" type="number" min="0" value="2000" style="width:100px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; padding:0.5rem 0.75rem; border-radius:4px; font-family:inherit; font-size:1rem;" />
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase;">项目根目录</label>
+                    <input id="project-root-input" type="text" value="." style="width:200px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; padding:0.5rem 0.75rem; border-radius:4px; font-family:inherit; font-size:1rem;" />
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <label style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase;">跳过 pre-write</label>
+                    <input id="skip-pre-write-checkbox" type="checkbox" />
+                </div>
+                <button id="start-btn" onclick="startWriting()" style="background:#06b6d4; color:#0f172a; border:none; padding:0.6rem 1.2rem; border-radius:4px; font-weight:bold; cursor:pointer; font-size:1rem;">开始写</button>
+                <button id="stop-btn" onclick="stopWriting()" disabled style="background:#ef4444; color:#f1f5f9; border:none; padding:0.6rem 1.2rem; border-radius:4px; font-weight:bold; cursor:not-allowed; font-size:1rem;">停止</button>
+            </div>
+            <div id="progress-log" style="background:#0f172a; border:1px solid #334155; border-radius:6px; padding:1rem; margin:1rem 0; font-family:ui-monospace,monospace; font-size:0.875rem; max-height:200px; overflow-y:auto;"></div>
+            <div id="chapter-content" style="background:#0f172a; border:1px solid #334155; border-radius:6px; padding:1.5rem; margin-top:1rem; white-space:pre-wrap; font-family:ui-monospace,monospace; font-size:0.95rem; line-height:1.8; min-height:100px; max-height:400px; overflow-y:auto;"></div>
+            <div id="writer-result" style="margin-top:1rem;"></div>
+        </div>
+
+        <div class="card">
+            <h2>📚 已写章节 (<span id="chapter-count">0</span>) — 点击查看详情</h2>
+            <div id="chapter-list"><div class="empty-state">加载中...</div></div>
         </div>
 
         <div class="card">
@@ -543,14 +621,32 @@ novel2all web  # 启动当前界面（默认 :8000）
         </div>
     </div>
 
+    <!-- 章节详情弹窗 -->
+    <div class="modal-overlay" id="chapter-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-title">章节详情</div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modal-body">加载中...</div>
+            <div class="modal-footer">
+                <span id="modal-meta"></span>
+                <button onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentEventSource = null;
         let collectedText = '';
+        let currentTracking = null;
+        let currentFsFilter = 'all';
 
         function logLine(text, cls = 'info') {
             const log = document.getElementById('progress-log');
             const line = document.createElement('div');
-            line.className = 'log-line ' + cls;
+            line.style.padding = '0.125rem 0';
+            line.className = cls;
             const ts = new Date().toLocaleTimeString();
             line.textContent = `[${ts}] ${text}`;
             log.appendChild(line);
@@ -561,14 +657,13 @@ novel2all web  # 启动当前界面（默认 :8000）
             if (currentEventSource) {
                 currentEventSource.close();
                 currentEventSource = null;
-                logLine('已断开 EventSource 连接', 'info');
+                logLine('已断开 EventSource 连接');
             }
             document.getElementById('start-btn').disabled = false;
             document.getElementById('stop-btn').disabled = true;
         }
 
         function startWriting() {
-            // 重置 UI
             collectedText = '';
             document.getElementById('chapter-content').textContent = '';
             document.getElementById('writer-result').innerHTML = '';
@@ -586,14 +681,10 @@ novel2all web  # 启动当前界面（默认 :8000）
                 skip_pre_write: skipPreWrite,
             });
             const url = '/api/write/stream?' + params.toString();
+            logLine('连接到 SSE: ' + url);
 
-            logLine(`连接到 SSE: ${url}`, 'info');
-
-            if (currentEventSource) {
-                currentEventSource.close();
-            }
+            if (currentEventSource) currentEventSource.close();
             currentEventSource = new EventSource(url);
-
             document.getElementById('start-btn').disabled = true;
             document.getElementById('stop-btn').disabled = false;
 
@@ -601,12 +692,10 @@ novel2all web  # 启动当前界面（默认 :8000）
                 const data = JSON.parse(e.data);
                 logLine(`Pipeline 启动: chapter=${data.chapter} skill=${data.skill}`, 'success');
             });
-
             currentEventSource.addEventListener('pre_write_check', (e) => {
                 const data = JSON.parse(e.data);
                 logLine(`Pre-write check: ${data.issues.length} 个问题`, data.issues.length > 0 ? 'error' : 'success');
             });
-
             currentEventSource.addEventListener('chunk', (e) => {
                 const data = JSON.parse(e.data);
                 collectedText += data.text;
@@ -614,12 +703,10 @@ novel2all web  # 启动当前界面（默认 :8000）
                 const el = document.getElementById('chapter-content');
                 el.scrollTop = el.scrollHeight;
             });
-
             currentEventSource.addEventListener('progress', (e) => {
                 const data = JSON.parse(e.data);
-                logLine(`[${data.phase}] ${data.message}`, 'info');
+                logLine(`[${data.phase}] ${data.message}`);
             });
-
             currentEventSource.addEventListener('post_write_check', (e) => {
                 const data = JSON.parse(e.data);
                 logLine(`Post-write check: ${data.issues.length} 个问题`, data.issues.length > 0 ? 'error' : 'success');
@@ -630,19 +717,17 @@ novel2all web  # 启动当前界面（默认 :8000）
                         '</ul>';
                 }
             });
-
             currentEventSource.addEventListener('done', (e) => {
                 const data = JSON.parse(e.data);
                 logLine(`完成: ${data.content_chars} 字 → ${data.output_path}`, 'success');
                 const result = document.getElementById('writer-result');
                 if (!result.innerHTML) {
                     result.innerHTML = `<span class="success">✓ 写入 ${data.output_path}</span><br>` +
-                        `<span class="stat-label">字数: ${data.content_chars}</span>`;
+                        `<span style="font-size:0.875rem; color:#94a3b8;">字数: ${data.content_chars}</span>`;
                 }
                 stopWriting();
-                loadChapters();  // 刷新章节列表
+                loadAll();
             });
-
             currentEventSource.addEventListener('error', (e) => {
                 let msg = '未知错误';
                 if (e.data) {
@@ -650,51 +735,193 @@ novel2all web  # 启动当前界面（默认 :8000）
                         const data = JSON.parse(e.data);
                         msg = data.message || msg;
                         if (data.issues) {
-                            msg += '\\n问题:\\n' + data.issues.map(i => `  - [${i.severity}] ${i.description}`).join('\\n');
+                            msg += '\n问题:\n' + data.issues.map(i => `  - [${i.severity}] ${i.description}`).join('\n');
                         }
-                    } catch (_) {
-                        msg = e.data;
-                    }
+                    } catch (_) { msg = e.data; }
                 }
                 logLine(`错误: ${msg}`, 'error');
                 document.getElementById('writer-result').innerHTML =
-                    `<span class="error">✗ ${msg.replace(/\\n/g, '<br>')}</span>`;
+                    `<span class="error">✗ ${msg.replace(/\n/g, '<br>')}</span>`;
                 stopWriting();
             });
-
-            currentEventSource.onerror = (e) => {
-                if (currentEventSource.readyState === EventSource.CLOSED) {
-                    logLine('EventSource 已关闭', 'info');
-                } else {
-                    logLine('EventSource 网络错误', 'error');
-                }
-            };
         }
 
-        async function load() {
+        // === 章节详情弹窗 ===
+        async function openChapterModal(chapter) {
+            const projectRoot = document.getElementById('project-root-input').value;
+            const modal = document.getElementById('chapter-modal');
+            const body = document.getElementById('modal-body');
+            const title = document.getElementById('modal-title');
+            const meta = document.getElementById('modal-meta');
+
+            title.textContent = `第 ${chapter} 章`;
+            body.textContent = '加载中...';
+            meta.textContent = '';
+            modal.classList.add('show');
+
             try {
-                // Status
-                const status = await fetch('/api/status').then(r => r.json());
+                const resp = await fetch(`/api/chapter/${chapter}/content?project_root=${encodeURIComponent(projectRoot)}`);
+                if (!resp.ok) {
+                    body.textContent = `加载失败: HTTP ${resp.status}`;
+                    return;
+                }
+                const data = await resp.json();
+                title.textContent = `第 ${data.chapter} 章 — ${data.first_line}`;
+                body.textContent = data.content;
+                meta.textContent = `${data.char_count} 字 · ${data.filename}`;
+            } catch (e) {
+                body.textContent = `加载失败: ${e.message}`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('chapter-modal').classList.remove('show');
+        }
+
+        // === 伏笔过滤 ===
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('#fs-filter button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#fs-filter button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFsFilter = btn.dataset.filter;
+                    renderForeshadowing();
+                });
+            });
+        });
+
+        function renderCharacters() {
+            const container = document.getElementById('characters');
+            if (!currentTracking || !currentTracking.characters || Object.keys(currentTracking.characters).length === 0) {
+                container.innerHTML = '<div class="empty-state">还没有角色</div>';
+                return;
+            }
+            const chars = Object.values(currentTracking.characters)
+                .sort((a, b) => (b.last_updated_chapter || 0) - (a.last_updated_chapter || 0));
+            container.innerHTML = chars.map(c => {
+                const isDead = c.alive === false;
+                const meta = [];
+                if (c.location) meta.push(`📍 ${c.location}`);
+                if (c.emotional_state) meta.push(`💭 ${c.emotional_state}`);
+                if (c.last_updated_chapter) meta.push(`📅 ch.${c.last_updated_chapter}`);
+                return `
+                    <div class="character-card ${isDead ? 'dead' : ''}">
+                        <div class="character-name">
+                            ${c.name}
+                            ${isDead ? '<span class="badge dead" style="margin-left:0.5rem;">dead</span>' : ''}
+                        </div>
+                        <div class="character-meta">${meta.map(m => `<strong>${m}</strong>`).join(' · ')}</div>
+                        ${c.description ? `<div class="character-desc">${c.description}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderForeshadowing() {
+            const container = document.getElementById('foreshadowing');
+            if (!currentTracking || !currentTracking.foreshadowing || Object.keys(currentTracking.foreshadowing).length === 0) {
+                container.innerHTML = '<div class="empty-state">还没有伏笔</div>';
+                return;
+            }
+            const items = Object.values(currentTracking.foreshadowing);
+            const filtered = currentFsFilter === 'all'
+                ? items
+                : items.filter(f => f.status === currentFsFilter);
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state">该状态无伏笔</div>';
+                return;
+            }
+            container.innerHTML = filtered.map(f => {
+                const meta = [];
+                if (f.planted_chapter) meta.push(`埋设 ch.${f.planted_chapter}`);
+                if (f.revealed_chapter) meta.push(`揭示 ch.${f.revealed_chapter}`);
+                return `
+                    <div class="foreshadowing-item ${f.status}">
+                        <div class="fs-title">
+                            <span class="badge ${f.status}">${f.status}</span>
+                            ${f.id || ''} ${f.title ? '— ' + f.title : ''}
+                        </div>
+                        ${f.description ? `<div class="fs-desc">${f.description}</div>` : ''}
+                        ${meta.length > 0 ? `<div class="fs-meta">${meta.join(' · ')}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadAll() {
+            const projectRoot = document.getElementById('project-root-input').value;
+            await loadStatus(projectRoot);
+            await loadTracking(projectRoot);
+            await loadChapters(projectRoot);
+        }
+
+        async function loadStatus(projectRoot) {
+            try {
+                const status = await fetch(`/api/status?project_root=${encodeURIComponent(projectRoot)}`).then(r => r.json());
                 const statusDiv = document.getElementById('status');
                 if (!status.initialized) {
                     statusDiv.innerHTML = '<span class="error">项目未初始化</span><br>运行 <code>novel2all setup</code> 初始化';
-                } else {
-                    statusDiv.innerHTML = `
-                        <div class="stat-grid">
-                            <div class="stat"><div class="stat-label">项目名</div><div class="stat-value">${status.project_name}</div></div>
-                            <div class="stat"><div class="stat-label">题材</div><div class="stat-value">${status.genre || '-'}</div></div>
-                            <div class="stat"><div class="stat-label">文风</div><div class="stat-value">${status.style_anchor || '-'}</div></div>
-                            <div class="stat"><div class="stat-label">当前章节</div><div class="stat-value">${status.last_updated_chapter}</div></div>
-                            <div class="stat"><div class="stat-label">角色数</div><div class="stat-value">${status.character_count}</div></div>
-                            <div class="stat"><div class="stat-label">活跃伏笔</div><div class="stat-value">${status.active_foreshadowing_count}</div></div>
-                            <div class="stat"><div class="stat-label">时间线</div><div class="stat-value">${status.timeline_count}</div></div>
-                            <div class="stat"><div class="stat-label">已有摘要</div><div class="stat-value">${status.summary_count}</div></div>
-                        </div>
-                    `;
+                    return;
                 }
-                loadChapters();
+                statusDiv.innerHTML = `
+                    <div class="stat-grid">
+                        <div class="stat"><div class="stat-label">项目名</div><div class="stat-value">${status.project_name}</div></div>
+                        <div class="stat"><div class="stat-label">题材</div><div class="stat-value">${status.genre || '-'}</div></div>
+                        <div class="stat"><div class="stat-label">文风</div><div class="stat-value">${status.style_anchor || '-'}</div></div>
+                        <div class="stat"><div class="stat-label">当前章节</div><div class="stat-value">${status.last_updated_chapter}</div></div>
+                        <div class="stat"><div class="stat-label">角色数</div><div class="stat-value">${status.character_count}</div></div>
+                        <div class="stat"><div class="stat-label">活跃伏笔</div><div class="stat-value">${status.active_foreshadowing_count}</div></div>
+                        <div class="stat"><div class="stat-label">时间线</div><div class="stat-value">${status.timeline_count}</div></div>
+                        <div class="stat"><div class="stat-label">已有摘要</div><div class="stat-value">${status.summary_count}</div></div>
+                    </div>
+                `;
+            } catch (e) {
+                document.getElementById('status').innerHTML = `<span class="error">加载失败: ${e.message}</span>`;
+            }
+        }
 
-                // Skills
+        async function loadTracking(projectRoot) {
+            try {
+                const tracking = await fetch(`/api/tracking?project_root=${encodeURIComponent(projectRoot)}`).then(r => r.json());
+                currentTracking = tracking;
+                // 角色
+                const charCount = tracking.characters ? Object.keys(tracking.characters).length : 0;
+                document.getElementById('character-count').textContent = charCount;
+                renderCharacters();
+                // 伏笔
+                const fsCount = tracking.foreshadowing ? Object.keys(tracking.foreshadowing).length : 0;
+                document.getElementById('foreshadowing-count').textContent = fsCount;
+                renderForeshadowing();
+            } catch (e) {
+                document.getElementById('characters').innerHTML = `<div class="empty-state">未初始化项目</div>`;
+                document.getElementById('foreshadowing').innerHTML = `<div class="empty-state">未初始化项目</div>`;
+            }
+        }
+
+        async function loadChapters(projectRoot) {
+            try {
+                const chapters = await fetch(`/api/chapters?project_root=${encodeURIComponent(projectRoot)}`).then(r => r.json());
+                document.getElementById('chapter-count').textContent = chapters.length;
+                document.getElementById('chapter-list').innerHTML = chapters.length === 0
+                    ? '<div class="empty-state">还没有章节</div>'
+                    : chapters.map(c => `
+                        <div class="chapter-list-item" onclick="openChapterModal(${c.chapter})">
+                            <div>
+                                <strong>第 ${c.chapter} 章</strong>
+                                <span class="ch-meta"> · ${c.char_count} 字</span>
+                                <div class="ch-meta">${c.first_line}</div>
+                            </div>
+                            <span class="ch-arrow">查看详情 →</span>
+                        </div>
+                    `).join('');
+            } catch (e) {
+                document.getElementById('chapter-list').innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        // 加载 skills / roles
+        async function loadSkillsAndRoles() {
+            try {
                 const skills = await fetch('/api/skills').then(r => r.json());
                 document.getElementById('skill-count').textContent = skills.length;
                 document.getElementById('skills').innerHTML = skills.map(s => `
@@ -707,8 +934,6 @@ novel2all web  # 启动当前界面（默认 :8000）
                         </div>
                     </div>
                 `).join('');
-
-                // Roles
                 const roles = await fetch('/api/roles').then(r => r.json());
                 document.getElementById('role-count').textContent = roles.length;
                 document.getElementById('roles').innerHTML = roles.map(r => `
@@ -719,33 +944,21 @@ novel2all web  # 启动当前界面（默认 :8000）
                     </div>
                 `).join('');
             } catch (e) {
-                document.getElementById('status').innerHTML = `<span class="error">加载失败: ${e.message}</span>`;
+                console.error('skills/roles load failed', e);
             }
         }
 
-        async function loadChapters() {
-            try {
-                const projectRoot = document.getElementById('project-root-input').value;
-                const chapters = await fetch(`/api/chapters?project_root=${encodeURIComponent(projectRoot)}`).then(r => r.json());
-                document.getElementById('chapter-count').textContent = chapters.length;
-                document.getElementById('chapter-list').innerHTML = chapters.length === 0
-                    ? '<span class="loading">还没有章节</span>'
-                    : chapters.map(c => `
-                        <div class="chapter-list-item">
-                            <div>
-                                <strong>第 ${c.chapter} 章</strong>
-                                <span class="ch-meta"> · ${c.char_count} 字</span>
-                                <div class="ch-meta">${c.first_line}</div>
-                            </div>
-                            <span class="ch-meta">${c.filename}</span>
-                        </div>
-                    `).join('');
-            } catch (e) {
-                document.getElementById('chapter-list').innerHTML = `<span class="error">加载失败: ${e.message}</span>`;
-            }
-        }
+        loadAll();
+        loadSkillsAndRoles();
 
-        load();
+        // ESC 关闭弹窗
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+        // 点击遮罩关闭
+        document.getElementById('chapter-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'chapter-modal') closeModal();
+        });
     </script>
 </body>
 </html>
