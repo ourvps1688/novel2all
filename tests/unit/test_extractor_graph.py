@@ -62,9 +62,7 @@ class TestGraphUpdateModels:
         assert "Invalid node type" in err
 
     def test_graph_edge_update_valid(self) -> None:
-        e = GraphEdgeUpdate(
-            from_id="char:林雷", to_id="char:苏寒", type="related_to", label="兄弟"
-        )
+        e = GraphEdgeUpdate(from_id="char:林雷", to_id="char:苏寒", type="related_to", label="兄弟")
         assert e.validate_type() is None
 
     def test_graph_edge_update_invalid_type(self) -> None:
@@ -232,7 +230,9 @@ class TestApplyGraphToState:
             graph=ExtractedGraphData(
                 nodes=[
                     GraphNodeUpdate(id="char:林雷", type="Character", name="林雷", alive=True),
-                    GraphNodeUpdate(id="loc:苍茫镇", type="Location", name="苍茫镇", type_detail="city"),
+                    GraphNodeUpdate(
+                        id="loc:苍茫镇", type="Location", name="苍茫镇", type_detail="city"
+                    ),
                 ],
                 edges=[
                     GraphEdgeUpdate(from_id="char:林雷", to_id="loc:苍茫镇", type="located_in"),
@@ -321,9 +321,7 @@ class TestApplyGraphToState:
                     GraphNodeUpdate(id="bad:x", type="InvalidType", name="x"),  # 跳过
                 ],
                 edges=[
-                    GraphEdgeUpdate(
-                        from_id="char:林雷", to_id="char:苏寒", type="related_to"
-                    ),
+                    GraphEdgeUpdate(from_id="char:林雷", to_id="char:苏寒", type="related_to"),
                 ],
             ),
         )
@@ -353,14 +351,8 @@ class TestGraphSummaryForPrompt:
 
     def test_truncation(self) -> None:
         """> 30 节点 / > 50 边时截断。"""
-        nodes = [
-            {"id": f"char:{i}", "type": "Character", "name": f"C{i}"}
-            for i in range(50)
-        ]
-        edges = [
-            {"from_id": f"a{i}", "to_id": f"b{i}", "type": "related_to"}
-            for i in range(80)
-        ]
+        nodes = [{"id": f"char:{i}", "type": "Character", "name": f"C{i}"} for i in range(50)]
+        edges = [{"from_id": f"a{i}", "to_id": f"b{i}", "type": "related_to"} for i in range(80)]
         result = _graph_summary_for_prompt({"nodes": nodes, "edges": edges})
         assert result["node_count"] == 50
         assert result["edge_count"] == 80

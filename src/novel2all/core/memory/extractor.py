@@ -35,14 +35,11 @@ class ContinuityIssue(BaseModel):
     description: str
 
 
-
-
 # === V0.22 L5 知识图谱增量提取 ===
 
 # 允许的节点类型（用于 LLM prompt 约束）
 _GRAPH_NODE_TYPES = [t.value for t in NodeType]
 _GRAPH_EDGE_TYPES = [t.value for t in EdgeType]
-
 
 
 class CharacterUpdate(BaseModel):
@@ -74,8 +71,6 @@ class TimelineEventUpdate(BaseModel):
     characters: list[str]
     summary: str
     author_only: bool = False
-
-
 
 
 class GraphNodeUpdate(BaseModel):
@@ -384,9 +379,7 @@ class Extractor:
 # === V0.22 helper：GraphNodeUpdate / EdgeUpdate → GraphNode / GraphEdge ===
 
 
-def _node_update_to_graph_node(
-    update: GraphNodeUpdate, chapter: int
-):  # type: ignore[valid-type]
+def _node_update_to_graph_node(update: GraphNodeUpdate, chapter: int):  # type: ignore[valid-type]
     """从 GraphNodeUpdate 转换到 GraphNode（带验证）。"""
     from novel2all.core.memory.types import GraphNode
 
@@ -409,9 +402,7 @@ def _node_update_to_graph_node(
         return None
 
 
-def _edge_update_to_graph_edge(
-    update: GraphEdgeUpdate, chapter: int
-):  # type: ignore[valid-type]
+def _edge_update_to_graph_edge(update: GraphEdgeUpdate, chapter: int):  # type: ignore[valid-type]
     """从 GraphEdgeUpdate 转换到 GraphEdge（带验证）。"""
     from novel2all.core.memory.types import GraphEdge
 
@@ -455,4 +446,3 @@ def _graph_summary_for_prompt(graph_dict: dict) -> dict:
         "node_brief": [_node_brief(n) for n in nodes[:30]],  # 截断到 30 个
         "edge_brief": [_edge_brief(e) for e in edges[:50]],  # 截断到 50 个
     }
-
