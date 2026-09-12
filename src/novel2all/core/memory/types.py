@@ -78,3 +78,87 @@ class MemoryConfig(BaseModel):
     auto_extract_after_write: bool = True
     auto_embed_after_write: bool = True
     pre_write_check_blocking: bool = True
+
+
+# === L5 知识图谱（V0.22）===
+
+
+class NodeType(str, Enum):
+    """知识图谱节点类型。"""
+
+    CHARACTER = "Character"
+    LOCATION = "Location"
+    FORESHADOWING = "Foreshadowing"
+    EVENT = "Event"
+    ITEM = "Item"
+
+
+class EdgeType(str, Enum):
+    """知识图谱边类型。"""
+
+    APPEARS_IN = "appears_in"  # Character → Event
+    LOCATED_IN = "located_in"  # Character → Location
+    OWNS = "owns"  # Character → Item
+    RELATED_TO = "related_to"  # Character → Character
+    FORESHADOWS = "foreshadows"  # Foreshadowing → Event
+    CAUSED_BY = "caused_by"  # Event → Event
+    SET_IN = "set_in"  # Event → Location
+
+
+class GraphNode(BaseModel):
+    """知识图谱节点。
+
+    ID 格式:
+      - Character: "char:林雷"
+      - Location: "loc:苍茫镇"
+      - Foreshadowing: "fs:bloodline_secret"
+      - Event: "event:awakening_ch2"
+      - Item: "item:玉佩"
+    """
+
+    id: str
+    type: NodeType
+    name: str
+    # Character 字段
+    alive: bool | None = None  # 仅 Character
+    # Location 字段
+    type_detail: str | None = None  # 仅 Location (city/sect/wild/...)
+    # Foreshadowing 字段
+    id_short: str | None = None  # 仅 Foreshadowing
+    status: str | None = None  # 仅 Foreshadowing (active/advanced/revealed)
+    # Event 字段
+    in_world_time: str | None = None
+    # 通用：起止章节
+    first_chapter: int | None = None
+    last_chapter: int | None = None
+
+    def short_id(self) -> str:
+        """返回去掉前缀的短 ID（仅用于显示）。"""
+        if ":" in self.id:
+            return self.id.split(":", 1)[1]
+        return self.id
+
+
+class GraphEdge(BaseModel):
+    """知识图谱边。"""
+
+    from_id: str  # 节点 id
+    to_id: str  # 节点 id
+    type: EdgeType
+    label: str | None = None  # 仅 related_to 需要（如"兄弟"）
+    chapter: int | None = None  # 边产生章节（用于时间线）
+
+
+class GraphData(BaseModel):
+    """图谱数据集合，嵌入 TrackingState.graph 字段。"""
+
+    nodes: list[GraphNode] = Field(default_factory=list)
+    edges: list[GraphEdge] = Field(default_factory=list)
+
+    def node_index(self) -> dict[str, GraphNode]:
+        """返回 {id: node} 索引。"""
+        return {n.id: n for n in self.nodes}
+
+    def edge_index(self) -> dict[tuple[str, str, str], GraphEdge]:
+        """返回 {(from_id, to_id, type): edge} 索引。"""
+        return {(e.from_id, e.to_id, e.type.value): e for e in self.edges}

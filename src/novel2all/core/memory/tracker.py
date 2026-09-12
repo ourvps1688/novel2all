@@ -61,6 +61,11 @@ class TrackingState(BaseModel):
     foreshadowing: dict[str, ForeshadowingState] = Field(default_factory=dict)
     timeline: list[TimelineEvent] = Field(default_factory=list)
 
+    # L5 知识图谱（V0.22+）
+    graph: dict = Field(
+        default_factory=lambda: {"nodes": [], "edges": []}
+    )  # 用 dict 避免循环依赖，graph.py 的 MemoryGraph.to_dict() 直接兼容
+
     # 最近章节摘要（用于 L3 滑动窗口）
     recent_chapter_summaries: dict[int, str] = Field(default_factory=dict)
 
