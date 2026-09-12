@@ -17,11 +17,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    # 注意：本私有仓库当前未在 Settings → Code security 启用 code scanning
-    # （security_and_analysis 无 code_scanning 项，依赖账号计划/Advanced Security），
-    # 故 CodeQL analyze 会报 configuration error。设为不阻断整体流水线，
-    # 待仓库开启 CodeQL 后将自动转绿。
-    continue-on-error: true
+    # 公开仓库已可在本 workflow 直接启用 CodeQL / code scanning（GitHub 对公开仓库免费提供）。
     strategy:
       fail-fast: false
       matrix:
