@@ -242,7 +242,8 @@ def write_chapter(
     stream: bool = typer.Option(True, "--stream/--no-stream", help="流式输出到 console"),
     min_chars: int = typer.Option(2000, "--min-chars", help="最低字数（低于则警告）"),
     skip_pre_write: bool = typer.Option(
-        False, "--skip-pre-write/--no-skip-pre-write",
+        False,
+        "--skip-pre-write/--no-skip-pre-write",
         help="跳过 pre-write check（开发/测试用）",
     ),
 ) -> None:

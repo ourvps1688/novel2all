@@ -27,6 +27,7 @@ from novel2all.core.skill import SkillDefinition, SkillRegistry
 
 # === 错误类型 ===
 
+
 class PipelineError(Exception):
     """Pipeline 基础错误。"""
 
@@ -49,6 +50,7 @@ class LLMAuthError(PipelineError):
 
 # === 结果类型 ===
 
+
 @dataclass
 class WriteResult:
     """一次写作的完整结果。"""
@@ -63,6 +65,7 @@ class WriteResult:
 
 
 # === Pipeline ===
+
 
 class WritingPipeline:
     """写作 pipeline。
@@ -121,9 +124,7 @@ class WritingPipeline:
         """
         # 1. 校验细纲
         if not outline_path.exists():
-            raise OutlineNotFoundError(
-                f"细纲文件不存在: {outline_path}。请先写细纲。"
-            )
+            raise OutlineNotFoundError(f"细纲文件不存在: {outline_path}。请先写细纲。")
         outline_text = outline_path.read_text(encoding="utf-8")
 
         # 2. pre-write check（可跳过）
@@ -144,9 +145,7 @@ class WritingPipeline:
         # 4. 取 skill 并组装 prompt
         skill = self.skill_registry.get(skill_name)
         if skill is None:
-            raise PipelineError(
-                f"skill '{skill_name}' 未注册。可用：{self.skill_registry.names()}"
-            )
+            raise PipelineError(f"skill '{skill_name}' 未注册。可用：{self.skill_registry.names()}")
 
         prompt = self._build_prompt(
             skill=skill,
