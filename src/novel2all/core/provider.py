@@ -34,6 +34,13 @@ class LLMConfig(BaseModel):
       - claude-sonnet-4-...  → "anthropic/claude-sonnet-4-20250514"
       - gpt-4o               → "openai/gpt-4o"
       - deepseek-chat        → "deepseek/deepseek-chat"
+      - minimax-M3           → "minimax/MiniMax-M3"（必须用 Anthropic 兼容路径）
+      - qwen3.8-flash        → "openai/qwen3.8-flash"（用 DashScope base_url）
+
+    API key 设置：
+      - api_key_anthropic / openai / deepseek：直接设到对应环境变量
+      - api_key_minimax：设到 MINIMAX_API_KEY（V0.23.5+）
+      - api_key_dashscope：设到 DASHSCOPE_API_KEY（V0.23.5+）
     """
 
     default_model: str = "deepseek/deepseek-chat"
@@ -41,6 +48,8 @@ class LLMConfig(BaseModel):
     api_key_anthropic: str | None = None
     api_key_openai: str | None = None
     api_key_deepseek: str | None = None
+    api_key_minimax: str | None = None
+    api_key_dashscope: str | None = None
     timeout_seconds: int = 120
     max_retries: int = 3
 
@@ -67,6 +76,11 @@ class LLMProvider:
             os.environ["OPENAI_API_KEY"] = self.config.api_key_openai
         if self.config.api_key_deepseek:
             os.environ["DEEPSEEK_API_KEY"] = self.config.api_key_deepseek
+        # V0.23.5+：minimax 和千问 key 注入
+        if self.config.api_key_minimax:
+            os.environ["MINIMAX_API_KEY"] = self.config.api_key_minimax
+        if self.config.api_key_dashscope:
+            os.environ["DASHSCOPE_API_KEY"] = self.config.api_key_dashscope
 
     async def complete(
         self,
@@ -104,10 +118,14 @@ class LLMProvider:
             "timeout": self.config.timeout_seconds,
             "num_retries": self.config.max_retries,
         }
-        # V0.23：自动应用模型 thinking 控制（防止 reasoning 耗光 token）
-        extra_body = self._get_extra_body(model_name)
-        if extra_body:
-            kwargs["extra_body"] = extra_body
+        # V0.23.5：自动应用模型完整配置（api_base + extra_body + headers）
+        model_cfg = self._get_model_config(model_name)
+        if model_cfg.api_base:
+            kwargs["api_base"] = model_cfg.api_base
+        if model_cfg.extra_body:
+            kwargs["extra_body"] = model_cfg.extra_body
+        if model_cfg.headers:
+            kwargs["extra_headers"] = model_cfg.headers
 
         response = await litellm.acompletion(**kwargs)
         return response.choices[0].message.content or ""
@@ -186,10 +204,14 @@ class LLMProvider:
             "temperature": temperature,
             "stream": True,
         }
-        # V0.23：自动应用模型 thinking 控制
-        extra_body = self._get_extra_body(model_name)
-        if extra_body:
-            kwargs["extra_body"] = extra_body
+        # V0.23.5：自动应用模型完整配置
+        model_cfg = self._get_model_config(model_name)
+        if model_cfg.api_base:
+            kwargs["api_base"] = model_cfg.api_base
+        if model_cfg.extra_body:
+            kwargs["extra_body"] = model_cfg.extra_body
+        if model_cfg.headers:
+            kwargs["extra_headers"] = model_cfg.headers
 
         response = await litellm.acompletion(**kwargs)
         async for chunk in response:
@@ -217,16 +239,23 @@ class LLMProvider:
             return router.select(task)
         return self.config.default_model
 
-    def _get_extra_body(self, model_name: str) -> dict[str, Any] | None:
-        """V0.23：返回模型的特殊控制参数（extra_body）。
+    def _get_model_config(self, model_name: str) -> Any:
+        """V0.23.5：返回模型的完整 litellm 配置。
 
-        主要用于 DeepSeek thinking 控制：
-        - v4-pro 默认 thinking 模式会耗光 token → 显式禁用
-        - flash 也类似（保持一致性）
+        通过 MODEL_CONFIG 字典统一管理 api_base / extra_body / headers。
+        未知模型返回空 ModelConfig（litellm 用默认行为）。
 
-        未知模型返回 None（让 litellm 用默认行为）。
+        V0.23 旧接口 _get_extra_body 保留向后兼容（委托给 ModelConfig.extra_body）。
         """
         # lazy import 避免循环依赖
-        from novel2all.core.provider_router import get_thinking_control
+        from novel2all.core.provider_router import get_model_config
 
-        return get_thinking_control(model_name)
+        return get_model_config(model_name)
+
+    def _get_extra_body(self, model_name: str) -> dict[str, Any] | None:
+        """V0.23：返回模型的 thinking 控制参数（extra_body）。
+
+        向后兼容接口，V0.23.5+ 委托给 MODEL_CONFIG.extra_body。
+        """
+        cfg = self._get_model_config(model_name)
+        return cfg.extra_body if cfg else None

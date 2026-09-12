@@ -87,13 +87,11 @@ CANDIDATE_MODELS = {
         "task_preference": "minimax 旗舰（中文长篇创作）",
     },
     # 千问平台（OpenAI 兼容 + 自定义 base_url）
-    "openai/qwen3.8-max": {
-        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "task_preference": "千问旗舰（对照组）",
-    },
+    # V0.23.5：剔除 qwen3.8-max（V0.23.4 benchmark 验证：¥0.0801/25 调用，字/成本比 54815，最低）
+    # 保留 qwen3.8-flash（字/成本比 676694，最高）
     "openai/qwen3.8-flash": {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "task_preference": "千问性价比",
+        "task_preference": "千问性价比（字/成本比冠军）",
     },
 }
 
@@ -103,7 +101,6 @@ API_KEY_ENV = {
     "deepseek/deepseek-v4-pro": "DEEPSEEK_API_KEY",
     "deepseek/deepseek-flash": "DEEPSEEK_API_KEY",
     "anthropic/MiniMax-M3": "MINIMAX_API_KEY",
-    "openai/qwen3.8-max": "DASHSCOPE_API_KEY",
     "openai/qwen3.8-flash": "DASHSCOPE_API_KEY",
 }
 
@@ -135,15 +132,7 @@ PRICING = {
         "input_miss_peak": 4.2,
         "output_peak": 8.4,
     },
-    "openai/qwen3.8-max": {
-        "input_hit_offpeak": 1.5,
-        "input_miss_offpeak": 12.0,
-        "output_offpeak": 36.0,
-        # 千问无 peak/off-peak 区分（按统一价）
-        "input_hit_peak": 1.5,
-        "input_miss_peak": 12.0,
-        "output_peak": 36.0,
-    },
+    # V0.23.5：剔除 qwen3.8-max（字/成本比 54815，最低）
     "openai/qwen3.8-flash": {
         "input_hit_offpeak": 0.1,
         "input_miss_offpeak": 0.8,

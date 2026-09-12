@@ -29,12 +29,14 @@ from novel2all.core.provider import LLMConfig, LLMProvider
 from novel2all.core.provider_router import (
     DEFAULT_TASK_FALLBACKS,
     DEFAULT_TASK_ROUTES,
+    MODEL_CONFIG,
     MODEL_PRICING,
     THINKING_CONTROL,
     ModelRouter,
     RouterConfig,
     TaskType,
     build_router_from_config,
+    get_model_config,
     get_thinking_control,
     is_peak_hour,
 )
@@ -499,3 +501,102 @@ class TestRouterProviderIntegration:
         provider = LLMProvider(config)
         for model in ("deepseek/deepseek-v4-pro", "deepseek/deepseek-flash"):
             assert provider._get_extra_body(model) == get_thinking_control(model)
+
+
+# === ModelConfig / MODEL_CONFIG 测试（V0.23.5）===
+
+
+class TestModelConfig:
+    """V0.23.5：每种模型的完整 litellm 配置（api_base + extra_body + headers）。"""
+
+    def test_minimax_requires_anthropic_compat(self) -> None:
+        """minimax 必须用 Anthropic 兼容路径 + 国内 endpoint（防止 401）。"""
+        cfg = get_model_config("minimax/MiniMax-M3")
+        assert cfg.api_base == "https://api.minimax.cn/anthropic"
+        assert cfg.extra_body == {"thinking": {"type": "disabled"}}
+
+    def test_qwen_requires_dashscope_base(self) -> None:
+        """千问必须用 DashScope OpenAI 兼容 endpoint。"""
+        cfg = get_model_config("openai/qwen3.8-flash")
+        assert cfg.api_base == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        assert cfg.extra_body == {"enable_thinking": False}
+
+    def test_deepseek_v4_pro_disables_thinking(self) -> None:
+        """DeepSeek v4-pro 默认关 thinking（防 reasoning 耗光 token）。"""
+        cfg = get_model_config("deepseek/deepseek-v4-pro")
+        assert cfg.extra_body == {"thinking": {"type": "disabled"}}
+        assert cfg.api_base is None  # 用 litellm 默认
+
+    def test_deepseek_flash_disables_thinking(self) -> None:
+        """DeepSeek flash 默认关 thinking。"""
+        cfg = get_model_config("deepseek/deepseek-flash")
+        assert cfg.extra_body == {"thinking": {"type": "disabled"}}
+
+    def test_unknown_model_returns_empty_config(self) -> None:
+        """未知模型返回空 ModelConfig（api_base=None + extra_body=None）。"""
+        cfg = get_model_config("unknown/model-x")
+        assert cfg.api_base is None
+        assert cfg.extra_body is None
+        assert cfg.headers is None
+
+    def test_all_thinking_models_have_disabled(self) -> None:
+        """所有有 thinking 配置的模型都禁用 thinking。"""
+        for model, cfg in MODEL_CONFIG.items():
+            if cfg.extra_body and "thinking" in cfg.extra_body:
+                assert cfg.extra_body["thinking"]["type"] == "disabled", f"{model} 应禁用 thinking"
+
+    def test_get_thinking_control_delegates_to_model_config(self) -> None:
+        """V0.23 旧接口 get_thinking_control 委托给 ModelConfig（向后兼容）。"""
+        assert (
+            get_thinking_control("deepseek/deepseek-v4-pro")
+            == get_model_config("deepseek/deepseek-v4-pro").extra_body
+        )
+
+    def test_llm_provider_uses_model_config(self) -> None:
+        """LLMProvider._get_model_config 委托给 get_model_config。"""
+        config = LLMConfig()
+        provider = LLMProvider(config)
+        assert (
+            provider._get_model_config("minimax/MiniMax-M3").api_base
+            == "https://api.minimax.cn/anthropic"
+        )
+
+
+# === LLMConfig V0.23.5 新字段测试 ===
+
+
+class TestLLMConfigV0235:
+    """V0.23.5：LLMConfig 加 api_key_minimax + api_key_dashscope。"""
+
+    def test_default_has_no_extra_keys(self) -> None:
+        """默认 LLMConfig 不设额外 key。"""
+        config = LLMConfig()
+        assert config.api_key_minimax is None
+        assert config.api_key_dashscope is None
+
+    def test_extra_keys_set(self) -> None:
+        """能设置 minimax + dashscope key。"""
+        config = LLMConfig(
+            api_key_minimax="sk-cp-test-minimax",
+            api_key_dashscope="sk-test-dashscope",
+        )
+        assert config.api_key_minimax == "sk-cp-test-minimax"
+        assert config.api_key_dashscope == "sk-test-dashscope"
+
+    def test_configure_env_sets_minimax_dashscope(self) -> None:
+        """_configure_env 应设 MINIMAX_API_KEY + DASHSCOPE_API_KEY。"""
+        import os
+
+        config = LLMConfig(
+            api_key_minimax="sk-cp-minimax-test",
+            api_key_dashscope="sk-dashscope-test",
+        )
+        # 清掉之前可能的残留
+        os.environ.pop("MINIMAX_API_KEY", None)
+        os.environ.pop("DASHSCOPE_API_KEY", None)
+        LLMProvider(config)
+        assert os.environ.get("MINIMAX_API_KEY") == "sk-cp-minimax-test"
+        assert os.environ.get("DASHSCOPE_API_KEY") == "sk-dashscope-test"
+        # 清理
+        os.environ.pop("MINIMAX_API_KEY", None)
+        os.environ.pop("DASHSCOPE_API_KEY", None)

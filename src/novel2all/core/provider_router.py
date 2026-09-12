@@ -133,12 +133,77 @@ THINKING_CONTROL: dict[str, dict[str, Any]] = {
 }
 
 
+# === V0.23.5：模型完整 litellm 配置 ===
+# 单一字典取代分散的 THINKING_CONTROL 等，统一管理每个模型的特殊配置：
+# - api_base：自定义 endpoint（如 minimax 必须用国内 Anthropic 兼容）
+# - extra_body：thinking 控制等（兼容 THINKING_CONTROL）
+# - headers：自定义 HTTP header（极少用）
+#
+# 为什么需要 MODEL_CONFIG 而不是简单加更多字段到 LLMConfig？
+# 1. 路由表（DEFAULT_TASK_ROUTES）按 model_name 决策，每种模型都有特殊 endpoint
+# 2. 用户不应该需要知道每个模型的 endpoint
+# 3. benchmark_llm.py 已经按模型配置 api_base，这里只是把同样逻辑搬到生产代码
+
+
+class ModelConfig(BaseModel):
+    """单个模型的完整 litellm 配置。
+
+    字段：
+    - api_base：自定义 endpoint URL（None = 用 litellm 默认）
+    - extra_body：每次调用注入的额外参数（thinking、enable_thinking 等）
+    - headers：自定义 HTTP header
+    """
+
+    api_base: str | None = None
+    extra_body: dict[str, Any] | None = None
+    headers: dict[str, str] | None = None
+
+
+MODEL_CONFIG: dict[str, ModelConfig] = {
+    # DeepSeek 直连（OpenAI 兼容，LiteLLM 默认路由）
+    "deepseek/deepseek-v4-pro": ModelConfig(
+        extra_body={"thinking": {"type": "disabled"}},
+    ),
+    "deepseek/deepseek-flash": ModelConfig(
+        extra_body={"thinking": {"type": "disabled"}},
+    ),
+    # DeepSeek 兼容旧路由名
+    "deepseek/deepseek-chat": ModelConfig(
+        extra_body={"thinking": {"type": "disabled"}},
+    ),
+    # minimax：必须用 Anthropic 兼容 + 国内 endpoint
+    # LiteLLM 默认会走 api.minimax.io（国际域名），401 invalid key
+    # 实测国内 OpenAI 兼容 (api.minimax.cn/v1) HTTP 200 但 content 为空（thinking 丢失 bug）
+    "minimax/MiniMax-M3": ModelConfig(
+        api_base="https://api.minimax.cn/anthropic",
+        extra_body={"thinking": {"type": "disabled"}},
+    ),
+    # 千问 OpenAI 兼容（DashScope）
+    "openai/qwen3.8-flash": ModelConfig(
+        api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        extra_body={"enable_thinking": False},
+    ),
+    # qwen3.8-max 暂不放入 MODEL_CONFIG（V0.23.4 benchmark 验证太贵，不推荐）
+}
+
+
+def get_model_config(model: str) -> ModelConfig:
+    """返回模型的完整 litellm 配置。
+
+    未知模型返回空 ModelConfig（让 litellm 用默认行为）。
+    """
+    return MODEL_CONFIG.get(model, ModelConfig())
+
+
 def get_thinking_control(model: str) -> dict[str, Any] | None:
     """返回模型的 thinking 控制参数（extra_body）。
 
     未知模型返回 None（让调用方用 litellm 默认）。
+
+    V0.23.5 保留此函数（向后兼容），内部委托给 get_model_config。
     """
-    return THINKING_CONTROL.get(model)
+    cfg = get_model_config(model)
+    return cfg.extra_body
 
 
 # === DeepSeek 真实 CNY 价格表 ===
@@ -303,12 +368,15 @@ def build_router_from_config(
 __all__ = [
     "DEFAULT_TASK_FALLBACKS",
     "DEFAULT_TASK_ROUTES",
+    "MODEL_CONFIG",
     "MODEL_PRICING",
     "THINKING_CONTROL",
+    "ModelConfig",
     "ModelRouter",
     "RouterConfig",
     "TaskType",
     "build_router_from_config",
+    "get_model_config",
     "get_thinking_control",
     "is_peak_hour",
 ]

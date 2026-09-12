@@ -272,6 +272,49 @@ curl -s https://platform.minimax.cn/docs/guides/quickstart-preparation
 
 ---
 
+
+
+## 11. V0.23.5 minimax 协议兼容性（实测验证）
+
+### 关键发现
+
+**minimax 必须用 Anthropic 兼容路径 + 国内 endpoint**——LiteLLM 默认走国际域名（`api.minimax.io`）会 401 invalid key。
+
+### 实测对比
+
+| 协议 | base_url | 结果 | 内容 |
+|---|---|---|---|
+| ❌ LiteLLM 默认 | `api.minimax.io/v1` | 401 invalid key | 无 |
+| ⚠️ 国内 OpenAI | `https://api.minimax.cn/v1` | HTTP 200 | **空**（thinking 内容丢失） |
+| ✅ 国内 Anthropic | `https://api.minimax.cn/anthropic` | HTTP 200 | 正常 |
+
+**结论**：minimax 用 **Anthropic 兼容路径**（`model='anthropic/MiniMax-M3'` + `api_base='https://api.minimax.cn/anthropic'`）。
+
+### 实施（V0.23.5）
+
+- `core/provider_router.py` 新增 `MODEL_CONFIG` 字典统一管理每种模型的 `api_base / extra_body / headers`
+- `core/provider.py` `LLMConfig` 加 `api_key_minimax` + `api_key_dashscope` 字段
+- `_configure_env()` 自动设 `MINIMAX_API_KEY` + `DASHSCOPE_API_KEY` 环境变量
+- `complete/stream/complete_structured` 自动应用 `MODEL_CONFIG.api_base / extra_body / headers`
+
+### 关键事实
+
+- minimax thinking 模式（默认开）在 OpenAI 兼容路径下会被 LiteLLM 算成 `reasoning_tokens`，但 content 字段为空
+- 必须显式 `{"thinking": {"type": "disabled"}}` 关闭 thinking 才能拿到内容
+- Anthropic 兼容路径天然兼容 minimax 的 thinking 模式
+
+### 千问同样处理（实测）
+
+- 必须 `api_base='https://dashscope.aliyuncs.com/compatible-mode/v1'`
+- 必须 `{"enable_thinking": False}`（实测 qwen3.8-max thinking_tokens 占 98%）
+- 千问 OpenAI 兼容路径能正常工作（HTTP 200 + content 正常）
+
+### DeepSeek 现状（无需特殊处理）
+
+- 默认 OpenAI 兼容（`https://api.deepseek.com`）
+- thinking 控制用 `{"thinking": {"type": "disabled"}}`
+- 也支持 Anthropic 兼容（`https://api.deepseek.com/anthropic`），价格相同——但当前代码用 OpenAI 风格 messages，零代码改动
+
 ## 10. 引用
 
 - 本文档用于 V0.23 决策依据
