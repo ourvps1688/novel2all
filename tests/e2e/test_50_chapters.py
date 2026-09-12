@@ -103,9 +103,7 @@ class MockLLM:
         提取——后者是上一章，会让当前章节永远小 1。
         """
         # 优先匹配 "## 本章正文\n第N章..." 这一段
-        m = re.search(
-            r"##\s*本章正文\s*\n\s*第\s*(\d+)\s*章", prompt
-        )
+        m = re.search(r"##\s*本章正文\s*\n\s*第\s*(\d+)\s*章", prompt)
         if m:
             return int(m.group(1))
         # 后备：匹配 "chapter: N" 或 "chapter N"
@@ -251,6 +249,7 @@ class MockLLM:
 
 # === Fixtures ===
 
+
 @pytest.fixture
 def tmp_project(tmp_path: Path) -> Path:
     (tmp_path / "设定").mkdir()
@@ -287,6 +286,7 @@ def manager(tmp_project: Path) -> MemoryManager:
 
 
 # === 50 章模拟 ===
+
 
 @pytest.mark.asyncio
 async def test_50_chapters_no_character_loss(manager: MemoryManager) -> None:
@@ -326,7 +326,8 @@ async def test_50_chapters_foreshadowing_lifecycle(manager: MemoryManager) -> No
 
     for ch in range(1, 51):
         await manager.update_after_writing(
-            ch, f"第{ch}章正文" + "林雷" * 50,
+            ch,
+            f"第{ch}章正文" + "林雷" * 50,
         )
 
     final = tracker.read()
@@ -354,7 +355,8 @@ async def test_50_chapters_timeline_density(manager: MemoryManager) -> None:
 
     for ch in range(1, 51):
         await manager.update_after_writing(
-            ch, f"第{ch}章正文" + "林雷" * 50,
+            ch,
+            f"第{ch}章正文" + "林雷" * 50,
         )
 
     final = tracker.read()
@@ -371,7 +373,8 @@ async def test_50_chapters_retriever_recall(manager: MemoryManager) -> None:
     # 先跑 50 章
     for ch in range(1, 51):
         await manager.update_after_writing(
-            ch, f"第{ch}章正文" + "林雷" * 50,
+            ch,
+            f"第{ch}章正文" + "林雷" * 50,
         )
 
     # === 验证：retriever 召回与"林雷"相关的事件 ===
@@ -390,7 +393,8 @@ async def test_50_chapters_load_for_writing_includes_history(
     # 跑 50 章
     for ch in range(1, 51):
         await manager.update_after_writing(
-            ch, f"第{ch}章正文" + "林雷" * 50,
+            ch,
+            f"第{ch}章正文" + "林雷" * 50,
         )
 
     # 模拟第 51 章写作前的 memory load
@@ -415,9 +419,7 @@ async def test_50_chapters_load_for_writing_includes_history(
     # 事件层：retriever 应召回了"林雷"相关历史
     assert len(ctx.events) >= 1
     # 召回的事件内容应含"林雷"
-    assert all(
-        "林雷" in item.content or "场景" in item.content for item in ctx.events
-    )
+    assert all("林雷" in item.content or "场景" in item.content for item in ctx.events)
 
     # 最近章节层：包含近 5 章（46-50）的全量摘要
     recent_chapters = [
@@ -435,7 +437,8 @@ async def test_50_chapters_token_budget_under_control(
     """50 章后，load_for_writing 返回的总 token 数不应爆炸（≤ recent_token_budget × 3）。"""
     for ch in range(1, 51):
         await manager.update_after_writing(
-            ch, f"第{ch}章正文" + "林雷" * 50,
+            ch,
+            f"第{ch}章正文" + "林雷" * 50,
         )
 
     ctx = await manager.load_for_writing(
@@ -461,7 +464,8 @@ async def test_50_chapters_no_blocking_issues(manager: MemoryManager) -> None:
     all_blocking: list[ConsistencyIssue] = []
     for ch in range(1, 51):
         _, issues = await manager.update_after_writing(
-            ch, f"第{ch}章正文" + "林雷" * 50,
+            ch,
+            f"第{ch}章正文" + "林雷" * 50,
         )
         # 我们的 mock verifier 返回 []，但收集以防万一
         all_blocking.extend([i for i in issues if i.severity == "critical"])
@@ -472,12 +476,14 @@ async def test_50_chapters_no_blocking_issues(manager: MemoryManager) -> None:
 
 # === 跨章测试：写第 51 章时仍能 recall 第 1 章的角色 ===
 
+
 @pytest.mark.asyncio
 async def test_recall_first_chapter_at_chapter_51(manager: MemoryManager) -> None:
     """写第 51 章时，retriever 应能召回第 1 章埋下的初始角色（即使 50 章后）。"""
     for ch in range(1, 51):
         await manager.update_after_writing(
-            ch, f"第{ch}章正文" + "林雷" * 50,
+            ch,
+            f"第{ch}章正文" + "林雷" * 50,
         )
 
     # 用 query "第1章" / "苍茫镇" 等早期关键词
