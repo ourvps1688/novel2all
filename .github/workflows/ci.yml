@@ -44,9 +44,7 @@ jobs:
 
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: |
-          uv run pytest tests/ --cov=src/novel2all --cov-report=xml --cov-report=term-missing
-          uv run coverage-badge -o assets/coverage.svg -f
+        run: uv run pytest tests/ --cov=src/novel2all --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
