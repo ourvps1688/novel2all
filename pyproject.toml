@@ -1,0 +1,93 @@
+[project]
+name = "novel2all"
+version = "0.20.0"
+description = "novel-to-all 创作工具集：长篇 / 短篇小说 + 自动化长记忆"
+license = { text = "MIT" }
+authors = [
+    { name = "novel2all team" },
+]
+readme = "README.md"
+requires-python = ">=3.12"
+keywords = ["novel", "writing", "long-form", "llm", "agent"]
+
+dependencies = [
+    # LLM SDK
+    "anthropic>=0.39.0",
+    "openai>=1.65.0",
+    "litellm>=1.55.0",
+
+    # 类型 / 数据验证
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "instructor>=1.7.0",
+
+    # Markdown 解析
+    "python-frontmatter>=1.1.0",
+    "markdown-it-py>=3.0.0",
+    "mdit-py-plugins>=0.4.2",
+
+    # Agent / Memory
+    "networkx>=3.4.0",
+    "chromadb>=0.5.23",
+    "tiktoken>=0.8.0",
+
+    # CLI / API
+    "typer>=0.15.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.28.0",
+    "anyio>=4.7.0",
+
+    # 文件 / 配置
+    "platformdirs>=4.3.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.9.0",
+    "tenacity>=9.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "mypy>=1.13.0",
+    "ruff>=0.8.0",
+    "freezegun>=1.5.0",
+]
+
+[project.scripts]
+novel2all = "novel2all.cli.main:app"
+novel2all-ci = "novel2all.scripts.ci_status:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/novel2all"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# B008: typer.Option / typer.Argument 在参数默认值中是 idiomatic 写法
+# BLE001: skill/role 单文件失败不影响全局加载，是有意为之
+extend-ignore = [
+    "B008",
+    "BLE001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]  # pytest 的 assert False 是合法写法
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

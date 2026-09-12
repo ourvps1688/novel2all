@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# uv
+.venv/
+venv/
+uv.lock
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# mypy / ruff
+.mypy_cache/
+.ruff_cache/
+
+# 环境
+.env
+.env.local
+.env.*.local
+
+# novel2all 项目元数据
+.novel2all/cache/
+.novel2all/memory.db
+.novel2all/ci-status.json
+.novel2all/ci-alerts.json
+.ci_watch.pid
+.ci_watch.log
+
+# CI scripts 临时文件
+scripts/__pycache__/
+
+# 测试日志（来自 PowerShell / Out-File）
+.test*.log
+.test*.py
+*.test.log
+FINAL-*.log
+
+# 用户项目
+# 用户用 novel2all 创建的小说项目目录由用户自己管理 .gitignore
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store

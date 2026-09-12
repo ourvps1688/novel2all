@@ -1,0 +1,295 @@
+"""novel2all CLI 主入口。
+
+用法：
+    novel2all --help
+    novel2all setup                          # 初始化项目
+    novel2all status                         # 查看项目状态
+    novel2all write 5 --outline "..."        # 写第 5 章
+    novel2all review 5                       # 审查第 5 章
+    novel2all web                            # 启动 Web UI
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from novel2all import __version__
+from novel2all.core import (
+    LLMConfig,
+    LLMProvider,
+    MemoryManager,
+)
+from novel2all.core.memory import Tracker
+from novel2all.core.role import RoleRegistry
+from novel2all.core.skill import SkillRegistry
+
+app = typer.Typer(
+    name="novel2all",
+    help="novel2all - novel-to-all 创作工具集",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+)
+
+console = Console()
+
+
+def get_project_root() -> Path:
+    """获取当前项目根目录（默认 ./ 或环境变量）。"""
+    import os
+
+    root = os.environ.get("NOVEL2ALL_PROJECT", ".")
+    return Path(root).resolve()
+
+
+def get_llm() -> LLMProvider:
+    """从环境变量创建 LLM provider。"""
+    import os
+
+    return LLMProvider(
+        LLMConfig(
+            default_model=os.environ.get("NOVEL2ALL_MODEL", "claude-sonnet-4-20250514"),
+            api_key_anthropic=os.environ.get("ANTHROPIC_API_KEY"),
+            api_key_openai=os.environ.get("OPENAI_API_KEY"),
+            api_key_deepseek=os.environ.get("DEEPSEEK_API_KEY"),
+        )
+    )
+
+
+@app.command()
+def version() -> None:
+    """显示版本号。"""
+    console.print(f"[bold cyan]novel2all[/bold cyan] v{__version__}")
+
+
+@app.command()
+def status() -> None:
+    """显示项目状态。"""
+    root = get_project_root()
+    tracker = Tracker(root / "_tracking-state.json")
+
+    table = Table(title=f"novel2all 项目状态 ({root})")
+    table.add_column("项", style="cyan")
+    table.add_column("状态", style="green")
+
+    if tracker.exists():
+        state = tracker.read()
+        table.add_row("项目名", state.project_name)
+        table.add_row("题材", state.genre or "(未设置)")
+        table.add_row("文风", state.style_anchor or "(未设置)")
+        table.add_row("目标章节", str(state.total_chapters_target or "?"))
+        table.add_row("目标字数", str(state.total_word_count_target or "?"))
+        table.add_row("当前章节", str(state.last_updated_chapter))
+        table.add_row("角色数", str(len(state.characters)))
+        table.add_row(
+            "活跃伏笔", str(len([f for f in state.foreshadowing.values() if f.status == "active"]))
+        )
+        table.add_row("时间线条目", str(len(state.timeline)))
+        table.add_row("已有摘要", f"{len(state.recent_chapter_summaries)} 章")
+        console.print(table)
+    else:
+        table.add_row("项目状态", "[red]未初始化[/red]")
+        table.add_row("提示", "运行 `novel2all setup` 初始化")
+        console.print(table)
+
+
+@app.command()
+def setup(
+    name: str = typer.Option(..., "--name", "-n", help="项目名（书名）"),
+    genre: str = typer.Option(None, "--genre", "-g", help="题材（如 玄幻 / 都市 / 言情）"),
+    style: str = typer.Option(None, "--style", "-s", help="文风锚点"),
+    chapters: int = typer.Option(None, "--chapters", "-c", help="目标章节数"),
+    words: int = typer.Option(None, "--words", "-w", help="目标字数"),
+) -> None:
+    """初始化项目。"""
+    from novel2all.core.project import ProjectStructure
+
+    root = get_project_root()
+    project = ProjectStructure(root=root)
+    project.init()
+
+    tracker = Tracker(project.tracking_state_file)
+    state = tracker.init(
+        project_name=name,
+        genre=genre,
+        style_anchor=style,
+        total_chapters_target=chapters,
+        total_word_count_target=words,
+    )
+
+    # 创建 创作设定.md 模板
+    setup_md = project.setup_md
+    if not setup_md.exists():
+        setup_md.write_text(
+            f"""# 创作设定
+
+## 项目名
+{name}
+
+## 题材
+{genre or "（待填）"}
+
+## 文风
+{style or "（待填）"}
+
+## 目标
+- 章节数：{chapters or "（待定）"}
+- 字数：{words or "（待定）"}
+
+## 主角
+（待填）
+
+## 故事梗概
+（待填）
+
+## 主线冲突
+（待填）
+
+## 世界观设定
+（待填）
+
+## 力量体系
+（待填）
+""",
+            encoding="utf-8",
+        )
+
+    console.print(f"[bold green]✓[/bold green] 项目已初始化：{root}")
+    console.print(f"  项目名：{state.project_name}")
+    console.print(f"  文风锚点：{state.style_anchor or '未设置'}")
+    console.print(f"  跟踪文件：{project.tracking_state_file}")
+    console.print()
+    console.print("下一步：")
+    console.print("  [cyan]novel2all status[/cyan]                 # 查看状态")
+    console.print("  [cyan]novel2all skills list[/cyan]            # 查看可用 skill")
+    console.print("  编辑 [cyan]创作设定.md[/cyan] 完善设定")
+
+
+# === skills 子命令 ===
+skills_app = typer.Typer(help="skill 管理")
+app.add_typer(skills_app, name="skills")
+
+
+@skills_app.command("list")
+def skills_list() -> None:
+    """列出所有可用 skill。"""
+    # 找 skills 目录（默认在包内，未来可被项目级覆盖）
+    skills_dir = Path(__file__).parent.parent / "skills"
+    registry = SkillRegistry(skills_dir)
+    registry.discover()
+
+    table = Table(title=f"novel2all skills ({len(registry.list())} 个)")
+    table.add_column("name", style="cyan")
+    table.add_column("description", style="dim")
+    for skill in registry.list():
+        desc = skill.description[:80] + "..." if len(skill.description) > 80 else skill.description
+        table.add_row(skill.name, desc)
+    console.print(table)
+
+
+# === roles 子命令 ===
+roles_app = typer.Typer(help="role 管理")
+app.add_typer(roles_app, name="roles")
+
+
+@roles_app.command("list")
+def roles_list() -> None:
+    """列出所有可用 role。"""
+    roles_dir = Path(__file__).parent.parent / "roles"
+    registry = RoleRegistry(roles_dir)
+    registry.discover()
+
+    table = Table(title=f"novel2all roles ({len(registry.list())} 个)")
+    table.add_column("name", style="cyan")
+    table.add_column("description", style="dim")
+    for role in registry.list():
+        desc = role.description[:80] + "..." if len(role.description) > 80 else role.description
+        table.add_row(role.name, desc)
+    console.print(table)
+
+
+# === write 子命令 ===
+write_app = typer.Typer(help="写作")
+app.add_typer(write_app, name="write")
+
+
+@write_app.command("chapter")
+def write_chapter(
+    chapter: int = typer.Argument(..., help="章节号"),
+    outline_file: Path = typer.Option(
+        None, "--outline", "-o", help="细纲文件路径（默认 大纲/细纲_第NNN章.md）"
+    ),
+) -> None:
+    """写第 N 章。"""
+    root = get_project_root()
+    from novel2all.core.project import ProjectStructure
+
+    project = ProjectStructure(root=root)
+    if not project.exists():
+        console.print("[red]项目未初始化，先跑 novel2all setup[/red]")
+        raise typer.Exit(1)
+
+    outline_path = outline_file or project.chapter_outline(chapter)
+    if not outline_path.exists():
+        console.print(f"[red]细纲不存在: {outline_path}[/red]")
+        console.print(f"先写细纲到 {outline_path}，或在 --outline 指定路径")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]开始写第 {chapter} 章[/bold]")
+    console.print(f"  细纲：{outline_path}")
+    console.print(f"  项目：{root}")
+    console.print()
+
+    # 占位：实际写作逻辑 v0.20 后续接入
+    # 当前 v0.20 只展示流程，v0.21+ 接 LLM 调 full flow
+    console.print("[yellow]⚠ v0.20 占位实现[/yellow]")
+    console.print("  完整 writing flow 见 docs/ROADMAP.md")
+    console.print("  当前仅 demo：打印 memory loading + write flow")
+    console.print()
+
+    # Demo: 加载 memory
+    llm = get_llm()
+    manager = MemoryManager(project_root=root, llm=llm)
+    state = Tracker(project.tracking_state_file).read()
+
+    console.print("[cyan]→[/cyan] 加载 5 层 memory context...")
+    import asyncio
+
+    outline_text = outline_path.read_text(encoding="utf-8")
+    memory = asyncio.run(
+        manager.load_for_writing(
+            chapter=chapter,
+            chapter_outline=outline_text,
+            characters_involved=list(state.characters.keys())[:3],
+        )
+    )
+    console.print(f"  L1 核心设定：{len(memory.core)} 项")
+    console.print(f"  L2 角色状态：{len(memory.character)} 项")
+    console.print(f"  L3 最近章节：{len(memory.recent)} 项")
+    console.print(f"  L4 事件检索：{len(memory.events)} 项（v0.20 空）")
+    console.print(f"  总 token 估算：{memory.total_tokens}")
+
+    console.print()
+    console.print("[green]✓[/green] memory context 已加载")
+    console.print("  下一步：实际写作流程 v0.21 接入")
+
+
+@app.command()
+def web(
+    host: str = typer.Option("127.0.0.1", "--host", "-h"),
+    port: int = typer.Option(8765, "--port", "-p"),
+) -> None:
+    """启动 Web UI。"""
+    import uvicorn
+
+    from novel2all.web.app import create_app
+
+    console.print(f"[bold cyan]novel2all Web UI[/bold cyan] -> http://{host}:{port}")
+    uvicorn.run(create_app(), host=host, port=port)
+
+
+if __name__ == "__main__":
+    app()
