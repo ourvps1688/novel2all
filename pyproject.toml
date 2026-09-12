@@ -83,6 +83,10 @@ extend-ignore = [
     "S110",
 ]
 
+[tool.ruff.lint.isort]
+# 把 novel2all 包视为 first-party（避免 sandbox/CI ruff 新版本 import 排序差异）
+known-first-party = ["novel2all"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B011"]  # pytest 的 assert False 是合法写法
 
