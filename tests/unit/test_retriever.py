@@ -267,6 +267,8 @@ def test_auto_fallback_on_chromadb_runtime_error(tmp_path: Path) -> None:
             raise RuntimeError("chromadb broken")
 
     rt = FailingRetriever(tmp_path / ".chroma", force_mode="chromadb")
+    if rt.mode != "chromadb":
+        pytest.skip(f"chromadb 不可用（mode={rt.mode}），跳过运行时降级测试")
     rt.add_events(
         [
             {"chapter": 1, "event_type": "timeline", "text": "林雷出生"},

@@ -373,9 +373,20 @@ class MemoryRetriever:
         self._fallback_corpus.clear()
 
     def wipe_disk(self) -> None:
-        """物理删除磁盘上的 chromadb 目录（谨慎使用）。"""
+        """物理删除磁盘上的 chromadb 目录（谨慎使用）。
+
+        容错：chromadb 在 Windows 上可能持有文件句柄，导致删除失败。
+        这种情况下清理 .chroma 内每个文件，捕获异常后 best-effort 跳过。
+        """
         if self.chroma_dir.exists():
-            shutil.rmtree(self.chroma_dir)
+            try:
+                shutil.rmtree(self.chroma_dir)
+            except (PermissionError, OSError):
+                # Windows 上 chromadb 句柄可能未释放 → 改用单文件删除 + ignore_errors
+                try:
+                    shutil.rmtree(self.chroma_dir, ignore_errors=True)
+                except Exception:
+                    pass
         self._fallback_corpus.clear()
 
 
