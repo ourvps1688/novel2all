@@ -96,14 +96,20 @@ class LLMProvider:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        response = await litellm.acompletion(
-            model=model_name,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=self.config.timeout_seconds,
-            num_retries=self.config.max_retries,
-        )
+        kwargs = {
+            "model": model_name,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": self.config.timeout_seconds,
+            "num_retries": self.config.max_retries,
+        }
+        # V0.23：自动应用模型 thinking 控制（防止 reasoning 耗光 token）
+        extra_body = self._get_extra_body(model_name)
+        if extra_body:
+            kwargs["extra_body"] = extra_body
+
+        response = await litellm.acompletion(**kwargs)
         return response.choices[0].message.content or ""
 
     async def complete_structured(
@@ -174,12 +180,18 @@ class LLMProvider:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        response = await litellm.acompletion(
-            model=model_name,
-            messages=messages,
-            temperature=temperature,
-            stream=True,
-        )
+        kwargs = {
+            "model": model_name,
+            "messages": messages,
+            "temperature": temperature,
+            "stream": True,
+        }
+        # V0.23：自动应用模型 thinking 控制
+        extra_body = self._get_extra_body(model_name)
+        if extra_body:
+            kwargs["extra_body"] = extra_body
+
+        response = await litellm.acompletion(**kwargs)
         async for chunk in response:
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
@@ -204,3 +216,17 @@ class LLMProvider:
             router = ModelRouter(self.config)
             return router.select(task)
         return self.config.default_model
+
+    def _get_extra_body(self, model_name: str) -> dict[str, Any] | None:
+        """V0.23：返回模型的特殊控制参数（extra_body）。
+
+        主要用于 DeepSeek thinking 控制：
+        - v4-pro 默认 thinking 模式会耗光 token → 显式禁用
+        - flash 也类似（保持一致性）
+
+        未知模型返回 None（让 litellm 用默认行为）。
+        """
+        # lazy import 避免循环依赖
+        from novel2all.core.provider_router import get_thinking_control
+
+        return get_thinking_control(model_name)
