@@ -30,6 +30,7 @@ from novel2all.core.skill import SkillRegistry
 
 # === Mock LLM ===
 
+
 class MockLLM(LLMProvider):
     """Mock LLM provider，stream 返回固定文本。"""
 
@@ -72,6 +73,7 @@ class MockLLM(LLMProvider):
 
 
 # === Fixtures ===
+
 
 @pytest.fixture
 def project_root(tmp_path: Path) -> Path:
@@ -125,6 +127,7 @@ def pipeline(
 
 
 # === Tests ===
+
 
 class TestWriteChapter:
     def test_outline_not_found(self, project_root: Path, skills_dir: Path) -> None:
@@ -237,15 +240,9 @@ class TestWriteChapter:
         # 预置 3 个角色
         tracker = Tracker(project_root / "_tracking-state.json")
         state = tracker.read()
-        state.characters["林雷"] = CharacterState(
-            name="林雷", last_updated_chapter=3
-        )
-        state.characters["苏寒"] = CharacterState(
-            name="苏寒", last_updated_chapter=2
-        )
-        state.characters["青云"] = CharacterState(
-            name="青云", last_updated_chapter=1
-        )
+        state.characters["林雷"] = CharacterState(name="林雷", last_updated_chapter=3)
+        state.characters["苏寒"] = CharacterState(name="苏寒", last_updated_chapter=2)
+        state.characters["青云"] = CharacterState(name="青云", last_updated_chapter=1)
         tracker.write(state)
 
         llm = MockLLM()
