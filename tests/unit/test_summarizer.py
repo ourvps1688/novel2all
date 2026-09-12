@@ -23,6 +23,7 @@ from novel2all.core.memory.summarizer import (
 
 # === 档位划分 ===
 
+
 class TestTier:
     def test_tier1_chapters(self) -> None:
         assert tier_of(1) == 1
@@ -113,14 +114,13 @@ class TestExtractiveSummary:
 
 # === Summarizer 主体 ===
 
+
 class TestChapterSummarizer:
     @pytest.fixture
     def summarizer(self) -> ChapterSummarizer:
         return ChapterSummarizer()
 
-    def test_summarize_chapter_returns_string(
-        self, summarizer: ChapterSummarizer
-    ) -> None:
+    def test_summarize_chapter_returns_string(self, summarizer: ChapterSummarizer) -> None:
         result = summarizer.summarize_chapter(SAMPLE_CHAPTER)
         assert isinstance(result, str)
         assert len(result) > 0
@@ -130,11 +130,9 @@ class TestChapterSummarizer:
         assert summarizer.summarize_chapter("") == ""
         assert summarizer.summarize_chapter("   \n  ") == ""
 
-    def test_summarize_chapter_truncates_long_output(
-        self, summarizer: ChapterSummarizer
-    ) -> None:
+    def test_summarize_chapter_truncates_long_output(self, summarizer: ChapterSummarizer) -> None:
         # 强制超长
-        long_text = "。" .join([f"第{i}句话包含一些内容" for i in range(100)])
+        long_text = "。".join([f"第{i}句话包含一些内容" for i in range(100)])
         result = summarizer.summarize_chapter(long_text)
         assert len(result) <= summarizer.target_max_chars + 5  # 允许省略号
 
@@ -143,9 +141,7 @@ class TestChapterSummarizer:
         assert summarizer.count_tokens("你好世界") >= 1
 
     @pytest.mark.asyncio
-    async def test_compress_range_no_llm_fallback(
-        self, summarizer: ChapterSummarizer
-    ) -> None:
+    async def test_compress_range_no_llm_fallback(self, summarizer: ChapterSummarizer) -> None:
         """llm=None 时压缩不应报错。"""
         summaries = {
             11: "林雷觉醒血脉。",
@@ -159,9 +155,7 @@ class TestChapterSummarizer:
         assert len(result) > 0
 
     @pytest.mark.asyncio
-    async def test_compress_range_single_chapter(
-        self, summarizer: ChapterSummarizer
-    ) -> None:
+    async def test_compress_range_single_chapter(self, summarizer: ChapterSummarizer) -> None:
         result = await summarizer.compress_range((5, 5), {5: "单章"}, llm=None)
         assert result == "单章"
 
@@ -170,9 +164,7 @@ class TestChapterSummarizer:
         result = await summarizer.compress_range((1, 5), {}, llm=None)
         assert result == ""
 
-    def test_token_reduction_meets_target(
-        self, summarizer: ChapterSummarizer
-    ) -> None:
+    def test_token_reduction_meets_target(self, summarizer: ChapterSummarizer) -> None:
         """摘要后 token 数相比原文应下降 ≥ 50%（V0.21 工程目标）。"""
         original_tokens = summarizer.count_tokens(SAMPLE_CHAPTER)
         summary = summarizer.summarize_chapter(SAMPLE_CHAPTER)

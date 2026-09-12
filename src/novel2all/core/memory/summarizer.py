@@ -134,12 +134,60 @@ def extractive_summary(text: str, max_sentences: int = 5) -> str:
 _TOKEN_RE = re.compile(r"[\w\u4e00-\u9fff]+", re.UNICODE)
 _STOPWORDS = {
     # 中文高频停用词
-    "的", "了", "是", "在", "和", "与", "或", "也", "就", "都", "而", "及",
-    "有", "无", "为", "着", "过", "把", "被", "对", "这", "那", "此",
+    "的",
+    "了",
+    "是",
+    "在",
+    "和",
+    "与",
+    "或",
+    "也",
+    "就",
+    "都",
+    "而",
+    "及",
+    "有",
+    "无",
+    "为",
+    "着",
+    "过",
+    "把",
+    "被",
+    "对",
+    "这",
+    "那",
+    "此",
     # 英文高频停用词（极简集）
-    "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be", "been",
-    "to", "of", "in", "on", "at", "by", "for", "with", "as", "it", "this", "that",
-    "he", "she", "they", "we", "i", "you",
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "but",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "by",
+    "for",
+    "with",
+    "as",
+    "it",
+    "this",
+    "that",
+    "he",
+    "she",
+    "they",
+    "we",
+    "i",
+    "you",
 }
 
 
@@ -157,6 +205,7 @@ def _tokenize(text: str) -> list[str]:
 
 
 # === 摘要器主类 ===
+
 
 class ChapterSummarizer:
     """章节摘要器。
@@ -218,9 +267,7 @@ class ChapterSummarizer:
         if len(relevant) == 1:
             return next(iter(relevant.values()))
 
-        combined = "\n\n".join(
-            f"第{ch}章: {summary}" for ch, summary in relevant.items()
-        )
+        combined = "\n\n".join(f"第{ch}章: {summary}" for ch, summary in relevant.items())
 
         if llm is None:
             # 降级：直接对 combined 做 extractive

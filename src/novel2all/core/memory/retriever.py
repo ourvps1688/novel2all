@@ -68,6 +68,7 @@ def _try_chromadb_embedding() -> EmbeddingFunc | None:
 
 # === 检索结果 ===
 
+
 @dataclass
 class RetrievedEvent:
     """单条检索结果。"""
@@ -80,6 +81,7 @@ class RetrievedEvent:
 
 
 # === 检索器 ===
+
 
 class MemoryRetriever:
     """事件检索器。
@@ -183,7 +185,10 @@ class MemoryRetriever:
         event_id: str | None = None,
     ) -> str:
         """入库一条事件。返回事件 ID。"""
-        eid = event_id or f"ch{chapter}-{event_type}-{hashlib.md5(text.encode('utf-8')).hexdigest()[:8]}"
+        eid = (
+            event_id
+            or f"ch{chapter}-{event_type}-{hashlib.md5(text.encode('utf-8')).hexdigest()[:8]}"
+        )
         meta = {"chapter": chapter, "event_type": event_type, **(metadata or {})}
 
         if self._mode == "chromadb":
@@ -196,9 +201,7 @@ class MemoryRetriever:
                 return eid
             except Exception:
                 # 运行时失败 → 降级
-                self._fallback_corpus.append(
-                    RetrievedEvent(chapter, event_type, text, 1.0, meta)
-                )
+                self._fallback_corpus.append(RetrievedEvent(chapter, event_type, text, 1.0, meta))
                 self._mode = "tfidf"
                 return eid
 

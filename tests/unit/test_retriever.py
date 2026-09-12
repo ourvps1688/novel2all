@@ -29,12 +29,14 @@ from novel2all.core.memory.types import MemoryLayer
 
 # === 环境探测 ===
 
+
 def _chromadb_available() -> bool:
     try:
         import chromadb  # noqa: F401
 
         # 再探测 rust 绑定（沙箱里这里会 ImportError）
         from chromadb.api import rust  # noqa: F401
+
         return True
     except Exception:
         return False
@@ -44,36 +46,31 @@ CHROMADB_OK = _chromadb_available()
 needs_chromadb = pytest.mark.skipif(
     not CHROMADB_OK,
     reason="chromadb 不可用（Windows DLL 缺失或 import 失败），沙箱/CI Windows 跳过。"
-           "Linux/macOS 或装好 VC++ runtime 的 Windows 应正常。",
+    "Linux/macOS 或装好 VC++ runtime 的 Windows 应正常。",
 )
 
 
 # === Fixtures ===
 
+
 @pytest.fixture
 def events_corpus() -> list[dict]:
     """10 条玄幻小说事件，覆盖角色/伏笔/时间线。"""
     return [
-        {"chapter": 1, "event_type": "timeline",
-         "text": "景和三年春，林雷出生于苍茫镇"},
-        {"chapter": 2, "event_type": "character_change",
-         "text": "林雷觉醒血脉之力"},
-        {"chapter": 3, "event_type": "foreshadowing",
-         "text": "神秘老者留下玉佩，暗示林雷身世之谜"},
-        {"chapter": 5, "event_type": "timeline",
-         "text": "林雷离开苍茫镇前往青云宗"},
-        {"chapter": 7, "event_type": "character_change",
-         "text": "林雷结识苏寒，结为兄弟"},
-        {"chapter": 10, "event_type": "foreshadowing",
-         "text": "玉佩秘密初显：林雷实为上古神族后裔"},
-        {"chapter": 15, "event_type": "timeline",
-         "text": "青云宗大比，林雷崭露头角"},
-        {"chapter": 20, "event_type": "character_change",
-         "text": "林雷突破筑基期"},
-        {"chapter": 25, "event_type": "foreshadowing",
-         "text": "苏寒背叛，盗走宗门至宝"},
-        {"chapter": 30, "event_type": "timeline",
-         "text": "林雷追杀苏寒至北荒"},
+        {"chapter": 1, "event_type": "timeline", "text": "景和三年春，林雷出生于苍茫镇"},
+        {"chapter": 2, "event_type": "character_change", "text": "林雷觉醒血脉之力"},
+        {"chapter": 3, "event_type": "foreshadowing", "text": "神秘老者留下玉佩，暗示林雷身世之谜"},
+        {"chapter": 5, "event_type": "timeline", "text": "林雷离开苍茫镇前往青云宗"},
+        {"chapter": 7, "event_type": "character_change", "text": "林雷结识苏寒，结为兄弟"},
+        {
+            "chapter": 10,
+            "event_type": "foreshadowing",
+            "text": "玉佩秘密初显：林雷实为上古神族后裔",
+        },
+        {"chapter": 15, "event_type": "timeline", "text": "青云宗大比，林雷崭露头角"},
+        {"chapter": 20, "event_type": "character_change", "text": "林雷突破筑基期"},
+        {"chapter": 25, "event_type": "foreshadowing", "text": "苏寒背叛，盗走宗门至宝"},
+        {"chapter": 30, "event_type": "timeline", "text": "林雷追杀苏寒至北荒"},
     ]
 
 
@@ -94,16 +91,16 @@ def fallback_retriever(tmp_path: Path) -> MemoryRetriever:
 
 # === Chromadb 路径（生产环境） ===
 
+
 @needs_chromadb
 class TestChromadbMode:
     def test_add_event_returns_id(self, fake_retriever: MemoryRetriever) -> None:
-        eid = fake_retriever.add_event(
-            chapter=1, event_type="timeline", text="q1"
-        )
+        eid = fake_retriever.add_event(chapter=1, event_type="timeline", text="q1")
         assert eid.startswith("ch1-")
 
-    def test_count_after_add(self, fake_retriever: MemoryRetriever,
-                             events_corpus: list[dict]) -> None:
+    def test_count_after_add(
+        self, fake_retriever: MemoryRetriever, events_corpus: list[dict]
+    ) -> None:
         fake_retriever.add_events(events_corpus)
         assert fake_retriever.count() == 10
         assert fake_retriever.mode == "chromadb"
@@ -148,6 +145,7 @@ class TestChromadbMode:
 
 # === TF-IDF 降级路径（沙箱/CI Windows 都可跑） ===
 
+
 class TestFallbackMode:
     def test_fallback_init_when_chromadb_unavailable(
         self, fallback_retriever: MemoryRetriever, events_corpus: list[dict]
@@ -176,9 +174,7 @@ class TestFallbackMode:
         self, fallback_retriever: MemoryRetriever, events_corpus: list[dict]
     ) -> None:
         fallback_retriever.add_events(events_corpus)
-        results = fallback_retriever.query(
-            "玉佩 林雷", top_k=10, event_type="foreshadowing"
-        )
+        results = fallback_retriever.query("玉佩 林雷", top_k=10, event_type="foreshadowing")
         for item in results:
             ch = int(item.source.split("#ch")[-1])
             assert ch in (3, 10, 25)
@@ -200,6 +196,7 @@ class TestFallbackMode:
 
 
 # === 纯函数（无外部依赖） ===
+
 
 class TestHelpers:
     def test_tokenize_chinese(self) -> None:
@@ -248,6 +245,7 @@ class TestHelpers:
 
 # === 自动降级测试 ===
 
+
 @needs_chromadb
 def test_auto_fallback_on_chromadb_runtime_error(tmp_path: Path) -> None:
     """chromadb 查询时崩溃 → 自动切到 TF-IDF。"""
@@ -257,10 +255,12 @@ def test_auto_fallback_on_chromadb_runtime_error(tmp_path: Path) -> None:
             raise RuntimeError("chromadb broken")
 
     rt = FailingRetriever(tmp_path / ".chroma", force_mode="chromadb")
-    rt.add_events([
-        {"chapter": 1, "event_type": "timeline", "text": "林雷出生"},
-        {"chapter": 2, "event_type": "timeline", "text": "林雷觉醒"},
-    ])
+    rt.add_events(
+        [
+            {"chapter": 1, "event_type": "timeline", "text": "林雷出生"},
+            {"chapter": 2, "event_type": "timeline", "text": "林雷觉醒"},
+        ]
+    )
     assert rt.mode == "chromadb"
     results = rt.query("林雷", top_k=2)
     assert rt.mode == "tfidf"

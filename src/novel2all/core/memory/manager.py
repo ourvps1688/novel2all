@@ -141,14 +141,13 @@ class MemoryManager(BaseModel):
         state = self.tracker.read()
         sorted_chapters = sorted(state.recent_chapter_summaries.keys(), reverse=True)
         # 最近 N 章（不压缩）作为"近期窗口"
-        recent_uncompressed = [
-            ch for ch in sorted_chapters if ch < current_chapter
-        ][: self.config.recent_chapter_count]
+        recent_uncompressed = [ch for ch in sorted_chapters if ch < current_chapter][
+            : self.config.recent_chapter_count
+        ]
 
         # 早期压缩：从剩余章节里按档位折叠
         older_chapters = [
-            ch for ch in sorted_chapters
-            if ch < current_chapter and ch not in recent_uncompressed
+            ch for ch in sorted_chapters if ch < current_chapter and ch not in recent_uncompressed
         ]
 
         items: list[MemoryItem] = []
@@ -322,9 +321,7 @@ class MemoryManager(BaseModel):
         for fs in state.foreshadowing.values():
             if fs.planted_chapter != chapter and fs.notes is None:
                 continue
-            if fs.planted_chapter == chapter or (
-                fs.notes and f"ch{chapter}" in fs.notes
-            ):
+            if fs.planted_chapter == chapter or (fs.notes and f"ch{chapter}" in fs.notes):
                 events.append(
                     {
                         "chapter": chapter,
