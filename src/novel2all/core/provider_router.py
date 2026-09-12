@@ -98,31 +98,40 @@ def is_peak_hour() -> bool:
     return (9 <= hour < 12) or (14 <= hour < 18)
 
 
-# === 默认路由表（V0.26 minimax 接入 - 失败回退）===
-# 数据来源：scripts/benchmark_results.md（2026-09-13 跑的真实数据）
+# === 默认路由表（V0.27 真实质量决策）===
+# 数据来源：
+# 1. scripts/benchmark_results.md（2026-09-13 跑的真实数据）
+# 2. scripts/test_quality_compare.py 实测质量对比（用户人工鉴别确认 minimax 显著更优）
 #
-# V0.26 关键发现（端到端测试失败）：
-# - minimax EXTRACTION 字数 1369（benchmark 数据看似最有价值）
-# - 但 minimax **强制用 Anthropic 兼容路径**（api_base=https://api.minimax.cn/anthropic）
-# - Anthropic 兼容 = /v1/messages 端点，instructor + litellm 走 OpenAI /v1/chat/completions
-# - 两个不兼容：实测报 404 page not found
+# V0.27 关键决策：WRITING 切到 minimax-M3
+# - minimax 实测 845 字 vs DeepSeek flash 550 字（不是空话：多出 295 字包含剧情推进 + 角色独白 + 伏笔）
+# - 代价：minimax 慢 63%（6.39s vs 3.92s），贵 3.3 倍
+# - 收益：长篇小说质量优先 > 节省 50% 成本
 #
-# 因此 V0.26 EXTRACTION 仍走 deepseek-flash（默认 fallback）。
-# minimax 保留在 MODEL_CONFIG + benchmark 脚本（用于非 structured 调用的 benchmark），
-# 但不接入生产路由。详见 docs/v0.23-design.md 与 docs/llm-providers-truth.md §11。
+# V0.27 transparent 分流（_is_anthropic_compat）：
+# - model="minimax/..." → httpx 直接调 /v1/messages（绕过 litellm 404 bug）
+# - model="deepseek/..." → litellm + instructor（V0.21 验证路径）
+#
+# 其他 4 个 task 仍用 DeepSeek 双模型：
+# - CONSISTENCY/EXTRACTION/SUMMARIZATION/COVER 都是结构化任务，DeepSeek flash 质量足够
+# - minimax 与 instructor 不兼容（V0.26 实测），不能用 complete_structured
 
 DEFAULT_TASK_ROUTES: dict[TaskType, str] = {
-    TaskType.WRITING: "deepseek/deepseek-v4-pro",  # 旗舰创作，字数多 35%
+    # V0.27：WRITING 切到 minimax-M3（基于实测质量对比：minimax 文笔 + 剧情推进显著优于 DeepSeek flash）
+    # 数据：scripts/test_quality_compare.py + docs/llm-providers-truth.md §15
+    TaskType.WRITING: "minimax/MiniMax-M3",  # 创作质量优先（实测 845 字含有效剧情）
     TaskType.CONSISTENCY: "deepseek/deepseek-flash",  # flash 字数更多 + 便宜
-    TaskType.EXTRACTION: "deepseek/deepseek-flash",  # V0.26 端到端测试发现：minimax 与 instructor 不兼容
+    TaskType.EXTRACTION: "deepseek/deepseek-flash",  # 批量处理（V0.26 minimax 试过，但 instructor 不兼容，回退）
     TaskType.SUMMARIZATION: "deepseek/deepseek-flash",  # 批量处理
     TaskType.COVER: "deepseek/deepseek-flash",  # 批量处理
 }
 
 DEFAULT_TASK_FALLBACKS: dict[TaskType, str | None] = {
-    TaskType.WRITING: "deepseek/deepseek-flash",  # v4-pro 故障 → flash
-    TaskType.CONSISTENCY: "deepseek/deepseek-v4-pro",  # flash 故障 → v4-pro
-    TaskType.EXTRACTION: "deepseek/deepseek-v4-pro",  # flash 故障 → v4-pro
+    # V0.27 前置：WRITING primary 将切到 minimax/MiniMax-M3（V0.27 实施）
+    # fallback 改 v4-pro 保证质量（之前的 flash fallback 是 V0.23 假设 WRITING 用 v4-pro 时的设计）
+    TaskType.WRITING: "deepseek/deepseek-v4-pro",  # minimax 故障 → v4-pro
+    TaskType.CONSISTENCY: "deepseek/deepseek-v4-pro",
+    TaskType.EXTRACTION: "deepseek/deepseek-v4-pro",
     TaskType.SUMMARIZATION: "deepseek/deepseek-v4-pro",
     TaskType.COVER: "deepseek/deepseek-v4-pro",
 }
@@ -179,9 +188,12 @@ MODEL_CONFIG: dict[str, ModelConfig] = {
     "deepseek/deepseek-chat": ModelConfig(
         extra_body={"thinking": {"type": "disabled"}},
     ),
-    # minimax：必须用 Anthropic 兼容 + 国内 endpoint
-    # LiteLLM 默认会走 api.minimax.io（国际域名），401 invalid key
-    # 实测国内 OpenAI 兼容 (api.minimax.cn/v1) HTTP 200 但 content 为空（thinking 丢失 bug）
+    # minimax-M3（Anthropic Messages API 兼容）
+    # V0.26 实测：LiteLLM 默认走 api.minimax.io（国际域名）→ 401 invalid key
+    # V0.26 实测：国内 OpenAI 兼容 (api.minimax.cn/v1) HTTP 200 但 content 为空（thinking 丢失 bug）
+    # V0.27 解决：LLMProvider._is_anthropic_compat 检测 api_base 含 "anthropic" 时，
+    # 走 _call_anthropic_compat()（httpx 直接调 /v1/messages），绕过 LiteLLM 404 bug
+    # 调用方直接传 model="minimax/MiniMax-M3" 即可，无需关心底层 endpoint
     "minimax/MiniMax-M3": ModelConfig(
         api_base="https://api.minimax.cn/anthropic",
         extra_body={"thinking": {"type": "disabled"}},

@@ -238,6 +238,18 @@ class LLMProvider:
         使用 instructor + 当前模型。
         """
         model_name = self._resolve_model(task=task, explicit_model=model)
+
+        # V0.27 前置：anthropic 兼容模型（如 minimax-M3）不支持 instructor Pydantic schema 验证
+        # 必须显式报错（V0.27 实现 transparent 分流后，WRITING 走 complete() 而非 complete_structured）
+        from novel2all.core.provider_router import get_model_config as _get_cfg_for_struct
+
+        _cfg = _get_cfg_for_struct(model_name)
+        if _cfg.api_base and "anthropic" in _cfg.api_base:
+            raise NotImplementedError(
+                f"complete_structured() 不支持 {model_name}（Anthropic Messages API 不兼容 instructor Pydantic 验证）。"
+                "请改用 complete() 返回文本，或换用 litellm 支持的模型（如 deepseek/千问）。"
+            )
+
         try:
             import instructor
         except ImportError as e:
