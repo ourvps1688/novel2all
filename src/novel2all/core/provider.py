@@ -255,13 +255,25 @@ class LLMProvider:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        result = await client.chat.completions.create(  # type: ignore[misc]
-            model=model_name,
-            messages=messages,  # type: ignore[arg-type]
-            response_model=response_model,
-            temperature=temperature,
-            max_retries=max_retries,
-            timeout=self.config.timeout_seconds,
+        # V0.26：应用 MODEL_CONFIG.api_base + extra_body（minimax 必须用 Anthropic 兼容）
+        model_cfg = self._get_model_config(model_name)
+        kwargs: dict[str, Any] = {
+            "model": model_name,
+            "messages": messages,
+            "response_model": response_model,
+            "temperature": temperature,
+            "max_retries": max_retries,
+            "timeout": self.config.timeout_seconds,
+        }
+        if model_cfg.api_base:
+            kwargs["api_base"] = model_cfg.api_base
+        if model_cfg.extra_body:
+            kwargs["extra_body"] = model_cfg.extra_body
+        if model_cfg.headers:
+            kwargs["extra_headers"] = model_cfg.headers
+
+        result = await client.chat.completions.create(
+            **kwargs,
         )
         return result  # type: ignore[no-any-return]
 

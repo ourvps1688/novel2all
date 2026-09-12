@@ -98,15 +98,23 @@ def is_peak_hour() -> bool:
     return (9 <= hour < 12) or (14 <= hour < 18)
 
 
-# === 默认路由表（V0.23，基于 benchmark 真实数据）===
+# === 默认路由表（V0.26 minimax 接入 - 失败回退）===
 # 数据来源：scripts/benchmark_results.md（2026-09-13 跑的真实数据）
-# 关键发现：flash 总成本 ¥0.007 vs v4-pro ¥0.025（flash 便宜 3.6 倍）
-# 唯一 v4-pro 优势：WRITING 字数多 35%（1662 vs 1232）
+#
+# V0.26 关键发现（端到端测试失败）：
+# - minimax EXTRACTION 字数 1369（benchmark 数据看似最有价值）
+# - 但 minimax **强制用 Anthropic 兼容路径**（api_base=https://api.minimax.cn/anthropic）
+# - Anthropic 兼容 = /v1/messages 端点，instructor + litellm 走 OpenAI /v1/chat/completions
+# - 两个不兼容：实测报 404 page not found
+#
+# 因此 V0.26 EXTRACTION 仍走 deepseek-flash（默认 fallback）。
+# minimax 保留在 MODEL_CONFIG + benchmark 脚本（用于非 structured 调用的 benchmark），
+# 但不接入生产路由。详见 docs/v0.23-design.md 与 docs/llm-providers-truth.md §11。
 
 DEFAULT_TASK_ROUTES: dict[TaskType, str] = {
     TaskType.WRITING: "deepseek/deepseek-v4-pro",  # 旗舰创作，字数多 35%
-    TaskType.CONSISTENCY: "deepseek/deepseek-flash",  # flash 在 consistency 上字数更多 + 便宜
-    TaskType.EXTRACTION: "deepseek/deepseek-flash",  # 批量处理，最便宜最快
+    TaskType.CONSISTENCY: "deepseek/deepseek-flash",  # flash 字数更多 + 便宜
+    TaskType.EXTRACTION: "deepseek/deepseek-flash",  # V0.26 端到端测试发现：minimax 与 instructor 不兼容
     TaskType.SUMMARIZATION: "deepseek/deepseek-flash",  # 批量处理
     TaskType.COVER: "deepseek/deepseek-flash",  # 批量处理
 }
@@ -114,7 +122,7 @@ DEFAULT_TASK_ROUTES: dict[TaskType, str] = {
 DEFAULT_TASK_FALLBACKS: dict[TaskType, str | None] = {
     TaskType.WRITING: "deepseek/deepseek-flash",  # v4-pro 故障 → flash
     TaskType.CONSISTENCY: "deepseek/deepseek-v4-pro",  # flash 故障 → v4-pro
-    TaskType.EXTRACTION: "deepseek/deepseek-v4-pro",
+    TaskType.EXTRACTION: "deepseek/deepseek-v4-pro",  # flash 故障 → v4-pro
     TaskType.SUMMARIZATION: "deepseek/deepseek-v4-pro",
     TaskType.COVER: "deepseek/deepseek-v4-pro",
 }
@@ -242,6 +250,16 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
         "input_hit_peak": 0.04,
         "input_miss_peak": 2.00,
         "output_peak": 8.00,
+    },
+    # V0.26：minimax-M3 EXTRACTION（无 peak/off-peak 区分，按统一价）
+    # 数据来源：docs/llm-providers-truth.md §4（minimax 官方价格）
+    "minimax/MiniMax-M3": {
+        "input_hit_offpeak": 0.84,
+        "input_miss_offpeak": 4.2,
+        "output_offpeak": 8.4,
+        "input_hit_peak": 0.84,
+        "input_miss_peak": 4.2,
+        "output_peak": 8.4,
     },
 }
 

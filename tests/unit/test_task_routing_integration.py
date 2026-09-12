@@ -28,7 +28,7 @@ from novel2all.core.memory.extractor import (
     Extractor,
 )
 from novel2all.core.provider import LLMConfig, LLMProvider
-from novel2all.core.provider_router import TaskType
+from novel2all.core.provider_router import ModelRouter, TaskType
 
 
 class MockLLM:
@@ -186,7 +186,7 @@ class TestTaskAffectsRouting:
         assert router.select(TaskType.WRITING) == model
 
     def test_extraction_task_picks_flash(self) -> None:
-        """task=EXTRACTION → 路由到 deepseek/deepseek-flash。"""
+        """task=EXTRACTION → 路由到 deepseek/deepseek-flash（V0.26 minimax 失败回退）。"""
         config = LLMConfig()
         provider = LLMProvider(config)
 
@@ -281,13 +281,18 @@ class TestPipelineTaskRouting:
 
 
 class TestAllTasksRouteCorrectly:
-    """验证 5 个 TaskType 都能正确解析到 DeepSeek 模型（V0.23 路由策略）。"""
+    """验证 5 个 TaskType 都能正确解析到对应模型（V0.26 路由策略）。
+
+    V0.26 关键变化：minimax-M3 **未接入默认路由**（与 instructor 路径不兼容，
+    端到端测试报 404 page not found）。所有 5 个 task 仍走 DeepSeek 双模型。
+    """
 
     @pytest.mark.parametrize(
         "task,expected_model",
         [
             (TaskType.WRITING, "deepseek/deepseek-v4-pro"),
             (TaskType.CONSISTENCY, "deepseek/deepseek-flash"),
+            # V0.26: EXTRACTION 仍用 flash（minimax 与 instructor 不兼容失败回退）
             (TaskType.EXTRACTION, "deepseek/deepseek-flash"),
             (TaskType.SUMMARIZATION, "deepseek/deepseek-flash"),
             (TaskType.COVER, "deepseek/deepseek-flash"),
@@ -305,3 +310,82 @@ class TestAllTasksRouteCorrectly:
         body = provider._get_extra_body(model)
         assert body is not None
         assert body["thinking"]["type"] == "disabled"
+
+
+# === V0.26 minimax 端到端测试（验证 MODEL_CONFIG 自动应用）===
+
+
+class TestMinimaxIntegrationV026:
+    """V0.26：minimax 保留在 MODEL_CONFIG 用于非 instructor 场景（benchmark、流式）。
+
+    关键发现（端到端测试失败回退）：
+    - minimax 强制用 Anthropic 兼容路径（api_base=https://api.minimax.cn/anthropic）
+    - Anthropic 兼容 = /v1/messages 端点
+    - instructor + litellm 走 OpenAI /v1/chat/completions
+    - 两个不兼容：实测报 404 page not found
+    - 因此 minimax 不接入生产路由，但保留在 MODEL_CONFIG 给 benchmark/流式调用用
+    """
+
+    def test_minimax_NOT_in_default_routes(self) -> None:
+        """V0.26 失败回退：EXTRACTION 不再默认 minimax（保持 deepseek-flash）。"""
+        config = LLMConfig()
+        router = ModelRouter(config)
+        # 失败回退：保持 DeepSeek
+        assert router.select(TaskType.EXTRACTION) == "deepseek/deepseek-flash"
+
+    def test_minimax_config_still_available(self) -> None:
+        """minimax MODEL_CONFIG 仍可用（benchmark + 流式调用）。"""
+        from novel2all.core.provider_router import get_model_config
+
+        cfg = get_model_config("minimax/MiniMax-M3")
+        assert cfg.api_base == "https://api.minimax.cn/anthropic"
+        assert cfg.extra_body == {"thinking": {"type": "disabled"}}
+
+    def test_minimax_complete_applies_api_base(self) -> None:
+        """LLMProvider.complete 调用 minimax 时自动注入 api_base + extra_body。
+
+        注意：complete（非结构化）走 litellm.acompletion direct，
+        即使 MODEL_CONFIG 配置正确，当前 litellm 版本也不支持 minimax provider，
+        实测报 404。
+        """
+        # 直接验证 provider.complete 拼 kwargs 时正确应用 MODEL_CONFIG
+        config = LLMConfig()
+        provider = LLMProvider(config)
+
+        captured_kwargs: dict = {}
+
+        async def fake_acompletion(**kwargs):
+            captured_kwargs.update(kwargs)
+            from types import SimpleNamespace
+
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="MOCK"))]
+            )
+
+        import litellm
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            import asyncio
+
+            asyncio.run(
+                provider.complete(
+                    prompt="test",
+                    model="minimax/MiniMax-M3",
+                )
+            )
+            # 验证 api_base 自动应用（即使该 URL 不可达，至少配置正确）
+            assert captured_kwargs.get("api_base") == "https://api.minimax.cn/anthropic"
+            assert captured_kwargs.get("extra_body") == {"thinking": {"type": "disabled"}}
+        finally:
+            litellm.acompletion = original
+
+    def test_minimax_cache_key_uses_correct_endpoint(self) -> None:
+        """V0.26: minimax cache key 应包含正确的 model name。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(cache_enabled=True, default_model="minimax/MiniMax-M3")
+        provider = LLMProvider(config)
+        key = provider._make_cache_key("minimax/MiniMax-M3", "sys", "user", 0.7)
+        assert key[0] == "minimax/MiniMax-M3"

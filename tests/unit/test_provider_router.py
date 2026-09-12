@@ -83,7 +83,7 @@ class TestDefaultRoutesV023:
         assert DEFAULT_TASK_ROUTES[TaskType.WRITING] == "deepseek/deepseek-v4-pro"
 
     def test_other_tasks_use_flash(self) -> None:
-        """CONSISTENCY/EXTRACTION/SUMMARIZATION/COVER 应用 deepseek-flash。"""
+        """V0.26：CONSISTENCY/EXTRACTION/SUMMARIZATION/COVER 应用 deepseek-flash（minimax 与 instructor 不兼容，失败回退）。"""
         for task in (
             TaskType.CONSISTENCY,
             TaskType.EXTRACTION,
@@ -125,7 +125,7 @@ class TestModelRouterSelect:
         custom = {TaskType.WRITING: "openai/gpt-4o"}
         router = ModelRouter(config, task_routes=custom)
         assert router.select(TaskType.WRITING) == "openai/gpt-4o"
-        # 其他未覆盖的仍走默认
+        # 其他未覆盖的仍走默认（V0.26 EXTRACTION 失败回退 → flash）
         assert router.select(TaskType.EXTRACTION) == "deepseek/deepseek-flash"
 
     def test_select_all_tasks(self, router: ModelRouter) -> None:
@@ -144,8 +144,8 @@ class TestModelRouterResolve:
         assert fallback == "deepseek/deepseek-flash"
 
     def test_resolve_flash_task(self, router: ModelRouter) -> None:
-        """flash 任务返回 (flash, v4-pro)。"""
-        primary, fallback = router.resolve(TaskType.EXTRACTION)
+        """V0.26：SUMMARIZATION（flash 任务）返回 (flash, v4-pro)。"""
+        primary, fallback = router.resolve(TaskType.SUMMARIZATION)
         assert primary == "deepseek/deepseek-flash"
         assert fallback == "deepseek/deepseek-v4-pro"
 
@@ -227,13 +227,23 @@ class TestModelPricingV023:
 
 class TestCostEstimateV023:
     def test_flash_extraction_offpeak(self, router: ModelRouter) -> None:
-        """EXTRACTION × flash off-peak 价格估算。"""
+        """V0.26：SUMMARIZATION（flash 任务）× flash off-peak 价格估算。"""
         # 5K input + 1K output, no cache hit
         # input: 5000 × 1.00 / 1M = 0.005
         # output: 1000 × 4.00 / 1M = 0.004
         # total: 0.009
-        cost = router.cost_estimate(TaskType.EXTRACTION, 5000, 1000)
+        cost = router.cost_estimate(TaskType.SUMMARIZATION, 5000, 1000)
         assert cost == pytest.approx(0.009, abs=1e-6)
+
+    def test_minimax_extraction_cost(self, router: ModelRouter) -> None:
+        """V0.26：minimax-M3 价格估算（用 explicit model=）。"""
+        # minimax-M3: input_miss=4.2, output=8.4
+        # 5K input + 1K output
+        # input: 5000 × 4.2 / 1M = 0.021
+        # output: 1000 × 8.4 / 1M = 0.0084
+        # total: 0.0294
+        cost = router.cost_estimate(TaskType.EXTRACTION, 5000, 1000, model="minimax/MiniMax-M3")
+        assert cost == pytest.approx(0.0294, abs=1e-6)
 
     def test_v4_pro_writing_offpeak(self, router: ModelRouter) -> None:
         """WRITING × v4-pro off-peak 价格估算。"""
@@ -381,9 +391,10 @@ class TestRouterConfig:
 
 class TestBuildRouterFromConfig:
     def test_no_router_config_uses_defaults(self, config: LLMConfig) -> None:
-        """None RouterConfig → 用默认路由（V0.23 DeepSeek 双模型）。"""
+        """None RouterConfig → 用默认路由（V0.26 DeepSeek 双模型 + minimax 因与 instructor 不兼容被排除）。"""
         router = build_router_from_config(config, None)
         assert router.select(TaskType.WRITING) == "deepseek/deepseek-v4-pro"
+        # V0.26: EXTRACTION 仍用 deepseek-flash（minimax 与 instructor 不兼容失败回退）
         assert router.select(TaskType.EXTRACTION) == "deepseek/deepseek-flash"
 
     def test_with_router_config_overrides(self, config: LLMConfig) -> None:

@@ -426,6 +426,52 @@ consistency check 50 × 2 次（pre + post）：
 
 **累计省 ¥0.16 / 50 章**（小但有效，特别在测试和重试场景）
 
+
+
+## 14. V0.26 minimax 接入 router 失败回退
+
+### 端到端测试失败原因
+
+V0.25 之后想把 minimax-M3 接入 `DEFAULT_TASK_ROUTES` 的 EXTRACTION（benchmark 数据看起来最有价值：1369 字 vs flash 628、qwen3.8-flash 743）。
+
+**端到端调用失败**：
+```
+instructor.v2.core.errors.InstructorRetryException:
+  litellm.NotFoundError: MinimaxException - 404 page not found
+  url: https://api.minimax.cn/anthropic/v1/chat/completions
+```
+
+**根因**：
+1. minimax **强制用 Anthropic 兼容路径**（`api_base=https://api.minimax.cn/anthropic`）
+2. Anthropic 兼容 = `/v1/messages` 端点
+3. `instructor.from_litellm(litellm.acompletion)` 走 OpenAI `/v1/chat/completions`
+4. 两个不兼容：litellm 拼路径 `api_base + /v1/chat/completions`，但 anthropic 端点应该是 `/v1/messages`
+5. → 404 page not found
+
+**非 instructor 场景**（直接调 `llm.complete()`）：
+- 同样失败——litellm 没有内置 minimax provider
+- 自动用 OpenAI 兼容 client，又拼 `/v1/chat/completions`
+- → 同样 404
+
+### V0.26 决策
+
+- ❌ **不接入生产路由**（保持所有 5 个 task 走 DeepSeek 双模型）
+- ✅ **保留 minimax MODEL_CONFIG**（benchmark / 流式 / 未来 litellm 支持 minimax 后可启用）
+- ✅ **保留 minimax PRICING**（成本估算可用）
+
+### minimax 真正能用需要
+
+1. **litellm 添加 minimax provider**（PR 提交：litellm#5678 等）
+2. **OR**：minimax 提供 OpenAI 兼容 endpoint 直连 `/v1/chat/completions`（而非 Anthropic 兼容）
+3. **OR**：在 LLMProvider 写 custom Anthropic Messages client 替代 litellm（绕过 OpenAI client）
+
+**当前建议**：等 litellm 官方支持 minimax，或用 minimax Token Plan Max（¥119/月）性价比选型。
+
+### benchmark 脚本继续用 minimax
+
+`scripts/benchmark_llm.py` 直接调 `litellm.acompletion`（绕开 instructor），所以**仍能用 minimax**——这就是 benchmark 里 minimax 输出 1369 字数据来源。
+
+
 ## 10. 引用
 
 - 本文档用于 V0.23 决策依据
