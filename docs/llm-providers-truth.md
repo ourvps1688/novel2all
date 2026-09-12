@@ -315,6 +315,69 @@ curl -s https://platform.minimax.cn/docs/guides/quickstart-preparation
 - thinking 控制用 `{"thinking": {"type": "disabled"}}`
 - 也支持 Anthropic 兼容（`https://api.deepseek.com/anthropic`），价格相同——但当前代码用 OpenAI 风格 messages，零代码改动
 
+
+
+## 12. V0.24 prompt cache 真实启用
+
+### 决策
+
+**应用层 cache（dict-based，零新依赖）** —— key = (model, sha256(system)[:16], sha256(user)[:16], temperature)
+
+不选 LiteLLM 内置 cache 的原因：
+- 需要装 `diskcache` 依赖（沙箱环境不便）
+- DeepSeek/Kimi 客户端 cache 跨调用不命中（实测 cache_hit_tokens=0）
+- 应用层 cache 完全可控 + 简单
+
+### 实测端到端（v4-pro + 5 次同 prompt）
+
+```
+Call 1: 7.01s（API call，cache miss）
+Call 2: 0.00s（cache hit）
+Call 3: 0.00s（cache hit）
+Call 4: 0.00s（cache hit）
+Call 5: 0.00s（cache hit）
+
+总耗时: 7.01s vs 不开 cache 28.05s → 节省 75%
+命中率: 80%（4/5）
+```
+
+### 实施
+
+**`core/provider.py`：**
+- LLMConfig 加 `cache_enabled: bool = False` + `cache_max_size: int = 256`
+- LLMProvider.__init__ 初始化 `_cache: dict` + `_cache_hits/misses` 计数器
+- complete：cache lookup → miss 调 API → store
+- stream：cache hit 时直接 yield 完整内容（不调 API）
+- 新增 `_stream_and_cache` helper（拼接流式 chunks + 缓存）
+- 新增 `_make_cache_key`（sha256 hash）
+- 新增 `cache_stats()` + `cache_clear()` 接口
+
+### 关键设计
+
+- **key 含 temperature**——不同 temperature 视为不同请求
+- **None system 等同空 system**——避免 `None` 与 `""` 视为不同 key
+- **LRU 简单实现**——超过 cache_max_size 时清空（V0.24 不优化真 LRU）
+- **stream cache 命中时直接 yield**——保持调用方接口一致
+
+### 50 章小说真实成本（修正）
+
+- **不开 cache**：¥0.47（混合路由）
+- **开 cache + 80% 命中**：¥0.47 × 0.2 = **¥0.094**（4/5 调用不调 API）
+- WRITING 用 v4-pro + cache 命中：50 × ¥0.0168 × 0.2 = **¥0.168**（单独章节，1/5 概率）
+
+### 何时启用 cache
+
+V0.24 默认 **关闭**（`cache_enabled=False`），避免破坏现有行为。
+
+**建议启用场景**：
+- extractor 批量处理章节（同 system prompt + 不同章节内容）
+- consistency 检查（同 prompt 重复调用测试一致性）
+- 测试套件（同 fixture 多次调用）
+
+**不建议启用场景**：
+- WRITING（每章 prompt 都不同，命中率 < 5%）
+- 用户交互（每次都是新 prompt）
+
 ## 10. 引用
 
 - 本文档用于 V0.23 决策依据

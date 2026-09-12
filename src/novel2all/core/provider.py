@@ -1,10 +1,17 @@
 """LLM Provider 抽象。
 
 基于 LiteLLM 统一接口，支持 Anthropic / OpenAI / DeepSeek 等。
+
+V0.24 prompt cache：
+- 应用层 cache（dict-based，零新依赖），key = (model, system_hash, user_hash, temperature)
+- 命中时直接返回缓存响应（不调 API）
+- 设计为**透明** cache：调用方无感知，cost_estimate 自动算 cache_hit
+- 适用场景：同一 system prompt + 类似 user prompt 重复调用（如 extractor 批处理章节）
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
 from typing import Any, TypeVar
 
@@ -52,6 +59,9 @@ class LLMConfig(BaseModel):
     api_key_dashscope: str | None = None
     timeout_seconds: int = 120
     max_retries: int = 3
+    # V0.24：prompt cache（应用层 dict-based，零新依赖）
+    cache_enabled: bool = False
+    cache_max_size: int = 256  # LRU 上限（防内存爆炸）
 
 
 class LLMProvider:
@@ -66,6 +76,11 @@ class LLMProvider:
     def __init__(self, config: LLMConfig | None = None):
         self.config = config or LLMConfig()
         self._configure_env()
+        # V0.24：prompt cache（应用层 dict-based）
+        # 透明 cache：调用方完全无感知
+        self._cache: dict[tuple[str, str, str, float], str] = {}
+        self._cache_hits: int = 0
+        self._cache_misses: int = 0
 
     def _configure_env(self) -> None:
         """从 config 同步设置环境变量（LiteLLM 需要）。"""
@@ -97,9 +112,23 @@ class LLMProvider:
         Args:
             task: TaskType 枚举（V0.22.5+）。若提供，router 选 model；若 model= 也提供，
                 model= 优先（向后兼容测试 / 调试场景）。
+
+        V0.24：自动应用 prompt cache（如果 config.cache_enabled=True）：
+        - key = (model, system_hash, user_hash, temperature)
+        - 命中：直接返回缓存，不调 API
+        - miss：调 API 并缓存响应
         """
         # 决定模型：显式 model= > task router > config.default_model
         model_name = self._resolve_model(task=task, explicit_model=model)
+
+        # V0.24：cache lookup（命中则直接返回，不调 API）
+        cache_key = self._make_cache_key(model_name, system, prompt, temperature)
+        if self.config.cache_enabled and cache_key in self._cache:
+            self._cache_hits += 1
+            return self._cache[cache_key]
+        if self.config.cache_enabled:
+            self._cache_misses += 1
+
         try:
             import litellm
         except ImportError as e:
@@ -128,7 +157,62 @@ class LLMProvider:
             kwargs["extra_headers"] = model_cfg.headers
 
         response = await litellm.acompletion(**kwargs)
-        return response.choices[0].message.content or ""
+        content = response.choices[0].message.content or ""
+
+        # V0.24：cache store（仅当 cache_enabled）
+        if self.config.cache_enabled:
+            self._cache_store(cache_key, content)
+
+        return content
+
+    def _make_cache_key(
+        self, model: str, system: str | None, user: str, temperature: float
+    ) -> tuple[str, str, str, float]:
+        """生成 cache key（V0.24）。
+
+        key = (model, sha256(system), sha256(user), temperature)
+        - hash 用 sha256 截前 16 字符（足够唯一 + 省内存）
+        - None system 用空字符串
+        """
+        sys_h = hashlib.sha256((system or "").encode("utf-8")).hexdigest()[:16]
+        usr_h = hashlib.sha256(user.encode("utf-8")).hexdigest()[:16]
+        return (model, sys_h, usr_h, temperature)
+
+    def _cache_store(self, key: tuple[str, str, str, float], content: str) -> None:
+        """存储到 cache（V0.24）。
+
+        LRU 简单实现：超过 cache_max_size 时清空（粗暴但安全）。
+        """
+        if len(self._cache) >= self.config.cache_max_size:
+            # 简单 LRU：超过上限时清空整个 cache
+            # （更精细的 LRU 需要 OrderedDict + 双向链表，V0.24 不优化）
+            self._cache.clear()
+        self._cache[key] = content
+
+    def cache_stats(self) -> dict[str, Any]:
+        """返回 cache 统计（V0.24）。
+
+        用于 benchmark / 监控 cache 命中率。
+        """
+        total = self._cache_hits + self._cache_misses
+        hit_rate = self._cache_hits / total if total > 0 else 0.0
+        return {
+            "enabled": self.config.cache_enabled,
+            "size": len(self._cache),
+            "max_size": self.config.cache_max_size,
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+            "hit_rate": round(hit_rate, 4),
+        }
+
+    def cache_clear(self) -> None:
+        """清空 cache（V0.24）。
+
+        用于测试或强制重新调用 API。
+        """
+        self._cache.clear()
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     async def complete_structured(
         self,
@@ -186,12 +270,25 @@ class LLMProvider:
 
         Args:
             task: TaskType 枚举（V0.22.5+）。若提供，router 选 model。
+
+        V0.24：cache 命中时直接 yield 完整 content（不调 API，零延迟）。
         """
         model_name = self._resolve_model(task=task, explicit_model=model)
-        try:
-            import litellm
-        except ImportError as e:
-            raise ImportError("Please install litellm: `uv add litellm`") from e
+
+        # V0.24：cache 命中 → 返回 cached stream
+        cache_key = self._make_cache_key(model_name, system, prompt, temperature)
+        if self.config.cache_enabled and cache_key in self._cache:
+            self._cache_hits += 1
+            cached_content = self._cache[cache_key]
+
+            async def _cached_stream() -> Any:
+                yield cached_content
+
+            return _cached_stream()
+        if self.config.cache_enabled:
+            self._cache_misses += 1
+
+        # litellm 由 _stream_and_cache 闭包导入（V0.24 重构）
 
         messages: list[dict[str, str]] = []
         if system:
@@ -213,10 +310,39 @@ class LLMProvider:
         if model_cfg.headers:
             kwargs["extra_headers"] = model_cfg.headers
 
+        # V0.24：缓存流式响应（拼接完整内容后存）
+        return self._stream_and_cache(kwargs, model_name, system, prompt, temperature)
+
+    async def _stream_and_cache(
+        self,
+        kwargs: dict[str, Any],
+        model_name: str,
+        system: str | None,
+        user: str,
+        temperature: float,
+    ) -> Any:
+        """流式调用 + 缓存（V0.24）。
+
+        真实流式调用 litellm，拼接完整内容后写入 cache。
+        整个函数本身是 async generator（直接 yield，调用方用 async for）。
+        """
+        import litellm
+
+        cache_key = self._make_cache_key(model_name, system, user, temperature)
+        cache_enabled = self.config.cache_enabled
+        cache_store = self._cache_store
+
+        chunks: list[str] = []
         response = await litellm.acompletion(**kwargs)
         async for chunk in response:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+            content = chunk.choices[0].delta.content or ""
+            if content:
+                chunks.append(content)
+                yield content
+        # 流结束后写入缓存
+        if cache_enabled:
+            full = "".join(chunks)
+            cache_store(cache_key, full)
 
     def _resolve_model(self, *, task: Any = None, explicit_model: str | None = None) -> str:
         """决定本次调用使用哪个模型。

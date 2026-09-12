@@ -600,3 +600,279 @@ class TestLLMConfigV0235:
         # 清理
         os.environ.pop("MINIMAX_API_KEY", None)
         os.environ.pop("DASHSCOPE_API_KEY", None)
+
+
+# === V0.24 Prompt Cache 测试 ===
+
+
+class TestPromptCacheV024:
+    """V0.24：LLMConfig 加 cache_enabled + LLMProvider 应用 cache。"""
+
+    @pytest.mark.asyncio
+    async def test_cache_disabled_by_default(self) -> None:
+        """默认 LLMConfig.cache_enabled=False（向后兼容）。"""
+        config = LLMConfig()
+        assert config.cache_enabled is False
+        assert config.cache_max_size == 256
+
+    @pytest.mark.asyncio
+    async def test_cache_miss_then_hit(self) -> None:
+        """cache miss 后存，第二次调用应命中。"""
+        from novel2all.core.provider import LLMProvider
+
+        # Mock LLMProvider 的 _resolve_model + 拦截 litellm.acompletion
+        config = LLMConfig(cache_enabled=True, default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {}
+        provider._cache_hits = 0
+        provider._cache_misses = 0
+        provider._resolve_model = lambda *, task, explicit_model: "mock/model"
+
+        # 拦截 litellm.acompletion
+        call_count = [0]
+
+        async def fake_acompletion(**kwargs):
+            call_count[0] += 1
+            # 返回 mock response 对象
+            from types import SimpleNamespace
+
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(message=SimpleNamespace(content=f"RESPONSE_{call_count[0]}"))
+                ]
+            )
+
+        # Patch litellm.acompletion
+        import litellm
+
+        original_acompletion = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            # 调用 1：cache miss → 调 API → 存 cache
+            result1 = await provider.complete(prompt="hello", system="sys")
+            assert result1 == "RESPONSE_1"
+            assert call_count[0] == 1
+            assert provider._cache_misses == 1
+            assert provider._cache_hits == 0
+
+            # 调用 2：cache hit → 不调 API
+            result2 = await provider.complete(prompt="hello", system="sys")
+            assert result2 == "RESPONSE_1"  # 来自 cache
+            assert call_count[0] == 1  # 没调 API
+            assert provider._cache_misses == 1
+            assert provider._cache_hits == 1
+        finally:
+            litellm.acompletion = original_acompletion
+
+    @pytest.mark.asyncio
+    async def test_cache_different_prompts(self) -> None:
+        """不同 prompt 不应命中同一 cache entry。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(cache_enabled=True, default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {}
+        provider._cache_hits = 0
+        provider._cache_misses = 0
+        provider._resolve_model = lambda *, task, explicit_model: "mock/model"
+
+        from types import SimpleNamespace
+
+        import litellm
+
+        async def fake_acompletion(**kwargs):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=f"RESP_{kwargs['messages'][-1]['content']}")
+                    )
+                ]
+            )
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            await provider.complete(prompt="prompt_A")
+            await provider.complete(prompt="prompt_B")
+            # 两次都 cache miss（不同 prompt）
+            assert provider._cache_misses == 2
+            assert provider._cache_hits == 0
+            # cache 应有 2 个 entries
+            assert len(provider._cache) == 2
+        finally:
+            litellm.acompletion = original
+
+    @pytest.mark.asyncio
+    async def test_cache_different_temperature(self) -> None:
+        """不同 temperature 不应命中同一 cache entry。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(cache_enabled=True, default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {}
+        provider._cache_hits = 0
+        provider._cache_misses = 0
+        provider._resolve_model = lambda *, task, explicit_model: "mock/model"
+
+        from types import SimpleNamespace
+
+        import litellm
+
+        call_count = [0]
+
+        async def fake_acompletion(**kwargs):
+            call_count[0] += 1
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=f"R{call_count[0]}"))]
+            )
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            await provider.complete(prompt="p", temperature=0.7)
+            await provider.complete(prompt="p", temperature=0.3)  # 不同 temp
+            # 两次 cache miss
+            assert provider._cache_misses == 2
+        finally:
+            litellm.acompletion = original
+
+    @pytest.mark.asyncio
+    async def test_cache_disabled_no_op(self) -> None:
+        """cache_enabled=False 时不应存 cache。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(cache_enabled=False, default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {}
+        provider._cache_hits = 0
+        provider._cache_misses = 0
+        provider._resolve_model = lambda *, task, explicit_model: "mock/model"
+
+        from types import SimpleNamespace
+
+        import litellm
+
+        async def fake_acompletion(**kwargs):
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="R"))])
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            await provider.complete(prompt="p")
+            await provider.complete(prompt="p")
+            # 不存 cache，两次都调 API
+            assert len(provider._cache) == 0
+            assert provider._cache_misses == 0  # 不计数
+        finally:
+            litellm.acompletion = original
+
+    @pytest.mark.asyncio
+    async def test_cache_max_size_evicts(self) -> None:
+        """超过 cache_max_size 时清空 cache。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(cache_enabled=True, cache_max_size=3, default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {}
+        provider._cache_hits = 0
+        provider._cache_misses = 0
+        provider._resolve_model = lambda *, task, explicit_model: "mock/model"
+
+        from types import SimpleNamespace
+
+        import litellm
+
+        async def fake_acompletion(**kwargs):
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="R"))])
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            # 调 5 次（不同 prompt）但 cache_max_size=3
+            for i in range(5):
+                await provider.complete(prompt=f"p_{i}")
+            # cache 永远 ≤ 3
+            assert len(provider._cache) <= 3
+        finally:
+            litellm.acompletion = original
+
+    @pytest.mark.asyncio
+    async def test_cache_stats(self) -> None:
+        """cache_stats 返回正确统计。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(cache_enabled=True, default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {}
+        provider._cache_hits = 0
+        provider._cache_misses = 0
+        provider._resolve_model = lambda *, task, explicit_model: "mock/model"
+
+        from types import SimpleNamespace
+
+        import litellm
+
+        async def fake_acompletion(**kwargs):
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="R"))])
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            await provider.complete(prompt="A")  # miss
+            await provider.complete(prompt="A")  # hit
+            await provider.complete(prompt="B")  # miss
+            stats = provider.cache_stats()
+            assert stats["enabled"] is True
+            assert stats["hits"] == 1
+            assert stats["misses"] == 2
+            assert stats["hit_rate"] == 0.3333
+            assert stats["size"] == 2  # 2 unique prompts
+        finally:
+            litellm.acompletion = original
+
+    @pytest.mark.asyncio
+    async def test_cache_clear(self) -> None:
+        """cache_clear 重置 stats + 清空 cache。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(cache_enabled=True, default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {"key1": "value1"}
+        provider._cache_hits = 5
+        provider._cache_misses = 3
+        provider._resolve_model = lambda *, task, explicit_model: "mock/model"
+
+        provider.cache_clear()
+        assert len(provider._cache) == 0
+        assert provider._cache_hits == 0
+        assert provider._cache_misses == 0
+
+    def test_cache_key_uses_sha256(self) -> None:
+        """_make_cache_key 用 sha256 截 16 字符。"""
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(default_model="mock/model")
+        provider = LLMProvider.__new__(LLMProvider)
+        provider.config = config
+        provider._cache = {}
+        provider._cache_hits = 0
+        provider._cache_misses = 0
+
+        key1 = provider._make_cache_key("model", "system", "user", 0.7)
+        key2 = provider._make_cache_key("model", "system", "user", 0.7)
+        assert key1 == key2  # same input → same key
+
+        key3 = provider._make_cache_key("model", "different", "user", 0.7)
+        assert key1 != key3  # different system → different key
+
+        key4 = provider._make_cache_key("model", None, "user", 0.7)
+        key5 = provider._make_cache_key("model", "", "user", 0.7)
+        # None system 和 "" system 视为相同（用 empty hash）
+        assert key4 == key5
