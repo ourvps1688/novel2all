@@ -19,6 +19,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from novel2all.core.memory.tracker import TrackingState
+from novel2all.core.provider_router import TaskType
 
 
 class ConsistencyIssue(BaseModel):
@@ -149,7 +150,7 @@ class Verifier:
         state: TrackingState,
         outline: str,
     ) -> list[ConsistencyIssue]:
-        """写前检查。"""
+        """写前检查（V0.23+：自动应用 DeepSeek flash 路由）。"""
         prompt = PRE_WRITE_PROMPT.format(
             state=self._state_to_text(state),
             outline=outline,
@@ -157,6 +158,7 @@ class Verifier:
         result = await self.llm.complete_structured(
             prompt=prompt,
             response_model=list[ConsistencyIssue],
+            task=TaskType.CONSISTENCY,
         )
         return self._filter_issues(result)
 
@@ -165,7 +167,7 @@ class Verifier:
         state: TrackingState,
         content: str,
     ) -> list[ConsistencyIssue]:
-        """写后检查。"""
+        """写后检查（V0.23+：自动应用 DeepSeek flash 路由）。"""
         prompt = POST_WRITE_PROMPT.format(
             state=self._state_to_text(state),
             content=content,
@@ -174,6 +176,7 @@ class Verifier:
         result = await self.llm.complete_structured(
             prompt=prompt,
             response_model=list[ConsistencyIssue],
+            task=TaskType.CONSISTENCY,
         )
         return self._filter_issues(result)
 

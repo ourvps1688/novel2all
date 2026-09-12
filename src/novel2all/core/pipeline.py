@@ -23,6 +23,7 @@ from novel2all.core.memory.verifier import (
 )
 from novel2all.core.project import ProjectStructure
 from novel2all.core.provider import LLMProvider
+from novel2all.core.provider_router import TaskType
 from novel2all.core.skill import SkillDefinition, SkillRegistry
 
 # === 错误类型 ===
@@ -155,13 +156,14 @@ class WritingPipeline:
             chapter=chapter,
         )
 
-        # 5. 流式调用 LLM
+        # 5. 流式调用 LLM（V0.23+：自动应用 DeepSeek 双模型路由 + thinking 控制）
         content_chunks: list[str] = []
         try:
             async for chunk in self.llm.stream(
                 prompt=prompt,
                 system=self._build_system_prompt(skill),
                 temperature=0.7,
+                task=TaskType.WRITING,
             ):
                 content_chunks.append(chunk)
                 if stream_callback is not None:

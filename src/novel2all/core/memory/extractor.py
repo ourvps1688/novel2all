@@ -21,6 +21,7 @@ from novel2all.core.memory.tracker import (
     TrackingState,
 )
 from novel2all.core.memory.types import EdgeType, NodeType
+from novel2all.core.provider_router import TaskType
 
 
 class ContinuityIssue(BaseModel):
@@ -229,11 +230,12 @@ class Extractor:
             content=content,
         )
 
-        # 用 instructor + LLM 做结构化输出
+        # 用 instructor + LLM 做结构化输出（V0.23+：自动应用 DeepSeek flash 路由）
         try:
             result = await self.llm.complete_structured(
                 prompt=prompt,
                 response_model=ExtractedChapterInfo,
+                task=TaskType.EXTRACTION,
             )
         except Exception as e:
             # 失败兜底：返回空结果（不阻断主流程）
