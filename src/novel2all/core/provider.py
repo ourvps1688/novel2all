@@ -76,14 +76,21 @@ class LLMProvider:
         system: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
+        task: Any = None,
     ) -> str:
-        """调 LLM 完成文本生成。"""
+        """调 LLM 完成文本生成。
+
+        Args:
+            task: TaskType 枚举（V0.22.5+）。若提供，router 选 model；若 model= 也提供，
+                model= 优先（向后兼容测试 / 调试场景）。
+        """
+        # 决定模型：显式 model= > task router > config.default_model
+        model_name = self._resolve_model(task=task, explicit_model=model)
         try:
             import litellm
         except ImportError as e:
             raise ImportError("Please install litellm: `uv add litellm`") from e
 
-        model_name = model or self.config.default_model
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -108,11 +115,13 @@ class LLMProvider:
         system: str | None = None,
         temperature: float = 0.3,
         max_retries: int = 3,
+        task: Any = None,
     ) -> T:
         """结构化输出：返回 Pydantic 模型实例。
 
         使用 instructor + 当前模型。
         """
+        model_name = self._resolve_model(task=task, explicit_model=model)
         try:
             import instructor
         except ImportError as e:
@@ -123,8 +132,6 @@ class LLMProvider:
         except ImportError as e:
             raise ImportError("Please install litellm: `uv add litellm`") from e
 
-        model_name = model or self.config.default_model
-
         client = instructor.from_litellm(litellm.acompletion)
 
         messages: list[dict[str, str]] = []
@@ -132,15 +139,15 @@ class LLMProvider:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        result = await client.chat.completions.create(
+        result = await client.chat.completions.create(  # type: ignore[misc]
             model=model_name,
-            messages=messages,
+            messages=messages,  # type: ignore[arg-type]
             response_model=response_model,
             temperature=temperature,
             max_retries=max_retries,
             timeout=self.config.timeout_seconds,
         )
-        return result
+        return result  # type: ignore[no-any-return]
 
     async def stream(
         self,
@@ -149,14 +156,19 @@ class LLMProvider:
         model: str | None = None,
         system: str | None = None,
         temperature: float = 0.7,
+        task: Any = None,
     ) -> Any:
-        """流式输出：返回 async iterator。"""
+        """流式输出：返回 async iterator。
+
+        Args:
+            task: TaskType 枚举（V0.22.5+）。若提供，router 选 model。
+        """
+        model_name = self._resolve_model(task=task, explicit_model=model)
         try:
             import litellm
         except ImportError as e:
             raise ImportError("Please install litellm: `uv add litellm`") from e
 
-        model_name = model or self.config.default_model
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -171,3 +183,24 @@ class LLMProvider:
         async for chunk in response:
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
+
+    def _resolve_model(self, *, task: Any = None, explicit_model: str | None = None) -> str:
+        """决定本次调用使用哪个模型。
+
+        优先级（高 → 低）：
+        1. 显式 model= 参数（测试 / 调试场景）
+        2. task 参数 + ModelRouter（V0.22.5+）
+        3. config.default_model（向后兼容）
+        """
+        if explicit_model:
+            return explicit_model
+        if task is not None:
+            # lazy import 避免循环依赖
+            from novel2all.core.provider_router import ModelRouter, TaskType
+
+            if not isinstance(task, TaskType):
+                # 容错：非 TaskType 实例就当作普通 model name 处理
+                return str(task)
+            router = ModelRouter(self.config)
+            return router.select(task)
+        return self.config.default_model
