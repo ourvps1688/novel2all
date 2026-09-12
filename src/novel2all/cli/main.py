@@ -24,6 +24,14 @@ from novel2all.core import (
     MemoryManager,
 )
 from novel2all.core.memory import Tracker
+from novel2all.core.pipeline import (
+    BlockingIssuesError,
+    LLMAuthError,
+    OutlineNotFoundError,
+    PipelineError,
+    WritingPipeline,
+)
+from novel2all.core.project import ProjectStructure
 from novel2all.core.role import RoleRegistry
 from novel2all.core.skill import SkillRegistry
 
@@ -220,61 +228,101 @@ app.add_typer(write_app, name="write")
 def write_chapter(
     chapter: int = typer.Argument(..., help="章节号"),
     outline_file: Path = typer.Option(
-        None, "--outline", "-o", help="细纲文件路径（默认 大纲/细纲_第NNN章.md）"
+        None,
+        "--outline",
+        "-o",
+        help="细纲文件路径（默认 大纲/细纲_第NNN章.md）",
+        exists=False,
+        dir_okay=False,
+        readable=True,
+    ),
+    skill: str = typer.Option(
+        "story-long-write", "--skill", "-s", help="使用的 skill（默认 story-long-write）"
+    ),
+    stream: bool = typer.Option(True, "--stream/--no-stream", help="流式输出到 console"),
+    min_chars: int = typer.Option(2000, "--min-chars", help="最低字数（低于则警告）"),
+    skip_pre_write: bool = typer.Option(
+        False, "--skip-pre-write/--no-skip-pre-write",
+        help="跳过 pre-write check（开发/测试用）",
     ),
 ) -> None:
-    """写第 N 章。"""
-    root = get_project_root()
-    from novel2all.core.project import ProjectStructure
+    """写第 N 章（v0.21+ 接真实 LLM）。"""
+    import asyncio
 
+    from dotenv import load_dotenv
+
+    load_dotenv()  # 加载 .env（DEEPSEEK_API_KEY 等）
+
+    root = get_project_root()
     project = ProjectStructure(root=root)
     if not project.exists():
         console.print("[red]项目未初始化，先跑 novel2all setup[/red]")
         raise typer.Exit(1)
 
     outline_path = outline_file or project.chapter_outline(chapter)
-    if not outline_path.exists():
-        console.print(f"[red]细纲不存在: {outline_path}[/red]")
-        console.print(f"先写细纲到 {outline_path}，或在 --outline 指定路径")
-        raise typer.Exit(1)
+
+    # 装配 pipeline
+    llm = get_llm()
+    manager = MemoryManager(project_root=root, llm=llm)
+    skills_dir = Path(__file__).parent.parent / "skills"
+    skill_registry = SkillRegistry(skills_dir)
+    skill_registry.discover()
+
+    pipeline = WritingPipeline(
+        manager=manager,
+        skill_registry=skill_registry,
+        llm=llm,
+        project=project,
+    )
 
     console.print(f"[bold]开始写第 {chapter} 章[/bold]")
     console.print(f"  细纲：{outline_path}")
+    console.print(f"  skill：{skill}")
     console.print(f"  项目：{root}")
     console.print()
 
-    # 占位：实际写作逻辑 v0.20 后续接入
-    # 当前 v0.20 只展示流程，v0.21+ 接 LLM 调 full flow
-    console.print("[yellow]⚠ v0.20 占位实现[/yellow]")
-    console.print("  完整 writing flow 见 docs/ROADMAP.md")
-    console.print("  当前仅 demo：打印 memory loading + write flow")
-    console.print()
+    def on_chunk(chunk: str) -> None:
+        if stream:
+            typer.echo(chunk, nl=False)
 
-    # Demo: 加载 memory
-    llm = get_llm()
-    manager = MemoryManager(project_root=root, llm=llm)
-    state = Tracker(project.tracking_state_file).read()
-
-    console.print("[cyan]→[/cyan] 加载 5 层 memory context...")
-    import asyncio
-
-    outline_text = outline_path.read_text(encoding="utf-8")
-    memory = asyncio.run(
-        manager.load_for_writing(
-            chapter=chapter,
-            chapter_outline=outline_text,
-            characters_involved=list(state.characters.keys())[:3],
+    try:
+        result = asyncio.run(
+            pipeline.write_chapter(
+                chapter=chapter,
+                outline_path=outline_path,
+                skill_name=skill,
+                stream_callback=on_chunk,
+                min_chars=min_chars,
+                skip_pre_write_check=skip_pre_write,
+            )
         )
-    )
-    console.print(f"  L1 核心设定：{len(memory.core)} 项")
-    console.print(f"  L2 角色状态：{len(memory.character)} 项")
-    console.print(f"  L3 最近章节：{len(memory.recent)} 项")
-    console.print(f"  L4 事件检索：{len(memory.events)} 项（v0.20 空）")
-    console.print(f"  总 token 估算：{memory.total_tokens}")
+    except OutlineNotFoundError as e:
+        console.print(f"[red]✗ 细纲缺失[/red] {e}")
+        raise typer.Exit(1)
+    except BlockingIssuesError as e:
+        console.print(f"[red]✗ 发现 {len(e.issues)} 个 critical 一致性问题[/red]")
+        for issue in e.issues:
+            console.print(f"  - [{issue.category}] {issue.description}")
+        raise typer.Exit(2)
+    except LLMAuthError as e:
+        console.print(f"[red]✗ LLM 鉴权失败[/red] {e}")
+        console.print("  请检查 .env 里的 API key")
+        raise typer.Exit(3)
+    except PipelineError as e:
+        console.print(f"[red]✗ Pipeline 错误[/red] {e}")
+        raise typer.Exit(4)
 
+    if stream:
+        console.print()  # 流式输出结束换行
     console.print()
-    console.print("[green]✓[/green] memory context 已加载")
-    console.print("  下一步：实际写作流程 v0.21 接入")
+    console.print(f"[green]✓[/green] 第 {chapter} 章已生成")
+    console.print(f"  文件：{result.output_path}")
+    console.print(f"  字数：{result.content_chars}")
+    console.print(f"  pre-write 警告：{len(result.pre_write_issues)} 个")
+    console.print(f"  post-write 警告：{len(result.post_write_issues)} 个")
+    if result.post_write_issues:
+        for issue in result.post_write_issues[:3]:
+            console.print(f"    - [{issue.category}] {issue.description}")
 
 
 @app.command()

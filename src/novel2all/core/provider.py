@@ -13,11 +13,31 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel)
 
 
-class LLMConfig(BaseModel):
-    """LLM 配置。"""
+def _strip_proxy_env() -> None:
+    """清除 httpx/litellm 会读取的代理环境变量。
 
-    default_model: str = "claude-sonnet-4-20250514"
-    fallback_model: str | None = "deepseek-chat"
+    在沙箱/CI 环境下，HTTP_PROXY/HTTPS_PROXY 会让 httpx 通过代理连接 DeepSeek，
+    代理会破坏 Bearer header（导致 'Illegal header value b\"Bearer \"'）。
+    """
+    for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
+        os.environ.pop(k, None)
+
+
+# 模块加载时立即清代理（关键：litellm import 时就会读 env）
+_strip_proxy_env()
+
+
+class LLMConfig(BaseModel):
+    """LLM 配置。
+
+    注意 default_model 必须带 litellm provider 前缀：
+      - claude-sonnet-4-...  → "anthropic/claude-sonnet-4-20250514"
+      - gpt-4o               → "openai/gpt-4o"
+      - deepseek-chat        → "deepseek/deepseek-chat"
+    """
+
+    default_model: str = "deepseek/deepseek-chat"
+    fallback_model: str | None = "deepseek/deepseek-chat"
     api_key_anthropic: str | None = None
     api_key_openai: str | None = None
     api_key_deepseek: str | None = None
@@ -40,6 +60,7 @@ class LLMProvider:
 
     def _configure_env(self) -> None:
         """从 config 同步设置环境变量（LiteLLM 需要）。"""
+        _strip_proxy_env()  # 沙箱/CI 环境必须
         if self.config.api_key_anthropic:
             os.environ["ANTHROPIC_API_KEY"] = self.config.api_key_anthropic
         if self.config.api_key_openai:
