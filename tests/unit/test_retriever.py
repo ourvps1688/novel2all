@@ -27,7 +27,6 @@ from novel2all.core.memory.retriever import (
 )
 from novel2all.core.memory.types import MemoryLayer
 
-
 # === 环境探测 ===
 
 def _chromadb_available() -> bool:
