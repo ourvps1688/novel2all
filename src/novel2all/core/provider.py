@@ -60,8 +60,16 @@ class LLMConfig(BaseModel):
     timeout_seconds: int = 120
     max_retries: int = 3
     # V0.24：prompt cache（应用层 dict-based，零新依赖）
+    # V0.25：从 NOVEL2ALL_LLM_CACHE 环境变量读默认（"1"/"true" 启用，其他关闭）
     cache_enabled: bool = False
     cache_max_size: int = 256  # LRU 上限（防内存爆炸）
+
+    def __init__(self, **data: Any) -> None:
+        """V0.25：从 .env 自动读 cache_enabled（如果未显式传入）。"""
+        if "cache_enabled" not in data:
+            env_val = os.environ.get("NOVEL2ALL_LLM_CACHE", "").lower()
+            data["cache_enabled"] = env_val in ("1", "true", "yes", "on")
+        super().__init__(**data)
 
 
 class LLMProvider:

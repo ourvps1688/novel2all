@@ -876,3 +876,62 @@ class TestPromptCacheV024:
         key5 = provider._make_cache_key("model", "", "user", 0.7)
         # None system 和 "" system 视为相同（用 empty hash）
         assert key4 == key5
+
+
+# === V0.25 cache_enabled 从 .env 自动读取测试 ===
+
+
+class TestCacheEnabledFromEnv:
+    """V0.25：cache_enabled 默认值从 NOVEL2ALL_LLM_CACHE 环境变量读取。"""
+
+    def test_default_disabled_when_env_not_set(self) -> None:
+        """未设环境变量时 cache_enabled=False（向后兼容）。"""
+        import os
+
+        os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
+        config = LLMConfig()
+        assert config.cache_enabled is False
+
+    def test_env_true_enables_cache(self) -> None:
+        """环境变量 NOVEL2ALL_LLM_CACHE=1 → cache_enabled=True。"""
+        import os
+
+        os.environ["NOVEL2ALL_LLM_CACHE"] = "1"
+        try:
+            config = LLMConfig()
+            assert config.cache_enabled is True
+        finally:
+            os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
+
+    def test_env_true_word_enables_cache(self) -> None:
+        """环境变量 NOVEL2ALL_LLM_CACHE=true → cache_enabled=True。"""
+        import os
+
+        os.environ["NOVEL2ALL_LLM_CACHE"] = "true"
+        try:
+            config = LLMConfig()
+            assert config.cache_enabled is True
+        finally:
+            os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
+
+    def test_env_false_disables_cache(self) -> None:
+        """环境变量 NOVEL2ALL_LLM_CACHE=false → cache_enabled=False。"""
+        import os
+
+        os.environ["NOVEL2ALL_LLM_CACHE"] = "false"
+        try:
+            config = LLMConfig()
+            assert config.cache_enabled is False
+        finally:
+            os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
+
+    def test_explicit_cache_enabled_overrides_env(self) -> None:
+        """显式传 cache_enabled=True 覆盖环境变量。"""
+        import os
+
+        os.environ["NOVEL2ALL_LLM_CACHE"] = "false"
+        try:
+            config = LLMConfig(cache_enabled=True)
+            assert config.cache_enabled is True
+        finally:
+            os.environ.pop("NOVEL2ALL_LLM_CACHE", None)

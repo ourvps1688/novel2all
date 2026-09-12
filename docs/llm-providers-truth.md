@@ -378,6 +378,54 @@ V0.24 默认 **关闭**（`cache_enabled=False`），避免破坏现有行为。
 - WRITING（每章 prompt 都不同，命中率 < 5%）
 - 用户交互（每次都是新 prompt）
 
+
+
+## 13. V0.25 cache_enabled 从 .env 自动启用
+
+### 改动
+
+\`LLMConfig.__init__\` 新增自定义构造函数，从环境变量 \`NOVEL2ALL_LLM_CACHE\` 自动读取 cache_enabled 默认值：
+- \`1\` / \`true\` / \`yes\` / \`on\` → cache_enabled=True
+- 其他（含未设置）→ cache_enabled=False（向后兼容）
+- 显式传 \`cache_enabled=\` 仍优先于环境变量
+
+### 用法
+
+\`\`\`bash
+# .env 加一行启用全局 cache
+NOVEL2ALL_LLM_CACHE=true
+\`\`\`
+
+\`\`\`python
+# 或代码中显式
+config = LLMConfig(cache_enabled=True)
+provider = LLMProvider(config)
+\`\`\`
+
+### 启用后的实际受益场景
+
+V0.25 不需要改任何业务代码——只要 \`pipeline.py\` / \`extractor.py\` / \`verifier.py\` 传入的 \`LLMProvider\` 是从 \`LLMConfig()\` 构造（默认读 .env），整个项目自动 cache 受益：
+
+1. **同章多次提取**（extractor）：重跑同一 chapter 提取（异常重试 / 测试 fixture）→ cache hit
+2. **同一章 pre+post write check**（verifier）：pre + post 间隔内 state 一致 → 部分 cache hit
+3. **测试套件**（同 fixture 多次跑）→ cache hit
+4. **benchmark 脚本**（重复调用同 prompt）→ cache hit
+
+**未启用场景**：
+- WRITING 每章 prompt 都不同（命中率 < 5%）
+
+### 50 章小说真实成本（V0.25 估算）
+
+如果启用 cache（80% 命中率），extractor 调用 50 次：
+- 不开 cache：50 × ¥0.0009 = **¥0.045**
+- 开 cache：50 × ¥0.0009 × 0.2 = **¥0.009**（80% 不调 API）
+
+consistency check 50 × 2 次（pre + post）：
+- 不开 cache：100 × ¥0.0015 = **¥0.15**
+- 开 cache（重试/同章预后共享）：~80 × ¥0.0015 × 0.2 = **¥0.024**
+
+**累计省 ¥0.16 / 50 章**（小但有效，特别在测试和重试场景）
+
 ## 10. 引用
 
 - 本文档用于 V0.23 决策依据
