@@ -20,6 +20,7 @@ from novel2all.core.memory.types import (
     GraphData,
     GraphEdge,
     GraphNode,
+    NodeType,
 )
 
 
@@ -84,7 +85,10 @@ class MemoryGraph:
             )
 
     def add_edge(self, edge: GraphEdge) -> None:
-        """添加边（from_id / to_id / type 三元组重复则更新 label/chapter）。"""
+        """添加边（from_id / to_id / type 三元组重复则更新 label/chapter）。
+
+        自动创建端点节点（如果不存在）—— 图论标准行为。
+        """
         key = (edge.from_id, edge.to_id, edge.type.value)
         existing = self._data.edge_index().get(key)
         if existing:
@@ -94,6 +98,29 @@ class MemoryGraph:
             ]
         else:
             self._data.edges.append(edge)
+
+        # 自动创建端点节点（如果不存在）—— 用占位 Node
+        for endpoint_id in (edge.from_id, edge.to_id):
+            if not self.has_node(endpoint_id):
+                prefix = endpoint_id.split(":", 1)[0] if ":" in endpoint_id else ""
+                type_map = {
+                    "char": NodeType.CHARACTER,
+                    "loc": NodeType.LOCATION,
+                    "fs": NodeType.FORESHADOWING,
+                    "event": NodeType.EVENT,
+                    "item": NodeType.ITEM,
+                }
+                inferred_type = type_map.get(prefix, NodeType.CHARACTER)
+                placeholder_name = (
+                    endpoint_id.split(":", 1)[1] if ":" in endpoint_id else endpoint_id
+                )
+                self.add_node(
+                    GraphNode(
+                        id=endpoint_id,
+                        type=inferred_type,
+                        name=placeholder_name,
+                    )
+                )
 
         if self._nx_graph is not None:
             self._nx_graph.add_edge(

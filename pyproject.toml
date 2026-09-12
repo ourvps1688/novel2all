@@ -77,10 +77,12 @@ target-version = "py312"
 # B008: typer.Option / typer.Argument 在参数默认值中是 idiomatic 写法
 # BLE001: skill/role 单文件失败不影响全局加载，是有意为之
 # S110: retriever.clear() 内的清理失败是 fail-silent 设计
+# S112: extractor.to_memory_graph 跳过非法节点/边是 fail-soft 设计
 extend-ignore = [
     "B008",
     "BLE001",
     "S110",
+    "S112",
 ]
 
 [tool.ruff.lint.isort]
