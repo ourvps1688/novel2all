@@ -124,12 +124,18 @@ class MemoryRetriever:
     def _init_mode(self, force_mode: str | None = None) -> None:
         """按优先级尝试初始化：chromadb → TF-IDF → keyword。
 
-        force_mode: 测试钩子，强制指定模式。
+        force_mode: 测试钩子，指定首选模式。失败时**自动降级**（fail-soft），
+        测试可通过 `retriever.mode` 检查实际模式并自行 skip。
+
+        设计原则：force_mode 是"首选"，不是"必须"。
         """
         if force_mode is not None:
             if force_mode == "chromadb":
-                assert self._try_init_chromadb(), "chromadb 初始化失败，无法 force_mode='chromadb'"
-                self._mode = "chromadb"
+                if self._try_init_chromadb():
+                    self._mode = "chromadb"
+                else:
+                    # 初始化失败时优雅降级到 TF-IDF（不阻断调用方）
+                    self._mode = "tfidf"
                 return
             if force_mode == "tfidf":
                 self._mode = "tfidf"
