@@ -1,5 +1,91 @@
 # Changelog
 
+## [0.23.0] - 2026-09-13
+
+### V0.23.0 — 数据驱动 LLM Provider 路由（基于真实 benchmark + 一手文档）
+
+**核心方法论**：从 V0.22.5 的"行业经验推测"转为"一手文档 + 真实 benchmark"。
+
+#### [0.23.0] Truth 文档 + Benchmark 脚本（commit 9833af7）
+
+- **docs/llm-providers-truth.md** (~6000 字符，10 节)
+  - §1 三家协议支持矩阵 + 5 次错误反思（千问没 Anthropic、DeepSeek 单协议、minimax 单协议、Anthropic caching 杀手级、USD vs CNY）
+  - §2 DeepSeek 完整价格表（CNY，off-peak/peak 时段，原文逐字抄录）
+  - §3 千问 DashScope 价格表 + **千问是模型市场**（含 DeepSeek/GLM/Kimi/minimax）
+  - §4 minimax Token Plan（¥119/月 = 18 亿 token）+ 按量计费
+  - §5 横向价格对比 + 全市场最低价格点
+  - §6 novel2all 路由策略推荐（DeepSeek 双模型覆盖 5 TaskType）
+  - §7 当前代码状态 + V0.23 待做
+  - §8 **不要做的事**（防止重蹈覆辙）
+  - §9 数据快照 + 核实命令
+  - §10 引用
+- **scripts/benchmark_llm.py** (~400 行)
+  - 横向对比 4 个候选模型 × 5 TaskType = 20 次调用
+  - 真实调 litellm.acompletion + 真实 usage 数据
+  - 自动应用模型特殊配置（v4-pro 显式 `thinking:disabled` 防 reasoning 耗光 token）
+  - 支持 dry-run / 单 task / 模型筛选
+- **scripts/benchmark_results.md + .json** 10 次真实调用结果（2 模型 × 5 task）
+
+#### [0.23.1] DeepSeek 双模型路由（commit 3d41034）
+
+- **core/provider_router.py** 重写（+186 行）
+  - `DEFAULT_TASK_ROUTES`: WRITING → v4-pro（字数多 35%），其他 → flash（便宜 3.6 倍）
+  - `DEFAULT_TASK_FALLBACKS`: 双模型互为回退（v4-pro ↔ flash）
+  - `MODEL_PRICING`: DeepSeek 真实 CNY 价格表（off-peak/peak × cache_hit/miss = 12 字段）
+  - 新增 `THINKING_CONTROL` 字典（v4-pro + flash 都禁用 thinking）
+  - 新增 `is_peak_hour()` 函数（zoneinfo + UTC+8 fallback）
+  - 新增 `get_thinking_control(model)` 辅助
+  - `ModelRouter.cost_estimate` 加 `cache_hit` 参数 + 自动选 off-peak/peak
+- **core/provider.py** 扩展（+54/-9 行）
+  - `LLMProvider.complete / complete_structured / stream` 自动应用模型 thinking 控制
+  - 新增 `_get_extra_body(model_name)` 私有方法（lazy import router 避免循环）
+- **tests/unit/test_provider_router.py** 重写（+347/-132 行）
+  - 55 个测试（V0.22.5 是 40，+15 新增）
+  - TestDefaultRoutesV023 / TestModelPricingV023 / TestCostEstimateV023 / TestIsPeakHour / TestThinkingControl / TestLLMProviderGetExtraBody
+
+#### [0.23.2] 现有模块接入 task=（commit 8e0a37e）
+
+- **core/pipeline.py**（+3/-1）：WritingPipeline._stream_chapter 加 `task=TaskType.WRITING`
+- **core/memory/extractor.py**（+3/-1）：Extractor.extract 加 `task=TaskType.EXTRACTION`
+- **core/memory/verifier.py**（+6/-2）：pre_write_check + post_write_check 加 `task=TaskType.CONSISTENCY`
+- **tests/unit/test_task_routing_integration.py**（+318 行，19 个测试）
+  - MockLLM 记录 kwargs 验证 task= 参数
+  - WRITING → v4-pro，其他 → flash
+  - thinking 自动应用
+  - 源码扫描验证 3 模块都 import + 使用 TaskType
+
+#### [0.23.3] 收官报告（commit eb87db0）
+
+- **docs/v0.23-summary.md** 12 节完整收官
+  - 目标 / 9 项关键决策 / 4 commit 链路 / 路由架构图 / 50 章真实成本 / 关键技术细节 / 限制与未来工作 / 测试演进 / CI 状态
+  - 致谢：5 次错误反思 + 数据驱动方法论
+
+#### Metrics
+
+- **测试**：259 (V0.22.5) → 274 (路由代码) → **293 (task 接入)** passed + 7 skipped
+- **远端 main 演进**：`e268d70` → `9833af7` → `3d41034` → `8e0a37e` → `eb87db0`
+- **4 个 commit 全部 ALL_GREEN**（3 个 code commit 跑 12 个 CI job）
+- **50 章小说真实成本**：
+  - 全 flash：**¥0.35**
+  - 混合（WRITING v4-pro + 其他 flash）：**¥1.12**
+  - 全 v4-pro：¥1.25
+
+#### Key Insights
+
+1. **DeepSeek 价格是 CNY**（不是 USD，便宜 7.2 倍）
+2. **三家全部支持双协议**（OpenAI + Anthropic）
+3. **v4-pro 默认 thinking 模式会耗光 token**（实测 30.52s 输出 0 字），必须显式禁用
+4. **DeepSeek flash cache hit ¥0.02/M** 是全市场最低
+5. **当前代码已经是 OpenAI 兼容 messages 风格**，零代码改动即可迁移到其他家模型
+
+#### Future Work (V0.24+)
+
+- benchmark 加 minimax-M3 + 千问 qwen3.8-max 横向对比
+- prompt cache 真实启用（验证 80% 命中假设，可降本 2-4 倍）
+- CHANGELOG 拆 V0.23 子版本（与 v0.21-summary 对齐）
+
+---
+
 ## [0.21.1] - 2026-09-12
 
 ### Step 1: L4 检索 + L3 早期压缩

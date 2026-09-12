@@ -67,9 +67,7 @@ except ImportError:
 # 复用 novel2all 已有模块（不修改它们）
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from novel2all.core.provider import LLMConfig, LLMProvider
-from novel2all.core.provider_router import DEFAULT_TASK_ROUTES, TaskType
-
+from novel2all.core.provider_router import TaskType
 
 # === 候选模型清单（基于 docs/llm-providers-truth.md）===
 
@@ -77,16 +75,21 @@ CANDIDATE_MODELS = {
     # DeepSeek 直连（OpenAI 兼容）
     "deepseek/deepseek-v4-pro": {
         "base_url": None,  # 用默认 litellm 路由
-        "task_preference": "旗舰模型，长文写作 + 推理",
+        "task_preference": "DeepSeek 旗舰（V0.23 WRITING 默认）",
     },
     "deepseek/deepseek-flash": {
         "base_url": None,
-        "task_preference": "批量处理（extraction/summarization）",
+        "task_preference": "DeepSeek 批量（V0.23 其他 task 默认）",
+    },
+    # minimax（Anthropic 兼容 + 自定义 base_url）
+    "anthropic/MiniMax-M3": {
+        "base_url": "https://api.minimax.cn/anthropic",
+        "task_preference": "minimax 旗舰（中文长篇创作）",
     },
     # 千问平台（OpenAI 兼容 + 自定义 base_url）
     "openai/qwen3.8-max": {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "task_preference": "千问旗舰，对照组",
+        "task_preference": "千问旗舰（对照组）",
     },
     "openai/qwen3.8-flash": {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -94,25 +97,60 @@ CANDIDATE_MODELS = {
     },
 }
 
+# === 各模型 API key 环境变量名 ===
+
+API_KEY_ENV = {
+    "deepseek/deepseek-v4-pro": "DEEPSEEK_API_KEY",
+    "deepseek/deepseek-flash": "DEEPSEEK_API_KEY",
+    "anthropic/MiniMax-M3": "MINIMAX_API_KEY",
+    "openai/qwen3.8-max": "DASHSCOPE_API_KEY",
+    "openai/qwen3.8-flash": "DASHSCOPE_API_KEY",
+}
+
 # === 价格表（CNY/M tokens，与 docs/llm-providers-truth.md 一致）===
 
 PRICING = {
     "deepseek/deepseek-v4-pro": {
-        "input_hit_offpeak": 0.15, "input_miss_offpeak": 4.50, "output_offpeak": 13.50,
-        "input_hit_peak": 0.30, "input_miss_peak": 9.00, "output_peak": 27.00,
+        "input_hit_offpeak": 0.15,
+        "input_miss_offpeak": 4.50,
+        "output_offpeak": 13.50,
+        "input_hit_peak": 0.30,
+        "input_miss_peak": 9.00,
+        "output_peak": 27.00,
     },
     "deepseek/deepseek-flash": {
-        "input_hit_offpeak": 0.02, "input_miss_offpeak": 1.00, "output_offpeak": 4.00,
-        "input_hit_peak": 0.04, "input_miss_peak": 2.00, "output_peak": 8.00,
+        "input_hit_offpeak": 0.02,
+        "input_miss_offpeak": 1.00,
+        "output_offpeak": 4.00,
+        "input_hit_peak": 0.04,
+        "input_miss_peak": 2.00,
+        "output_peak": 8.00,
+    },
+    "anthropic/MiniMax-M3": {
+        # minimax 无 peak/off-peak 区分（按统一价），原文截自 docs/llm-providers-truth.md §4
+        "input_hit_offpeak": 0.84,
+        "input_miss_offpeak": 4.2,
+        "output_offpeak": 8.4,
+        "input_hit_peak": 0.84,
+        "input_miss_peak": 4.2,
+        "output_peak": 8.4,
     },
     "openai/qwen3.8-max": {
-        "input_hit_offpeak": 1.5, "input_miss_offpeak": 12.0, "output_offpeak": 36.0,
+        "input_hit_offpeak": 1.5,
+        "input_miss_offpeak": 12.0,
+        "output_offpeak": 36.0,
         # 千问无 peak/off-peak 区分（按统一价）
-        "input_hit_peak": 1.5, "input_miss_peak": 12.0, "output_peak": 36.0,
+        "input_hit_peak": 1.5,
+        "input_miss_peak": 12.0,
+        "output_peak": 36.0,
     },
     "openai/qwen3.8-flash": {
-        "input_hit_offpeak": 0.1, "input_miss_offpeak": 0.8, "output_offpeak": 2.7,
-        "input_hit_peak": 0.1, "input_miss_peak": 0.8, "output_peak": 2.7,
+        "input_hit_offpeak": 0.1,
+        "input_miss_offpeak": 0.8,
+        "output_offpeak": 2.7,
+        "input_hit_peak": 0.1,
+        "input_miss_peak": 0.8,
+        "output_peak": 2.7,
     },
 }
 
@@ -121,11 +159,13 @@ def is_peak_hour() -> bool:
     """判断当前是否处于 DeepSeek 高峰时段（北京时间）。"""
     try:
         import pytz  # type: ignore[import-not-found]
+
         tz = pytz.timezone("Asia/Shanghai")
     except ImportError:
         # 退化：用本地时间
         tz = None
-    now = datetime.now(tz) if tz else datetime.now()
+    now = datetime.now(tz) if tz else datetime.now()  # noqa: DTZ005
+    # ^ 本地时间用于 fallback，timestamp 字段
     if now.weekday() >= 5:
         return False
     hour = now.hour
@@ -204,6 +244,7 @@ TEST_CASES = {
 
 # === 数据类 ===
 
+
 @dataclass
 class BenchmarkResult:
     task: str
@@ -217,30 +258,37 @@ class BenchmarkResult:
     cache_hit: bool = False
     output_preview: str = ""
     error: str | None = None
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())  # noqa: DTZ005
 
 
 # === Benchmark 主逻辑 ===
 
-async def run_single(task: TaskType, model: str, llm: LLMProvider) -> BenchmarkResult:
+
+async def run_single(
+    task: TaskType, model: str, api_key: str, base_url: str | None
+) -> BenchmarkResult:
     """跑单个 task + model 组合。"""
     import litellm  # 用于设置 thinking 参数 + 获取真实 usage
 
     case = TEST_CASES[task]
     start = time.time()
 
-    # 模型特殊配置（v4-pro 默认 thinking 会耗光 token，需要显式控制）
-    extra_body = None
-    if "v4-pro" in model:
-        # v4-pro 默认 thinking 模式，对简单任务禁用（否则 reasoning 耗光 token）
+    # 模型特殊配置（各家 thinking 控制）
+    extra_body: dict[str, Any] | None = None
+    if "deepseek/deepseek" in model:
+        # DeepSeek 默认 thinking（特别是 v4-pro）会耗光 token，显式禁用
         extra_body = {"thinking": {"type": "disabled"}}
-    elif "flash" in model:
-        # flash 也支持 thinking，但默认关闭 thinking 让 benchmark 更公平
+    elif "qwen" in model.lower():
+        # 千问默认 thinking 默认开（实测 qwen3.8-max thinking_tokens 占 98%）
+        # V0.23 默认禁用以公平对比
+        extra_body = {"enable_thinking": False}
+    # minimax 官方推荐思考模式默认开，但 benchmark 关闭以公平对比
+    elif "minimax" in model.lower():
         extra_body = {"thinking": {"type": "disabled"}}
 
     try:
         # 直接调 litellm 以获取真实 usage 数据
-        messages = []
+        messages: list[dict[str, str]] = []
         if case["system"]:
             messages.append({"role": "system", "content": case["system"]})
         messages.append({"role": "user", "content": case["user"]})
@@ -248,9 +296,12 @@ async def run_single(task: TaskType, model: str, llm: LLMProvider) -> BenchmarkR
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
+            "api_key": api_key,
             "temperature": 0.7 if task == TaskType.WRITING else 0.3,
             "max_tokens": 2048,
         }
+        if base_url:
+            kwargs["api_base"] = base_url
         if extra_body:
             kwargs["extra_body"] = extra_body
 
@@ -260,7 +311,12 @@ async def run_single(task: TaskType, model: str, llm: LLMProvider) -> BenchmarkR
         usage = resp.usage
         input_tokens = getattr(usage, "prompt_tokens", 0) or 0
         output_tokens = getattr(usage, "completion_tokens", 0) or 0
-        cache_hit_tokens = getattr(usage, "prompt_cache_hit_tokens", 0) or 0
+        # 千问的 cache 字段名不同
+        cache_hit_tokens = (
+            getattr(usage, "prompt_cache_hit_tokens", 0)
+            or getattr(usage, "cache_read_input_tokens", 0)
+            or 0
+        )
         cache_hit = cache_hit_tokens > 0 and cache_hit_tokens >= input_tokens * 0.5
         cost = calc_cost(model, input_tokens, output_tokens, cache_hit=cache_hit)
 
@@ -292,56 +348,45 @@ async def run_benchmark(
     models: list[str],
     api_keys: dict[str, str],
 ) -> list[BenchmarkResult]:
-    """跑全部 benchmark 组合。"""
+    """跑全部 benchmark 组合。
+
+    每个模型独立配置 base_url + api_key，通过 litellm.acompletion 直调（不走 LLMProvider，
+    这样能直接拿真实 usage 数据，且不受 provider_router thinking 控制影响）。
+    """
     results = []
     for model in models:
-        # 每个模型独立 LLMProvider（不同的 api_key / base_url）
-        base_url = CANDIDATE_MODELS[model].get("base_url")
-        api_key = None
-        if "deepseek" in model:
-            api_key = api_keys.get("deepseek")
-        elif "qwen" in model or "dashscope" in str(base_url):
-            api_key = api_keys.get("dashscope")
-        elif "minimax" in model:
-            api_key = api_keys.get("minimax")
+        cfg = CANDIDATE_MODELS[model]
+        base_url = cfg.get("base_url")
 
-        if not api_key and "openai/" not in model:
-            # DeepSeek 直连需要 key；千问通过 base_url + DASHSCOPE_API_KEY
-            print(f"[SKIP] {model}: no API key", file=sys.stderr)
+        # 获取 API key（按 API_KEY_ENV 表）
+        env_key_name = API_KEY_ENV.get(model)
+        api_key = os.environ.get(env_key_name) if env_key_name else None
+        if not api_key:
+            print(f"[SKIP] {model}: no API key ({env_key_name})", file=sys.stderr)
             continue
-
-        # 配置 provider
-        config_kwargs = {
-            "default_model": model,
-            "timeout_seconds": 60,
-        }
-        if "deepseek" in model and api_key:
-            config_kwargs["api_key_deepseek"] = api_key
-        elif "qwen" in model and api_key:
-            # 千问用 OpenAI 兼容 + base_url
-            os.environ["OPENAI_API_KEY"] = api_key
-            if base_url:
-                os.environ["OPENAI_BASE_URL"] = base_url
-
-        config = LLMConfig(**config_kwargs)
-        llm = LLMProvider(config)
 
         for task in tasks:
             print(f"[RUN] {task.value} × {model}...", file=sys.stderr)
-            result = await run_single(task, model, llm)
+            result = await run_single(task, model, api_key, base_url)
             results.append(result)
             status = "✓" if result.success else f"✗ ({result.error})"
-            print(f"  {status} {result.latency_seconds}s, {result.output_chars}字, ¥{result.cost_cny:.4f}", file=sys.stderr)
+            print(
+                f"  {status} {result.latency_seconds}s, {result.output_chars}字, "
+                f"¥{result.cost_cny:.4f}",
+                file=sys.stderr,
+            )
 
     return results
 
 
-def render_markdown(results: list[BenchmarkResult], tasks: list[TaskType], models: list[str]) -> str:
+def render_markdown(
+    results: list[BenchmarkResult], tasks: list[TaskType], models: list[str]
+) -> str:
     """生成 markdown 报告。"""
     lines = [
         "# novel2all LLM Benchmark 报告",
         "",
-        f"**生成时间**：{datetime.now().isoformat()}",
+        f"**生成时间**：{datetime.now().isoformat()}",  # noqa: DTZ005
         f"**高峰时段**：{'是（DeepSeek 高峰价）' if is_peak_hour() else '否（DeepSeek 空闲价）'}",
         f"**任务数**：{len(tasks)}，**模型数**：{len(models)}",
         "",
@@ -389,7 +434,7 @@ def render_markdown(results: list[BenchmarkResult], tasks: list[TaskType], model
         total_cost = sum(r.cost_cny for r in mr)
         avg_lat = sum(r.latency_seconds for r in mr) / len(mr) if mr else 0
         succ_rate = sum(1 for r in mr if r.success) / len(mr) if mr else 0
-        lines.append(f"| {model} | ¥{total_cost:.4f} | {avg_lat:.2f} | {succ_rate*100:.0f}% |")
+        lines.append(f"| {model} | ¥{total_cost:.4f} | {avg_lat:.2f} | {succ_rate * 100:.0f}% |")
 
     # 输出预览（仅 successful 且为写作/摘要 task）
     lines.append("\n## 输出预览（抽样）")
@@ -428,9 +473,10 @@ def main() -> None:
         "dashscope": os.environ.get("DASHSCOPE_API_KEY"),
         "minimax": os.environ.get("MINIMAX_API_KEY"),
     }
-    print(f"[INFO] API keys: " + ", ".join(
-        f"{k}={'OK' if v else 'MISSING'}" for k, v in api_keys.items()
-    ))
+    print(
+        "[INFO] API keys: "
+        + ", ".join(f"{k}={'OK' if v else 'MISSING'}" for k, v in api_keys.items())
+    )
 
     if args.dry_run:
         print(f"[DRY-RUN] would test {len(tasks)} tasks × {len(models)} models")

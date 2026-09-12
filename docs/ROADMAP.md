@@ -1,5 +1,81 @@
 # novel2all 路线图
 
+## v0.23 ✅ 数据驱动 LLM Provider 路由（已完成 2026-09-13）
+
+**目标**: 从"行业经验推测"转为"一手文档 + 真实 benchmark"
+
+**完成报告**: [`docs/v0.23-summary.md`](v0.23-summary.md)（9 项关键决策 / 4 commit 链路 / 路由架构图 / 50 章真实成本 / 数据驱动方法论）
+
+**事实基础**: [`docs/llm-providers-truth.md`](llm-providers-truth.md)（一手文档原文 + 5 次错误反思）
+
+**Benchmark 工具**: [`scripts/benchmark_llm.py`](../scripts/benchmark_llm.py) + [结果](../scripts/benchmark_results.md)
+
+### 子版本
+
+| 版本 | 内容 | commit |
+|---|---|---|
+| 0.23.0 | Truth 文档 + Benchmark 脚本 + 真实数据 | `9833af7` |
+| 0.23.1 | DeepSeek 双模型路由 + 真实 CNY 价格 + thinking 控制 | `3d41034` |
+| 0.23.2 | 现有模块接入 task=（pipeline/extractor/verifier） | `8e0a37e` |
+| 0.23.3 | 收官报告（v0.23-summary.md） | `eb87db0` |
+| **合计** | | **4 个 ALL_GREEN** |
+
+### 关键决策（基于真实数据）
+
+1. 三家全部支持双协议（OpenAI + Anthropic）
+2. DeepSeek 价格是 CNY（不是 USD，便宜 7.2 倍）
+3. DeepSeek 双模型覆盖全部 5 TaskType
+4. WRITING 用 v4-pro（字数多 35%），其他用 flash（便宜 3.6 倍 + 快 2 倍）
+5. flash/v4-pro 默认关 thinking（防止 reasoning 耗光 token）
+6. 协议统一 OpenAI 兼容（零代码改动）
+7. is_peak_hour() 自动判断时段（高峰 = off-peak ×2）
+
+### 测试覆盖
+
+- V0.22.5 基线：259 passed + 7 skipped
+- V0.23.0 (Truth + Benchmark)：纯文档，未触发 pytest
+- V0.23.1 (路由代码)：274 passed + 7 skipped（+15 router 新测试）
+- V0.23.2 (task 接入)：**293 passed + 7 skipped**（+19 task 路由集成测试）
+
+### 关键能力
+
+- WRITING 路由到 `deepseek/deepseek-v4-pro`（字数多 35%）
+- 其他 4 个 task 路由到 `deepseek/deepseek-flash`（便宜 3.6 倍）
+- 双模型互为回退（高可用）
+- 50 章小说真实成本：¥1.12（混合方案）/ ¥0.35（全 flash）
+- 远端 main = `eb87db0`，CI + CodeQL ALL_GREEN
+
+### V0.23 → V0.24 候选
+
+- benchmark 加 minimax-M3 + 千问 qwen3.8-max 横向对比
+- prompt cache 真实启用（验证 80% 命中假设，可降本 2-4 倍）
+- CHANGELOG 拆 V0.23 子版本（已完成，0.23.0/0.23.1/0.23.2/0.23.3）
+
+---
+
+## v0.22 ✅ 知识图谱 + 模型路由基础（已完成 2026-09-12）
+
+**目标**: 解决"一致性"问题
+
+### 子版本
+
+| 版本 | 内容 | commit |
+|---|---|---|
+| 0.22.1 | 设计文档（v0.22-design.md） | `cb1a952` |
+| 0.22.2 | graph.py + 节点/边 Pydantic（36 tests） | `16da0bf` |
+| 0.22.3 | Extractor 增量提取图谱（21 tests） | `18e6d32` |
+| 0.22.4 | Manager.load_for_writing 集成 L5（20 tests） | `2c934dd` |
+| 0.22.5 | ModelRouter + TaskType（40 tests） | `e268d70` |
+| **合计** | | **5 个 ALL_GREEN** |
+
+### 关键能力
+
+- L5 知识图谱：5 类节点（Character/Location/Foreshadowing/Event/Item）+ 7 类边
+- 5 TaskType + 双模型路由基础设施
+- 远端 main = `e268d70`
+
+---
+
 ## v0.21 ✅ 检索 + 摘要 + LLM 真写 + Web SSE + UX 面板（已完成 2026-09-12）
 
 **目标**: 解决"漏掉历史"问题，端到端跑通最小可用闭环
@@ -33,20 +109,6 @@
 - 5 层 memory: 50 章模拟零丢失
 - 角色 / 伏笔 / 章节详情 三个面板
 - 远端 main = `56d8455`，CI + CodeQL ALL_GREEN
-
----
-
-## v0.22 — 知识图谱 + 多模型路由
-
-**目标**: 解决"一致性"问题
-
-| 模块 | 工作量 |
-|---|---|
-| `core/memory/graph.py` (NetworkX 知识图谱) | 3 天 |
-| 自动从章节提取图谱节点 / 边 | 3 天 |
-| `core/provider/router.py` (按任务选模型) | 2 天 |
-| 多模型对比实验 | 2 天 |
-| **合计** | **~2 周** |
 
 ---
 
