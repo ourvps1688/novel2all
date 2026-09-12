@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from novel2all.core.memory.extractor import Extractor
+from novel2all.core.memory.graph import MemoryGraph
 from novel2all.core.memory.retriever import MemoryRetriever
 from novel2all.core.memory.summarizer import ChapterSummarizer
 from novel2all.core.memory.tracker import (
@@ -50,24 +51,37 @@ class MemoryManager(BaseModel):
 
     @property
     def extractor(self) -> Extractor:
-        return Extractor(self.llm)  # type: ignore[arg-type]
+        return Extractor(self.llm)
 
     @property
     def verifier(self) -> Verifier:
-        return Verifier(self.llm)  # type: ignore[arg-type]
+        return Verifier(self.llm)
 
     @property
     def retriever(self) -> MemoryRetriever:
         # Lazy init，单例模式：项目级复用 .chroma/ 目录
         if not hasattr(self, "_retriever_cache"):
-            self._retriever_cache = MemoryRetriever(  # type: ignore[attr-defined]
-                self.project_root / ".chroma"
-            )
-        return self._retriever_cache  # type: ignore[attr-defined]
+            self._retriever_cache = MemoryRetriever(self.project_root / ".chroma")
+        return self._retriever_cache
 
     @property
     def summarizer(self) -> ChapterSummarizer:
         return ChapterSummarizer()
+
+    @property
+    def graph(self) -> MemoryGraph:
+        """L5 知识图谱（v0.22，lazy init）。
+
+        从 tracker state.graph（dict）反序列化；无 tracker 时返回空图谱。
+        单例缓存：避免每次 query 都重读 JSON。
+        """
+        if not hasattr(self, "_graph_cache"):
+            if not self.tracker.exists():
+                self._graph_cache = MemoryGraph()
+            else:
+                state = self.tracker.read()
+                self._graph_cache = MemoryGraph.from_dict(state.graph)
+        return self._graph_cache
 
     # === L1: 核心设定 ===
 
@@ -213,6 +227,98 @@ class MemoryManager(BaseModel):
             chapter_range=chapter_range,
         )
 
+    # === L5: 知识图谱（v0.22） ===
+
+    async def load_graph_for_chapter(
+        self,
+        chapter: int,
+        characters_involved: list[str],
+        chapter_outline: str | None = None,
+        *,
+        character_hops: int = 2,
+        recent_event_window: int = 5,
+    ) -> list[MemoryItem]:
+        """加载与本章相关的图谱子图（v0.22 L5 集成）。
+
+        三路查询 + 去重：
+        1. **角色子图**：每个涉及角色为中心（hops=2），覆盖关系、位置、物品
+        2. **active 伏笔**：所有 status=="active" 的伏笔节点（hops=1）
+        3. **最近事件**：last_chapter 在 [chapter-window, chapter) 的事件（hops=1）
+
+        Args:
+            chapter: 当前章节号
+            characters_involved: 本章涉及角色名列表
+            chapter_outline: 章节细纲（保留位，未来可加语义匹配节点）
+            character_hops: 角色子图跳数（默认 2）
+            recent_event_window: 最近事件窗口（默认 ±5 章）
+
+        Returns:
+            list[MemoryItem]：每个子图作为一个 item，便于 LLM 看到结构化段落。
+            空图谱 / 无 tracker → 返回 []。
+        """
+        graph = self.graph
+        if graph.count() == (0, 0):
+            return []
+
+        items: list[MemoryItem] = []
+        seen_node_ids: set[str] = set()
+
+        # 1. 角色子图（最高优先级）
+        for char_name in characters_involved:
+            char_id = f"char:{char_name}"
+            if not graph.has_node(char_id):
+                continue
+            sub = graph.query_subgraph(char_id, hops=character_hops)
+            new_items = _format_subgraph_items(
+                sub,
+                source_label=f"角色 {char_name} 子图",
+                relevance=0.9,
+            )
+            items.extend(new_items)
+            seen_node_ids.update(n["id"] for n in sub["nodes"])
+
+        # 2. active 伏笔（hooks 提醒 LLM 兑现）
+        if self.tracker.exists():
+            state = self.tracker.read()
+            for fs_id_short, fs in state.foreshadowing.items():
+                if fs.status != "active":
+                    continue
+                # fs.id 可能是 "fs:bloodline" 或 "bloodline"（兼容两种）
+                fs_node_id = fs.id if fs.id.startswith("fs:") else f"fs:{fs_id_short}"
+                if fs_node_id in seen_node_ids:
+                    continue
+                if not graph.has_node(fs_node_id):
+                    continue
+                sub = graph.query_subgraph(fs_node_id, hops=1)
+                new_items = _format_subgraph_items(
+                    sub,
+                    source_label=f"伏笔 {fs_node_id}",
+                    relevance=0.85,
+                )
+                items.extend(new_items)
+                seen_node_ids.update(n["id"] for n in sub["nodes"])
+
+        # 3. 最近事件（last_chapter 接近当前章节）
+        for node in graph.iter_nodes():
+            if node.type.value != "Event":
+                continue
+            if node.last_chapter is None or node.last_chapter >= chapter:
+                continue
+            if chapter - node.last_chapter > recent_event_window:
+                continue
+            if node.id in seen_node_ids:
+                continue
+            sub = graph.query_subgraph(node.id, hops=1)
+            new_items = _format_subgraph_items(
+                sub,
+                source_label=f"近期事件 {node.id}",
+                relevance=0.6,
+            )
+            items.extend(new_items)
+            seen_node_ids.update(n["id"] for n in sub["nodes"])
+
+        return items
+
     # === 统一组装 ===
 
     async def load_for_writing(
@@ -221,17 +327,23 @@ class MemoryManager(BaseModel):
         chapter_outline: str,
         characters_involved: list[str],
     ) -> MemoryContext:
-        """写作前组装完整 memory context。"""
+        """写作前组装完整 memory context（v0.22 接入 L5 知识图谱）。"""
         core = await self.load_core()
         character = await self.load_character_states(characters_involved)
         recent = await self.load_recent_chapters(chapter)
         events = await self.search_relevant_events(chapter_outline)
+        graph_items = await self.load_graph_for_chapter(
+            chapter=chapter,
+            characters_involved=characters_involved,
+            chapter_outline=chapter_outline,
+        )
 
         return MemoryContext(
             core=core,
             character=character,
             recent=recent,
             events=events,
+            graph=graph_items,
         )
 
     # === 写后更新 ===
@@ -365,3 +477,73 @@ class MemoryManager(BaseModel):
             for k in char.knowledge:
                 parts.append(f"- {k}")
         return "\n".join(parts)
+
+
+# === L5 图谱格式化辅助函数（v0.22）===
+
+
+def _format_subgraph_items(
+    sub: dict[str, Any],
+    source_label: str,
+    relevance: float = 0.7,
+) -> list[MemoryItem]:
+    """把 query_subgraph 返回的 dict 转成单个 MemoryItem。
+
+    空子图（无节点）返回 []。
+    """
+    nodes = sub.get("nodes", [])
+    edges = sub.get("edges", [])
+    if not nodes:
+        return []
+
+    lines = [f"# {source_label}（{len(nodes)} 节点 / {len(edges)} 边）"]
+    for n in nodes:
+        line = _format_graph_node_line(n)
+        if line:
+            lines.append(line)
+    for e in edges:
+        line = _format_graph_edge_line(e)
+        if line:
+            lines.append(line)
+
+    content = "\n".join(lines)
+    return [
+        MemoryItem(
+            content=content,
+            source=f"graph#{source_label}",
+            layer=MemoryLayer.GRAPH,
+            relevance=relevance,
+            token_count=max(1, len(content) // 4),
+        )
+    ]
+
+
+def _format_graph_node_line(n: dict[str, Any]) -> str | None:
+    """把节点 dict 转成单行 markdown 描述。"""
+    nid = n.get("id")
+    ntype = n.get("type", "Unknown")
+    name = n.get("name", nid or "?")
+    if not nid:
+        return None
+    extra = ""
+    if ntype == "Character":
+        if n.get("alive") is False:
+            extra = " (已死)"
+    elif ntype == "Foreshadowing":
+        extra = f" [{n.get('status', '?')}]"
+    elif ntype == "Location":
+        td = n.get("type_detail")
+        if td:
+            extra = f" [{td}]"
+    return f"- {nid} ({ntype}): {name}{extra}"
+
+
+def _format_graph_edge_line(e: dict[str, Any]) -> str | None:
+    """把边 dict 转成单行 markdown 描述。"""
+    from_id = e.get("from_id")
+    to_id = e.get("to_id")
+    etype = e.get("type", "?")
+    if not from_id or not to_id:
+        return None
+    label = f' "{e.get("label")}"' if e.get("label") else ""
+    return f"- {from_id} --{etype}--> {to_id}{label}"
