@@ -472,6 +472,150 @@ instructor.v2.core.errors.InstructorRetryException:
 `scripts/benchmark_llm.py` 直接调 `litellm.acompletion`（绕开 instructor），所以**仍能用 minimax**——这就是 benchmark 里 minimax 输出 1369 字数据来源。
 
 
+## 15. V0.27 transparent 分流 + V0.28 数据驱动（minimax 真实可用）
+
+### V0.26 留下的"第三条路"
+
+V0.26 失败文档列出三种让 minimax 真实可用的方案：
+
+1. 等 litellm 官方添加 minimax provider（社区 PR 进度不可控）
+2. 等 minimax 提供 OpenAI 兼容 `/v1/chat/completions`（厂商决策）
+3. **在 LLMProvider 写 custom Anthropic Messages client 替代 litellm**（我们自己可控）
+
+V0.27 选 **方案 3** —— 不依赖 litellm/minimax 任何一方，**直接用 httpx 调 `/v1/messages`**，绕过 OpenAI client 的 404 bug。
+
+### V0.27 transparent 分流（commit `4c894b6` / `0c99b7d`）
+
+**核心机制**：调用方传 `model="minimax/MiniMax-M3"` 与传 `model="deepseek/deepseek-v4-pro"` 写法完全一致。LLMProvider 内部按 `MODEL_CONFIG[model].api_base` 是否含 `"anthropic"` 决定走哪条路径：
+
+```
+provider.complete(model="minimax/MiniMax-M3", ...)
+    ↓
+_get_model_config() → ModelConfig(api_base="https://api.minimax.cn/anthropic", ...)
+    ↓
+_is_anthropic_compat() → True（api_base 含 "anthropic"）
+    ↓
+分支 1（minimax/anthropic）→ _call_anthropic_compat() httpx POST /v1/messages
+分支 2（DeepSeek/千问）   → litellm.acompletion (默认)
+```
+
+**关键代码**（`src/novel2all/core/provider.py`）：
+
+```python
+async def complete(self, prompt: str, model: str | None = None, ...) -> str:
+    model_name = self._resolve_model(...)
+    ...
+    if self._is_anthropic_compat(model_name):
+        model_cfg = self._get_model_config(model_name)
+        api_key = self._anthropic_api_key_for(model_name)  # V0.28 数据驱动
+        return await self._call_anthropic_compat(
+            model_name=model_name,
+            api_base=model_cfg.api_base,
+            api_key=api_key,
+            ...
+        )
+    # 否则走 litellm 默认路径
+    return await litellm.acompletion(model=model_name, messages=messages, ...)
+```
+
+**Anthropic Messages API 请求格式**（与 OpenAI Chat Completion 不同）：
+- URL：`{api_base}/v1/messages`（不是 `/v1/chat/completions`）
+- Headers：`x-api-key` + `anthropic-version: 2023-06-01` + `content-type: application/json`
+- Body：
+  - `model`：去掉 provider 前缀（`MiniMax-M3` 而非 `minimax/MiniMax-M3`）
+  - `system`：顶层字段（不在 `messages` 内）
+  - `messages`：只含 user（不含 system）
+  - 合并 `extra_body`（如 `thinking: {type: disabled}`）
+  - 流式时加 `stream: true`
+
+**流式 SSE 解析**：
+- 监听 `event: content_block_delta` + `data: {...}` 行
+- 取 `delta.text` 字段 yield 给调用方
+- 忽略 `message_start` / `content_block_start` / `content_block_stop` / `message_stop` 等事件
+
+### V0.27 顺手修的真 bug
+
+`_stream_anthropic_compat` 原代码里 `continue` 后面跟的 `yield` 是**死代码**——Python `try/except` 后 `continue` 跳过同一缩进层的剩余代码，控制流跳回循环顶部。这意味着之前 stream 路径**从没真的 yield 过任何 text delta**（如果之前跑过这条路径的话）。V0.27 测试用 mock SSE 抓到，修法是把 yield 块移出 `try/except`（改为正常缩进）。
+
+### V0.28 数据驱动重构（commit `0c87f19`）
+
+V0.27 的 `_anthropic_api_key_for` 是 hardcoded 启发式（`"minimax" in name` / `"anthropic"/"claude" in name`），每加一个 anthropic_compat provider 都要改代码。V0.28 改为读 `MODEL_CONFIG[model].api_key_env` 字段：
+
+```python
+# V0.27 (hardcoded)
+def _anthropic_api_key_for(self, model_name: str) -> str | None:
+    name_lower = model_name.lower()
+    if "minimax" in name_lower:
+        return os.environ.get("MINIMAX_API_KEY")
+    if "anthropic" in name_lower or "claude" in name_lower:
+        return os.environ.get("ANTHROPIC_API_KEY")
+    return None
+
+# V0.28 (data-driven)
+def _anthropic_api_key_for(self, model_name: str) -> str | None:
+    model_cfg = self._get_model_config(model_name)
+    if not model_cfg.api_key_env:
+        return None
+    return os.environ.get(model_cfg.api_key_env)
+```
+
+`ModelConfig` 加 `api_key_env: str | None = None` 字段。`MODEL_CONFIG` 给现有条目配 `api_key_env`：
+
+```python
+"minimax/MiniMax-M3": ModelConfig(
+    api_base="https://api.minimax.cn/anthropic",
+    extra_body={"thinking": {"type": "disabled"}},
+    api_key_env="MINIMAX_API_KEY",  # V0.28 新增
+),
+"anthropic/claude-sonnet-4-20250514": ModelConfig(
+    api_key_env="ANTHROPIC_API_KEY",  # 占位：未来如需走 Anthropic Messages API 加 api_base 即可
+),
+"anthropic/claude-opus-4-20250514": ModelConfig(
+    api_key_env="ANTHROPIC_API_KEY",
+),
+```
+
+### 真实端到端验证（2026-09-13）
+
+三个场景用真实 `MINIMAX_API_KEY` 跑通：
+
+| 场景 | 调用方式 | 耗时 | 输出 |
+|---|---|---|---|
+| `complete` | `complete(model='minimax/MiniMax-M3')` | **3.15s** | 53 字中文 |
+| `stream` | `await provider.stream(...)` + async for | **2.67s** | 21 chunks 真诗句 |
+| **router 自动路由** | `complete(task=TaskType.WRITING)`（不传 model）| **9.31s** | 16 字武侠开篇 |
+
+**关键意义**：V0.26 时期 `complete(model='minimax/MiniMax-M3')` 直接 404；V0.27 现在真实 API 调用成功返回有效中文内容。**第 3 个场景是核心卖点** —— `task=WRITING` 不传 model，router 自动选 minimax，transparent 分流到 httpx，调用方完全无感知。
+
+### 当前限制
+
+- `complete_structured()` **仍走 litellm + instructor**（未接 anthropic_compat 分流）。原因：minimax 不支持 Pydantic schema 验证（Anthropic Messages API 无 structured outputs 端点）。如果未来 WRITING 任务需要结构化输出，路由时已自动避开 minimax（EXTRACTION/CONSISTENCY/SUMMARIZATION/COVER 用 DeepSeek flash）
+- `_stream_anthropic_compat` 修复死代码 bug 后**尚未在生产验证过 SSE 真实流式**——单元测试用 mock 验证了事件解析，但未跑过真实 minimax 流式调用。后续应做真实 SSE 端到端测试
+- 国内代理 Anthropic Claude（如自托管 Anthropic 兼容服务）目前走 litellm 默认；如需 transparent 分流到 httpx，只用在 `MODEL_CONFIG` 加 `api_base` 含 `"anthropic"` + `api_key_env` 字段
+
+### V0.27 + V0.28 决策与影响
+
+**决策**：在 LLMProvider 内部做 anthropic_compat 分流，**不依赖 litellm 官方支持 minimax**。这条路：
+- ✅ 完全可控（我们自己写 httpx）
+- ✅ 调用方无感（透明分流）
+- ✅ 数据驱动（V0.28 加 provider 零代码改动）
+- ⚠️ 失去 litellm 的统一抽象（重试、流控、监控等需自己实现）
+- ⚠️ instructor/Pydantic 验证不支持（这是协议层限制）
+
+**影响**：
+- WRITING 默认路由从 `deepseek/deepseek-v4-pro` 切到 `minimax/MiniMax-M3`（基于 V0.26 benchmark 实测字数优势 845 vs 550）
+- 其他 4 个 task 仍走 DeepSeek 双模型（结构化任务，flash 质量足够）
+- 50 章小说 WRITING 成本预估：~¥0.024 / 章（minimax 4.2 元/M input + 8.4 元/M output）
+
+### 测试与 CI
+
+- `TestAnthropicCompatV027`：10 个测试覆盖 `_is_anthropic_compat` / `_anthropic_api_key_for` / `_call_anthropic_compat` / `_stream_anthropic_compat` / `complete()` 路由分流（mock httpx + mock litellm）
+- `TestModelConfigApiKeyEnvV028`：7 个测试覆盖 `ModelConfig.api_key_env` 字段 + 配置驱动 + 扩展性
+- **CI #46 + CodeQL #46**（V0.27 commit `0c99b7d`）：12/12 jobs 双绿
+- **CI #47 + CodeQL #47**（V0.28 commit `0c87f19`）：12/12 jobs 双绿
+- **pytest 总数**：V0.27 前 324 → V0.28 后 341（+17 新测试），零回归
+
+
 ## 10. 引用
 
 - 本文档用于 V0.23 决策依据
