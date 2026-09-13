@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import inspect
 from datetime import datetime, timedelta, timezone
+from typing import ClassVar
 from unittest.mock import patch
 
 import pytest
@@ -949,3 +950,306 @@ class TestCacheEnabledFromEnv:
             assert config.cache_enabled is True
         finally:
             os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
+
+
+class TestAnthropicCompatV027:
+    """V0.27 transparent 分流：Anthropic Messages API 兼容路径。
+
+    关键背景：
+    - minimax-M3 必须用国内 Anthropic 端点 api.minimax.cn/anthropic
+    - litellm 默认拼 /v1/chat/completions → 404 page not found
+    - V0.27 解法：LLMProvider._is_anthropic_compat 检测 api_base 含 "anthropic" 时，
+      绕过 litellm，直接 httpx POST /v1/messages
+    - 调用方传 model="minimax/MiniMax-M3" 即可，透明分流
+    """
+
+    def test_is_anthropic_compat_detects_minimax(self) -> None:
+        """minimax api_base 含 "anthropic" → _is_anthropic_compat 返回 True。"""
+        from novel2all.core.provider import LLMProvider
+
+        provider = LLMProvider(LLMConfig())
+        assert provider._is_anthropic_compat("minimax/MiniMax-M3") is True
+
+    def test_is_anthropic_compat_false_for_deepseek(self) -> None:
+        """DeepSeek / 千问（OpenAI 兼容）→ 返回 False（走 litellm）。"""
+        from novel2all.core.provider import LLMProvider
+
+        provider = LLMProvider(LLMConfig())
+        assert provider._is_anthropic_compat("deepseek/deepseek-v4-pro") is False
+        assert provider._is_anthropic_compat("deepseek/deepseek-flash") is False
+        assert provider._is_anthropic_compat("openai/qwen3.8-flash") is False
+
+    def test_is_anthropic_compat_false_for_unknown(self) -> None:
+        """未知模型 → 返回 False（走 litellm 默认）。"""
+        from novel2all.core.provider import LLMProvider
+
+        provider = LLMProvider(LLMConfig())
+        assert (
+            provider._is_anthropic_compat("anthropic/claude-sonnet-4-20250514") is False
+        )  # 无国内镜像配置
+        assert provider._is_anthropic_compat("unknown-model") is False
+
+    def test_anthropic_api_key_for_minimax_uses_minimax_key(self) -> None:
+        """minimax model → 读 MINIMAX_API_KEY 环境变量。"""
+        import os
+
+        from novel2all.core.provider import LLMProvider
+
+        os.environ["MINIMAX_API_KEY"] = "test-minimax-key"
+        try:
+            provider = LLMProvider(LLMConfig())
+            assert provider._anthropic_api_key_for("minimax/MiniMax-M3") == "test-minimax-key"
+        finally:
+            os.environ.pop("MINIMAX_API_KEY", None)
+
+    def test_anthropic_api_key_for_anthropic_uses_anthropic_key(self) -> None:
+        """anthropic/claude model → 读 ANTHROPIC_API_KEY 环境变量。"""
+        import os
+
+        from novel2all.core.provider import LLMProvider
+
+        os.environ["ANTHROPIC_API_KEY"] = "test-anthropic-key"
+        try:
+            provider = LLMProvider(LLMConfig())
+            assert (
+                provider._anthropic_api_key_for("anthropic/claude-sonnet-4-20250514")
+                == "test-anthropic-key"
+            )
+        finally:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    def test_anthropic_api_key_returns_none_when_unset(self) -> None:
+        """未设置环境变量 → 返回 None（调用方需自己处理）。"""
+        import os
+
+        from novel2all.core.provider import LLMProvider
+
+        os.environ.pop("MINIMAX_API_KEY", None)
+        provider = LLMProvider(LLMConfig())
+        assert provider._anthropic_api_key_for("minimax/MiniMax-M3") is None
+
+    @pytest.mark.asyncio
+    async def test_call_anthropic_compat_sends_correct_request(self) -> None:
+        """_call_anthropic_compat 实际 httpx 请求格式正确。
+
+        Mock httpx.AsyncClient.post，验证：
+        - URL = api_base + /v1/messages
+        - Headers: x-api-key, anthropic-version: 2023-06-01
+        - Body.model: 去掉 provider 前缀（MiniMax-M3 而非 minimax/MiniMax-M3）
+        - Body.system: 顶层（非 messages 内）
+        - Body.messages: 只含 user（不含 system）
+        - Body 合并 extra_body（如 thinking: {type: disabled}）
+        """
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from novel2all.core.provider import LLMProvider
+
+        provider = LLMProvider(LLMConfig())
+
+        with (
+            patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"),
+            patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "id": "msg_xxx",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Hello back"}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 10, "output_tokens": 3},
+            }
+            mock_resp.raise_for_status = MagicMock()
+            mock_post.return_value = mock_resp
+
+            content = await provider._call_anthropic_compat(
+                model_name="minimax/MiniMax-M3",
+                api_base="https://api.minimax.cn/anthropic",
+                api_key="test-key",
+                messages=[{"role": "user", "content": "Hello"}],
+                system="You are a writer.",
+                temperature=0.7,
+                max_tokens=1024,
+                extra_body={"thinking": {"type": "disabled"}},
+            )
+
+        # 1. 返回内容正确
+        assert content == "Hello back"
+
+        # 2. httpx.post 被调用一次
+        mock_post.assert_called_once()
+        # client.post(url, ...) 的 url 是位置参数（在 args[0]）
+        call_args = mock_post.call_args.args
+        assert call_args[0] == "https://api.minimax.cn/anthropic/v1/messages"
+
+        # 3. Headers + Body 都在 kwargs
+        call_kwargs = mock_post.call_args.kwargs
+        headers = call_kwargs["headers"]
+        assert headers["x-api-key"] == "test-key"
+        assert headers["anthropic-version"] == "2023-06-01"
+        assert headers["content-type"] == "application/json"
+
+        body = call_kwargs["json"]
+        assert body["model"] == "MiniMax-M3"  # 不是 "minimax/MiniMax-M3"
+        assert body["max_tokens"] == 1024
+        assert body["temperature"] == 0.7
+
+        # 4. Body.system: 顶层（不在 messages）
+        assert body["system"] == "You are a writer."
+        assert all(m["role"] != "system" for m in body["messages"])
+        assert body["messages"] == [{"role": "user", "content": "Hello"}]
+
+        # 5. extra_body 合并（thinking: {type: disabled}）
+        assert body["thinking"] == {"type": "disabled"}
+
+    @pytest.mark.asyncio
+    async def test_complete_routes_minimax_to_anthropic_compat(self) -> None:
+        """complete() 调 minimax 时走 _call_anthropic_compat，不调 litellm。"""
+        import os
+        from unittest.mock import AsyncMock, patch
+
+        from novel2all.core.provider import LLMProvider
+
+        os.environ["MINIMAX_API_KEY"] = "test-key"
+        try:
+            provider = LLMProvider(LLMConfig())
+
+            # Mock 两个：litellm 不应被调 + anthropic_compat 应被调
+            with patch.object(
+                LLMProvider, "_call_anthropic_compat", new_callable=AsyncMock
+            ) as mock_call:
+                mock_call.return_value = "MOCK_TEXT"
+
+                # 同时 patch litellm（如果被调会失败）
+                with patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm:
+                    result = await provider.complete(prompt="hi", model="minimax/MiniMax-M3")
+
+                    # 1. anthropic_compat 被调
+                    mock_call.assert_called_once()
+                    # 2. litellm 完全没被调（关键：透明分流）
+                    mock_litellm.assert_not_called()
+                    # 3. 返回内容
+                    assert result == "MOCK_TEXT"
+        finally:
+            os.environ.pop("MINIMAX_API_KEY", None)
+
+    @pytest.mark.asyncio
+    async def test_complete_still_uses_litellm_for_deepseek(self) -> None:
+        """complete() 调 DeepSeek（非 anthropic_compat）时仍走 litellm。"""
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+
+        from novel2all.core.provider import LLMProvider
+
+        provider = LLMProvider(LLMConfig())
+
+        # 同时 patch 两个
+        with (
+            patch.object(
+                LLMProvider, "_call_anthropic_compat", new_callable=AsyncMock
+            ) as mock_call,
+            patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm,
+        ):
+            mock_litellm.return_value = SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="DS_RESPONSE"))]
+            )
+
+            result = await provider.complete(prompt="hi", model="deepseek/deepseek-flash")
+
+            # 1. litellm 被调
+            mock_litellm.assert_called_once()
+            # 2. anthropic_compat 没被调
+            mock_call.assert_not_called()
+            # 3. 返回 litellm 内容
+            assert result == "DS_RESPONSE"
+
+    @pytest.mark.asyncio
+    async def test_stream_anthropic_compat_yields_deltas(self) -> None:
+        """_stream_anthropic_compat 正确解析 SSE content_block_delta 事件。"""
+        from unittest.mock import patch
+
+        from novel2all.core.provider import LLMProvider
+
+        provider = LLMProvider(LLMConfig())
+
+        # 构造 SSE 响应
+        sse_lines = [
+            "event: message_start",
+            'data: {"type":"message_start","message":{"id":"msg_1"}}',
+            "",
+            "event: content_block_start",
+            'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+            "",
+            "event: content_block_delta",
+            'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}',
+            "",
+            "event: content_block_delta",
+            'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world"}}',
+            "",
+            "event: content_block_stop",
+            'data: {"type":"content_block_stop","index":0}',
+            "",
+            "event: message_stop",
+            'data: {"type":"message_stop"}',
+            "",
+        ]
+
+        # Fake httpx.AsyncClient：模拟 SSE 流式响应
+        class FakeResponse:
+            def raise_for_status(self) -> None:
+                pass
+
+            async def aiter_lines(self):
+                for line in sse_lines:
+                    yield line
+
+        class FakeStreamContext:
+            """async with client.stream(...) as resp: 的 resp 上下文"""
+
+            async def __aenter__(self):
+                return FakeResponse()
+
+            async def __aexit__(self, *args):
+                return None
+
+        class FakeClient:
+            """async with httpx.AsyncClient(...) as client: 的 client 上下文"""
+
+            captured_kwargs: ClassVar[dict] = {}
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            def stream(self, method: str, url: str, **kwargs):
+                FakeClient.captured_kwargs = {"method": method, "url": url, **kwargs}
+                return FakeStreamContext()
+
+        with patch("httpx.AsyncClient", FakeClient):
+            chunks: list[str] = []
+            async for text in provider._stream_anthropic_compat(
+                model_name="minimax/MiniMax-M3",
+                api_base="https://api.minimax.cn/anthropic",
+                api_key="test-key",
+                messages=[{"role": "user", "content": "hi"}],
+                system=None,
+                temperature=0.7,
+                max_tokens=1024,
+                extra_body={"thinking": {"type": "disabled"}},
+            ):
+                chunks.append(text)
+
+        # 只 yield text_delta，其他事件（start/stop）忽略
+        assert chunks == ["Hello", " world"]
+        # body 验证
+        assert FakeClient.captured_kwargs["method"] == "POST"
+        assert FakeClient.captured_kwargs["url"] == "https://api.minimax.cn/anthropic/v1/messages"
+        body = FakeClient.captured_kwargs["json"]
+        assert body["model"] == "MiniMax-M3"
+        assert body["stream"] is True
+        assert body["thinking"] == {"type": "disabled"}

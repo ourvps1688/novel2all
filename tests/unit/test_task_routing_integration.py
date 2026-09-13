@@ -353,44 +353,45 @@ class TestMinimaxIntegrationV027:
         assert cfg.extra_body == {"thinking": {"type": "disabled"}}
 
     def test_minimax_complete_applies_api_base(self) -> None:
-        """LLMProvider.complete 调用 minimax 时自动注入 api_base + extra_body。
+        """V0.27 transparent 分流：LLMProvider.complete 调用 minimax 时走 httpx 分支。
 
-        注意：complete（非结构化）走 litellm.acompletion direct，
-        即使 MODEL_CONFIG 配置正确，当前 litellm 版本也不支持 minimax provider，
-        实测报 404。
+        V0.27 关键改动：minimax-M3 必须用 Anthropic Messages API（国内端点
+        api.minimax.cn/anthropic），litellm 默认拼 /v1/chat/completions → 404。
+        LLMProvider._is_anthropic_compat() 检测 api_base 含 "anthropic" 时，
+        绕过 litellm，直接 httpx POST /v1/messages。
         """
-        # 直接验证 provider.complete 拼 kwargs 时正确应用 MODEL_CONFIG
+        import asyncio
+        import os
+        from unittest.mock import AsyncMock, patch
+
+        # 确保有 API key（mock httpx 不真发请求，但 _anthropic_api_key_for 需读到 key）
+        os.environ["MINIMAX_API_KEY"] = "test-key-v027"
+
         config = LLMConfig()
         provider = LLMProvider(config)
 
-        captured_kwargs: dict = {}
+        from novel2all.core import provider as provider_mod
 
-        async def fake_acompletion(**kwargs):
-            captured_kwargs.update(kwargs)
-            from types import SimpleNamespace
+        # 直接 patch _call_anthropic_compat（端到端 mock）— 验证调用链 + 返回内容
+        with patch.object(
+            provider_mod.LLMProvider,
+            "_call_anthropic_compat",
+            new_callable=AsyncMock,
+        ) as mock_call:
+            mock_call.return_value = "MOCK_RESPONSE"
 
-            return SimpleNamespace(
-                choices=[SimpleNamespace(message=SimpleNamespace(content="MOCK"))]
-            )
+            result = asyncio.run(provider.complete(prompt="hello", model="minimax/MiniMax-M3"))
 
-        import litellm
+            # 1. httpx 分支被调用（不是 litellm）
+            mock_call.assert_called_once()
+            call_kwargs = mock_call.call_args.kwargs
+            assert call_kwargs["model_name"] == "minimax/MiniMax-M3"
+            assert call_kwargs["api_base"] == "https://api.minimax.cn/anthropic"
+            assert call_kwargs["api_key"] == "test-key-v027"
+            assert call_kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
 
-        original = litellm.acompletion
-        litellm.acompletion = fake_acompletion
-        try:
-            import asyncio
-
-            asyncio.run(
-                provider.complete(
-                    prompt="test",
-                    model="minimax/MiniMax-M3",
-                )
-            )
-            # 验证 api_base 自动应用（即使该 URL 不可达，至少配置正确）
-            assert captured_kwargs.get("api_base") == "https://api.minimax.cn/anthropic"
-            assert captured_kwargs.get("extra_body") == {"thinking": {"type": "disabled"}}
-        finally:
-            litellm.acompletion = original
+            # 2. 返回的内容正确传递
+            assert result == "MOCK_RESPONSE"
 
     def test_minimax_cache_key_uses_correct_endpoint(self) -> None:
         """V0.26: minimax cache key 应包含正确的 model name。"""

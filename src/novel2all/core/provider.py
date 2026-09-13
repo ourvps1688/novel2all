@@ -12,7 +12,9 @@ V0.24 prompt cache：
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+from collections.abc import AsyncIterator
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -137,15 +139,38 @@ class LLMProvider:
         if self.config.cache_enabled:
             self._cache_misses += 1
 
-        try:
-            import litellm
-        except ImportError as e:
-            raise ImportError("Please install litellm: `uv add litellm`") from e
-
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
+
+        # V0.27 transparent 分流：Anthropic Messages API 兼容路径（minimax 等）
+        if self._is_anthropic_compat(model_name):
+            model_cfg = self._get_model_config(model_name)
+            api_key = self._anthropic_api_key_for(model_name)
+            if not api_key:
+                raise ValueError(
+                    f"{model_name} requires API key but not set in environment "
+                    f"(expected MINIMAX_API_KEY or ANTHROPIC_API_KEY)"
+                )
+            content = await self._call_anthropic_compat(
+                model_name=model_name,
+                api_base=model_cfg.api_base,  # 已由 _is_anthropic_compat 保证非 None
+                api_key=api_key,
+                messages=messages,
+                system=system,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_body=model_cfg.extra_body,
+            )
+            if self.config.cache_enabled:
+                self._cache_store(cache_key, content)
+            return content
+
+        try:
+            import litellm
+        except ImportError as e:
+            raise ImportError("Please install litellm: `uv add litellm`") from e
 
         kwargs = {
             "model": model_name,
@@ -327,6 +352,26 @@ class LLMProvider:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
+        # V0.27 transparent 分流：Anthropic Messages API 兼容路径
+        if self._is_anthropic_compat(model_name):
+            model_cfg = self._get_model_config(model_name)
+            api_key = self._anthropic_api_key_for(model_name)
+            if not api_key:
+                raise ValueError(
+                    f"{model_name} requires API key but not set in environment "
+                    f"(expected MINIMAX_API_KEY or ANTHROPIC_API_KEY)"
+                )
+            return self._stream_anthropic_and_cache(
+                model_name=model_name,
+                api_base=model_cfg.api_base,
+                api_key=api_key,
+                messages=messages,
+                system=system,
+                temperature=temperature,
+                extra_body=model_cfg.extra_body,
+                cache_key=cache_key,
+            )
+
         kwargs = {
             "model": model_name,
             "messages": messages,
@@ -376,6 +421,45 @@ class LLMProvider:
             full = "".join(chunks)
             cache_store(cache_key, full)
 
+    async def _stream_anthropic_and_cache(
+        self,
+        *,
+        model_name: str,
+        api_base: str,
+        api_key: str,
+        messages: list[dict[str, str]],
+        system: str | None,
+        temperature: float,
+        max_tokens: int = 4096,
+        extra_body: dict[str, Any] | None = None,
+        cache_key: tuple[str, str, str, float] | None = None,
+    ) -> AsyncIterator[str]:
+        """V0.27：流式 httpx 调 Anthropic Messages API + 缓存。
+
+        与 _stream_and_cache 对称：拼接完整内容后写入 cache。
+        调用方用 async for 消费。
+        """
+        cache_enabled = self.config.cache_enabled
+        cache_store = self._cache_store
+
+        chunks: list[str] = []
+        async for text in self._stream_anthropic_compat(
+            model_name=model_name,
+            api_base=api_base,
+            api_key=api_key,
+            messages=messages,
+            system=system,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            extra_body=extra_body,
+        ):
+            chunks.append(text)
+            yield text
+        # 流结束后写入缓存
+        if cache_enabled and cache_key is not None:
+            full = "".join(chunks)
+            cache_store(cache_key, full)
+
     def _resolve_model(self, *, task: Any = None, explicit_model: str | None = None) -> str:
         """决定本次调用使用哪个模型。
 
@@ -417,3 +501,178 @@ class LLMProvider:
         """
         cfg = self._get_model_config(model_name)
         return cfg.extra_body if cfg else None
+
+    # === V0.27 transparent 分流：Anthropic Messages API 兼容路径 ===
+    # 背景：minimax-M3 必须用 Anthropic Messages API（国内端点 api.minimax.cn/anthropic），
+    # 但 litellm 默认拼 /v1/chat/completions → 404。instructor 走 litellm → 同样 404。
+    # 解法：LLMProvider 检测 api_base 含 "anthropic" 时，绕过 litellm，直接 httpx 调 /v1/messages。
+    # 调用方无需任何改动（仍传 model="minimax/MiniMax-M3"），透明分流。
+
+    def _is_anthropic_compat(self, model_name: str) -> bool:
+        """V0.27：判断模型是否走 Anthropic Messages API 兼容端点。
+
+        规则：MODEL_CONFIG[model].api_base 含 "anthropic"。
+        适用：minimax-M3（国内 Anthropic 兼容端点 api.minimax.cn/anthropic）。
+        未来：其他国内 Anthropic 镜像也可走此路径（如 claude 国内代理）。
+
+        Returns:
+            True = 走 _call_anthropic_compat()（httpx 直接调 /v1/messages）
+            False = 走 litellm.acompletion()（OpenAI 兼容 / 默认）
+        """
+        cfg = self._get_model_config(model_name)
+        return bool(cfg.api_base and "anthropic" in cfg.api_base)
+
+    def _anthropic_api_key_for(self, model_name: str) -> str | None:
+        """V0.27：从环境变量读 anthropic 兼容端点的 API key。
+
+        规则（按 model_name 启发式，未来可改为 MODEL_CONFIG 加字段）：
+        - "minimax" in model_name → MINIMAX_API_KEY
+        - "anthropic"/"claude" in model_name → ANTHROPIC_API_KEY
+        - 其他 anthropic_compat 模型 → 返回 None（调用方需显式提供）
+
+        Returns:
+            API key 字符串，未设置则返回 None。
+        """
+        name_lower = model_name.lower()
+        if "minimax" in name_lower:
+            return os.environ.get("MINIMAX_API_KEY")
+        if "anthropic" in name_lower or "claude" in name_lower:
+            return os.environ.get("ANTHROPIC_API_KEY")
+        return None
+
+    async def _call_anthropic_compat(
+        self,
+        *,
+        model_name: str,
+        api_base: str,
+        api_key: str,
+        messages: list[dict[str, str]],
+        system: str | None,
+        temperature: float,
+        max_tokens: int,
+        extra_body: dict[str, Any] | None = None,
+    ) -> str:
+        """V0.27：直接 httpx 调 Anthropic Messages API（/v1/messages）。
+
+        绕过 litellm 默认拼 `/v1/chat/completions` 路径导致的 404 bug。
+        适用：minimax-M3 等使用 Anthropic Messages API 协议但 litellm 不识别的 provider。
+
+        Body 格式（Anthropic 规范）：
+        - model 字段去掉 provider 前缀（如 "minimax/MiniMax-M3" → "MiniMax-M3"）
+        - system 在 body 顶层（不在 messages 里）
+        - messages 只含 user/assistant（不含 system）
+
+        Returns:
+            response.content[].text 拼接的字符串。
+        """
+        import httpx
+
+        # 去掉 provider 前缀（Anthropic Messages API 不认 "minimax/"）
+        bare_model = model_name.split("/", 1)[-1] if "/" in model_name else model_name
+
+        # 过滤掉 system messages（Anthropic 用顶层 system 字段）
+        user_messages = [
+            {"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"
+        ]
+
+        body: dict[str, Any] = {
+            "model": bare_model,
+            "max_tokens": max_tokens,
+            "messages": user_messages,
+            "temperature": temperature,
+        }
+        if system:
+            body["system"] = system
+        # extra_body 合并（如 {"thinking": {"type": "disabled"}}）
+        if extra_body:
+            body.update(extra_body)
+
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+
+        url = api_base.rstrip("/") + "/v1/messages"
+        async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
+            resp = await client.post(url, json=body, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+        # Anthropic 响应：content 是数组，每个 element.type="text" 含 text 字段
+        content_blocks = data.get("content", [])
+        parts: list[str] = []
+        for blk in content_blocks:
+            if blk.get("type") == "text":
+                parts.append(blk.get("text", ""))
+        return "".join(parts)
+
+    async def _stream_anthropic_compat(
+        self,
+        *,
+        model_name: str,
+        api_base: str,
+        api_key: str,
+        messages: list[dict[str, str]],
+        system: str | None,
+        temperature: float,
+        max_tokens: int,
+        extra_body: dict[str, Any] | None = None,
+    ) -> AsyncIterator[str]:
+        """V0.27：流式 httpx 调 Anthropic Messages API（SSE 事件流）。
+
+        SSE 事件格式：
+        - content_block_delta: data.delta.type="text_delta", data.delta.text="..."
+        - 其他事件（message_start/content_block_start/content_block_stop/message_stop）忽略
+
+        Yields:
+            text_delta 字符串（拼起来即完整响应）。
+        """
+        import httpx
+
+        bare_model = model_name.split("/", 1)[-1] if "/" in model_name else model_name
+        user_messages = [
+            {"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"
+        ]
+
+        body: dict[str, Any] = {
+            "model": bare_model,
+            "max_tokens": max_tokens,
+            "messages": user_messages,
+            "temperature": temperature,
+            "stream": True,
+        }
+        if system:
+            body["system"] = system
+        if extra_body:
+            body.update(extra_body)
+
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+
+        url = api_base.rstrip("/") + "/v1/messages"
+        async with (
+            httpx.AsyncClient(timeout=self.config.timeout_seconds) as client,
+            client.stream("POST", url, json=body, headers=headers) as resp,
+        ):
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if not line or not line.startswith("data: "):
+                    continue
+                data_str = line[len("data: ") :].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    evt = json.loads(data_str)
+                except Exception:  # SSE 容错：忽略非 JSON 行
+                    continue
+                # content_block_delta 事件：delta.type="text_delta", delta.text="..."
+                if evt.get("type") == "content_block_delta":
+                    delta = evt.get("delta", {})
+                    if delta.get("type") == "text_delta":
+                        text = delta.get("text", "")
+                        if text:
+                            yield text
