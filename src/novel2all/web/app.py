@@ -267,6 +267,14 @@ def create_app() -> FastAPI:
             {"models": models, "current_model": provider.config.default_model},
         )
 
+    # V0.30.2：Cache 命中率面板（暴露 V0.24 + V0.29.0 LRU）
+    @app.get("/page/cache-panel", response_class=HTMLResponse)
+    async def page_cache_panel(request: Request) -> HTMLResponse:
+        """HTMX 用：渲染 cache_panel.html（含 hit_rate 颜色逻辑 + LRU 进度条）。"""
+        provider: LLMProvider = request.app.state.provider
+        stats = provider.cache_stats()
+        return templates.TemplateResponse(request, "cache_panel.html", {"stats": stats})
+
     @app.get("/api/cache/stats")
     async def cache_stats(request: Request) -> dict[str, Any]:
         """V0.29.3：返回 lifespan provider 的 cache 统计。

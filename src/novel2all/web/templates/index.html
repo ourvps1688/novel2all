@@ -18,6 +18,11 @@
     <div class="card"><h2>🤖 模型选择</h2><p>加载中...</p></div>
 </div>
 
+{# V0.30.2 Cache 命中率面板（HTMX hx-trigger="every 5s" 实时刷新）#}
+<div hx-get="/page/cache-panel" hx-trigger="load, every 5s" hx-swap="outerHTML" id="cache-panel">
+    <div class="card"><h2>📊 Cache 统计</h2><p>加载中...</p></div>
+</div>
+
 <div class="grid">
     <div class="card">
         <h2>📋 Skill 列表</h2>
