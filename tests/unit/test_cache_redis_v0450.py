@@ -254,7 +254,10 @@ def test_redis_backend_raises_on_connection_failure() -> None:
     mock_client = MagicMock()
     mock_client.ping.side_effect = ConnectionError("Redis refused")
 
-    with patch("redis.Redis.from_url", return_value=mock_client), pytest.raises((ConnectionError, OSError, RuntimeError)):
+    with (
+        patch("redis.Redis.from_url", return_value=mock_client),
+        pytest.raises((ConnectionError, OSError, RuntimeError)),
+    ):
         # 应抛 ConnectionError 或包装后的异常
         RedisBackend(url="redis://nonexistent:6379/0", namespace="test")
 
