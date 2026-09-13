@@ -741,6 +741,168 @@ def create_app() -> FastAPI:
             "hint": "POST 表单到 /api/write/stream/model 触发扩写",
         }
 
+    # V0.38：AI 重写指定区段
+    @app.post("/api/chapter/{chapter}/rewrite")
+    async def rewrite_section(
+        chapter: int,
+        start: int = Form(...),
+        end: int = Form(...),
+        instruction: str = Form("改写得更生动自然"),
+        project_root: str = Form("."),
+        model: str | None = Form(None),
+    ) -> dict[str, Any]:
+        """V0.38：LLM 改写章节中指定字符范围 [start, end)。
+
+        Args:
+            start: 起始字符位置（0-based）
+            end: 结束字符位置（exclusive）
+            instruction: 改写指令（默认"改写得更生动自然"）
+
+        Returns:
+            dict 含 original / rewritten / start / end / chapter / model
+
+        注意：本端点只生成 LLM 改写结果，不直接修改文件。
+        前端应在用户确认后调 /api/chapter/{n}/save 应用修改。
+        """
+        root = Path(project_root).resolve()
+        project = ProjectStructure(root=root)
+        if not project.exists():
+            raise HTTPException(status_code=404, detail="Project not initialized")
+        prose_path = project.chapter_prose(chapter)
+        if not prose_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Chapter {chapter} not found",
+            )
+        full_content = prose_path.read_text(encoding="utf-8")
+        total = len(full_content)
+        if start < 0 or end > total or start >= end:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid range [{start}:{end}] for content length {total}",
+            )
+        selected = full_content[start:end]
+        before = full_content[:start]
+        after = full_content[end:]
+
+        # 调 LLM 改写
+        from novel2all.cli.main import get_llm_for_model
+
+        llm = get_llm_for_model(model)
+        system = (
+            "你是一位专业的中文小说编辑。根据用户指令改写指定段落，"
+            "保持原文风格、人称和情节连续性，只输出改写后的段落文本本身（不含任何前后缀）。"
+        )
+        user_prompt = (
+            f"##原文（{len(selected)} 字）\n{selected}\n\n"
+            f"##改写要求\n{instruction}\n\n"
+            "##输出要求\n只输出改写后的段落文本，不要加任何说明、注释、引号或前后缀。"
+        )
+        try:
+            rewritten = await llm.complete(
+                prompt=user_prompt, system=system, max_tokens=2000, temperature=0.7
+            )
+        except Exception as e:
+            logger.exception("V0.38 rewrite_section: LLM call failed")
+            raise HTTPException(status_code=500, detail=f"LLM 调用失败: {e}") from e
+        rewritten_clean = rewritten.strip()
+        logger.info(
+            "V0.38 rewrite: 第 %s 章 [%s:%s] %s字 → %s字",
+            chapter,
+            start,
+            end,
+            len(selected),
+            len(rewritten_clean),
+        )
+        return {
+            "chapter": chapter,
+            "start": start,
+            "end": end,
+            "original": selected,
+            "rewritten": rewritten_clean,
+            "before_len": len(before),
+            "after_len": len(after),
+            "model": model or "default",
+        }
+
+    # V0.38：在指定位置插入 AI 生成的内容
+    @app.post("/api/chapter/{chapter}/insert")
+    async def insert_at_position(
+        chapter: int,
+        position: int = Form(...),
+        instruction: str = Form("自然衔接上下文的过渡段落"),
+        project_root: str = Form("."),
+        model: str | None = Form(None),
+        context_chars: int = Form(500),
+    ) -> dict[str, Any]:
+        """V0.38：LLM 在 position 处生成可插入的内容（前后各取 context_chars 字上下文）。
+
+        Returns:
+            dict 含 position / inserted / chapter / model
+
+        注意：本端点只生成 LLM 插入内容，不直接修改文件。
+        前端应在用户确认后调 /api/chapter/{n}/save 应用修改。
+        """
+        root = Path(project_root).resolve()
+        project = ProjectStructure(root=root)
+        if not project.exists():
+            raise HTTPException(status_code=404, detail="Project not initialized")
+        prose_path = project.chapter_prose(chapter)
+        if not prose_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Chapter {chapter} not found",
+            )
+        full_content = prose_path.read_text(encoding="utf-8")
+        total = len(full_content)
+        if position < 0 or position > total:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid position {position} for content length {total}",
+            )
+        # 取上下文
+        ctx_start = max(0, position - context_chars)
+        ctx_end = min(total, position + context_chars)
+        before_ctx = full_content[ctx_start:position]
+        after_ctx = full_content[position:ctx_end]
+
+        from novel2all.cli.main import get_llm_for_model
+
+        llm = get_llm_for_model(model)
+        system = (
+            "你是一位专业的中文小说编辑。在小说指定位置插入自然衔接的段落，"
+            "保持文风一致、人称一致、情节连续，只输出要插入的新段落文本本身（不含任何前后缀）。"
+        )
+        user_prompt = (
+            f"##插入位置前的上下文（前 {len(before_ctx)} 字）\n{before_ctx}\n"
+            f"[在此处插入新内容]\n"
+            f"##插入位置后的上下文（后 {len(after_ctx)} 字）\n{after_ctx}\n\n"
+            f"##插入要求\n{instruction}\n\n"
+            "##输出要求\n只输出要插入的新段落文本，不要加任何说明、注释、引号或前后缀。"
+        )
+        try:
+            inserted = await llm.complete(
+                prompt=user_prompt, system=system, max_tokens=2000, temperature=0.7
+            )
+        except Exception as e:
+            logger.exception("V0.38 insert_at_position: LLM call failed")
+            raise HTTPException(status_code=500, detail=f"LLM 调用失败: {e}") from e
+        inserted_clean = inserted.strip()
+        logger.info(
+            "V0.38 insert: 第 %s 章 pos=%s → %s字",
+            chapter,
+            position,
+            len(inserted_clean),
+        )
+        return {
+            "chapter": chapter,
+            "position": position,
+            "inserted": inserted_clean,
+            "before_ctx_len": len(before_ctx),
+            "after_ctx_len": len(after_ctx),
+            "model": model or "default",
+        }
+
     @app.get("/api/outlines")
     async def list_outlines(project_root: str = ".") -> list[dict]:
         """列出项目下已有细纲。"""

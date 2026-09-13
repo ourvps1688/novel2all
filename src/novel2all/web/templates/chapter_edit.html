@@ -1,17 +1,29 @@
 {# V0.34 章节编辑器 — 手动编辑 + AI 扩写引导 #}
+{# V0.38 扩展 — AI 重写选中 + AI 插入段落（带预览 modal） #}
 <div class="card"
      x-data="{
-        status: 'idle',  // idle | loading | loaded | saving | saved | error | expanding
+        status: 'idle',  // idle | loading | loaded | saving | saved | error | expanding | rewriting | inserting
         chapter: 1,
         content: '',
         originalContent: '',
         charCount: 0,
         modified: false,
         errorMsg: '',
+
+        // V0.38：选区 + modal 状态
+        selStart: 0,
+        selEnd: 0,
+        modalType: '',   // '' | 'rewrite' | 'insert'
+        modalInstruction: '改写得更生动自然',
+        modalResult: '',
+        modalLoading: false,
+        modalError: '',
+
         async loadChapter(ch) {
             this.chapter = ch;
             this.status = 'loading';
             this.errorMsg = '';
+            this.closeModal();
             try {
                 const resp = await fetch('/api/chapter/' + ch + '/content');
                 if (!resp.ok) {
@@ -60,7 +72,6 @@
             // V0.34：AI 扩写（从当前章节末尾继续）
             if (this.chapter < 1) return;
             try {
-                // 1. 调 expand endpoint 获取扩写元数据
                 const metaResp = await fetch('/api/chapter/' + this.chapter + '/expand', {
                     method: 'POST',
                     body: (() => {
@@ -76,7 +87,6 @@
                 }
                 const meta = await metaResp.json();
                 this.status = 'expanding';
-                // 2. 跳转到 write-form 页 + 自动触发续写（用户手动点击「继续写」）
                 alert(
                     'V0.34 扩写已准备：第 ' + this.chapter + ' 章当前 ' + meta.current_chars + ' 字。\n\n' +
                     '下一步：\n' +
@@ -91,6 +101,134 @@
                 this.errorMsg = String(e);
             }
         },
+
+        // V0.38：监听 textarea 选区变化
+        updateSelection() {
+            const ta = this.$refs.editor;
+            if (!ta) return;
+            this.selStart = ta.selectionStart;
+            this.selEnd = ta.selectionEnd;
+        },
+        get hasSelection() {
+            return this.selEnd > this.selStart;
+        },
+        get selectionLength() {
+            return this.selEnd - this.selStart;
+        },
+        get selectionPreview() {
+            if (!this.hasSelection) return '';
+            const text = this.content.substring(this.selStart, this.selEnd);
+            // 截取前后 30 字符作上下文提示
+            const before = this.content.substring(Math.max(0, this.selStart - 30), this.selStart);
+            const after = this.content.substring(this.selEnd, Math.min(this.content.length, this.selEnd + 30));
+            return (before ? '…' + before : '') + '【' + text + '】' + (after ? after + '…' : '');
+        },
+
+        // V0.38：打开 AI 重写 modal
+        openRewriteModal() {
+            if (!this.hasSelection) {
+                alert('请先在编辑器中选中要改写的文本');
+                return;
+            }
+            this.modalType = 'rewrite';
+            this.modalInstruction = '改写得更生动自然';
+            this.modalResult = '';
+            this.modalError = '';
+            this.modalLoading = false;
+        },
+        // V0.38：打开 AI 插入 modal
+        openInsertModal() {
+            this.modalType = 'insert';
+            this.modalInstruction = '自然衔接上下文的过渡段落';
+            this.modalResult = '';
+            this.modalError = '';
+            this.modalLoading = false;
+            // 默认插入位置：当前选区末尾；若无选区则在光标处
+            this.insertPosition = this.hasSelection ? this.selEnd : this.selEnd;
+        },
+        insertPosition: 0,
+        closeModal() {
+            this.modalType = '';
+            this.modalResult = '';
+            this.modalError = '';
+            this.modalLoading = false;
+        },
+
+        // V0.38：执行 AI 重写
+        async executeRewrite() {
+            if (!this.hasSelection) return;
+            this.modalLoading = true;
+            this.modalError = '';
+            try {
+                const form = new FormData();
+                form.append('start', this.selStart);
+                form.append('end', this.selEnd);
+                form.append('instruction', this.modalInstruction);
+                form.append('project_root', '.');
+                const resp = await fetch('/api/chapter/' + this.chapter + '/rewrite', {
+                    method: 'POST',
+                    body: form,
+                });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    this.modalError = err.detail || '改写失败: ' + resp.status;
+                    this.modalLoading = false;
+                    return;
+                }
+                const data = await resp.json();
+                this.modalResult = data.rewritten;
+                this.modalLoading = false;
+            } catch (e) {
+                this.modalError = String(e);
+                this.modalLoading = false;
+            }
+        },
+        // V0.38：执行 AI 插入
+        async executeInsert() {
+            this.modalLoading = true;
+            this.modalError = '';
+            try {
+                const form = new FormData();
+                form.append('position', this.insertPosition);
+                form.append('instruction', this.modalInstruction);
+                form.append('project_root', '.');
+                const resp = await fetch('/api/chapter/' + this.chapter + '/insert', {
+                    method: 'POST',
+                    body: form,
+                });
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    this.modalError = err.detail || '插入失败: ' + resp.status;
+                    this.modalLoading = false;
+                    return;
+                }
+                const data = await resp.json();
+                this.modalResult = data.inserted;
+                this.modalLoading = false;
+            } catch (e) {
+                this.modalError = String(e);
+                this.modalLoading = false;
+            }
+        },
+
+        // V0.38：应用 AI 重写结果到 content
+        applyRewrite() {
+            if (!this.modalResult || this.modalType !== 'rewrite') return;
+            this.content = this.content.substring(0, this.selStart) + this.modalResult + this.content.substring(this.selEnd);
+            this.charCount = this.content.length;
+            this.modified = true;
+            this.closeModal();
+        },
+        // V0.38：应用 AI 插入结果到 content
+        applyInsert() {
+            if (!this.modalResult || this.modalType !== 'insert') return;
+            const pos = Math.min(this.insertPosition, this.content.length);
+            this.content = this.content.substring(0, pos) + this.modalResult + this.content.substring(pos);
+            this.charCount = this.content.length;
+            this.modified = true;
+            this.closeModal();
+        },
+
         onContentInput() {
             this.charCount = this.content.length;
             this.modified = this.content !== this.originalContent;
@@ -110,6 +248,7 @@
         <span x-show="status === 'saving'" class="badge" style="background: #fef3c7; color: #92400e;">💾 保存中</span>
         <span x-show="status === 'saved'" class="badge status-ok">✓ 已保存</span>
         <span x-show="status === 'expanding'" class="badge" style="background: #dbeafe; color: #1e40af;">🤖 扩写中</span>
+        <span x-show="status === 'rewriting' || status === 'inserting'" class="badge" style="background: #dbeafe; color: #1e40af;">🤖 AI 处理中</span>
         <span x-show="status === 'error'" class="badge" style="background: #fecaca; color: #991b1b;">✗ 错误</span>
         <span x-show="modified" class="badge" style="background: #fde68a; color: #92400e;">● 未保存</span>
     </h2>
@@ -141,6 +280,18 @@
                 :style="status !== 'loaded' ? 'background: var(--fg-muted); cursor: not-allowed;' : 'background: #8b5cf6; color: white;'">
             🤖 AI 扩写
         </button>
+        {# V0.38：AI 重写选中 + AI 插入段落 #}
+        <button type="button" @click="openRewriteModal()"
+                :disabled="!hasSelection || status !== 'loaded'"
+                :title="hasSelection ? '改写选中的 ' + selectionLength + ' 字' : '请先在编辑器中选中要改写的文本'"
+                :style="(!hasSelection || status !== 'loaded') ? 'background: var(--fg-muted); cursor: not-allowed;' : 'background: #f59e0b; color: white;'">
+            🔄 AI 重写选中
+        </button>
+        <button type="button" @click="openInsertModal()"
+                :disabled="status !== 'loaded'"
+                :style="status !== 'loaded' ? 'background: var(--fg-muted); cursor: not-allowed;' : 'background: #ec4899; color: white;'">
+            ➕ AI 插入段落
+        </button>
     </div>
 
     {# 状态条 + 字数统计 #}
@@ -148,7 +299,7 @@
         <div>
             <span x-show="status === 'idle'">💡 输入章节号 → 加载 → 编辑 → 保存</span>
             <span x-show="status === 'loading'">⏳ 正在加载章节内容...</span>
-            <span x-show="status === 'loaded' && !modified">📄 已加载，可编辑</span>
+            <span x-show="status === 'loaded' && !modified">📄 已加载，可编辑（V0.38 选中后可用「🔄 AI 重写选中」）</span>
             <span x-show="status === 'loaded' && modified" style="color: #92400e;">● 有未保存修改</span>
             <span x-show="status === 'saving'">💾 正在保存...</span>
             <span x-show="status === 'saved'" style="color: #10b981;">✓ 保存成功！</span>
@@ -160,18 +311,99 @@
             <span x-show="originalContent" style="color: var(--fg-muted); margin-left: 8px;">
                 (原 <span x-text="originalContent.length"></span> 字)
             </span>
+            <span x-show="hasSelection" style="color: var(--accent); margin-left: 8px;">
+                [选区 <span x-text="selectionLength"></span> 字]
+            </span>
         </div>
     </div>
 
-    {# 编辑器 textarea #}
-    <textarea x-model="content"
+    {# 编辑器 textarea — V0.38 加 @select/@keyup/@click 跟踪选区 #}
+    <textarea x-ref="editor"
+              x-model="content"
               @input="onContentInput()"
+              @select="updateSelection()"
+              @keyup="updateSelection()"
+              @click="updateSelection()"
+              @focus="updateSelection()"
               :disabled="status === 'loading' || status === 'saving'"
               :placeholder="status === 'idle' ? '加载章节后在此编辑...' : ''"
               style="width: 100%; min-height: 400px; padding: 12px; border: 1px solid #d1d5db; border-radius: var(--radius); font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; font-size: 14px; line-height: 1.6; resize: vertical; box-sizing: border-box;"
               spellcheck="false"></textarea>
 
+    {# V0.38：选区预览（选中后才显示）#}
+    <div x-show="hasSelection" style="margin-top: 8px; padding: 8px 12px; background: #fef3c7; border-radius: var(--radius); font-size: 12px; color: #92400e;">
+        <strong>📌 选区预览：</strong>
+        <span x-text="selectionPreview" style="font-family: ui-monospace; word-break: break-all;"></span>
+    </div>
+
     <p style="margin-top: 8px; font-size: 12px; color: var(--fg-muted);">
-        💡 V0.34 支持手动编辑 + 「AI 扩写」从当前末尾续写（基于 V0.32 智能恢复）。保存后 _tracking-state.json 的 last_updated_chapter 同步更新。
+        💡 V0.34 支持手动编辑 + 「AI 扩写」从当前末尾续写。V0.38 新增「🔄 AI 重写选中」改写局部 +「➕ AI 插入段落」在指定位置插入新内容（带预览确认）。所有 AI 操作不会直接改文件，需手动保存。
     </p>
+
+    {# V0.38：AI 操作预览 modal（rewrite + insert 共用）#}
+    <div x-show="modalType !== ''"
+         x-cloak
+         style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;"
+         @click.self="closeModal()">
+        <div style="background: white; padding: 24px; border-radius: 8px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h3 style="margin-top: 0;">
+                <span x-show="modalType === 'rewrite'">🔄 AI 重写选中文本</span>
+                <span x-show="modalType === 'insert'">➕ AI 插入段落</span>
+            </h3>
+
+            {# 上下文信息 #}
+            <div x-show="modalType === 'rewrite'" style="margin-bottom: 12px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px;">
+                <strong>选区：</strong>
+                [<span x-text="selStart"></span>:<span x-text="selEnd"></span>] ·
+                <strong>长度：</strong><span x-text="selectionLength"></span> 字
+            </div>
+            <div x-show="modalType === 'insert'" style="margin-bottom: 12px; padding: 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px;">
+                <strong>插入位置：</strong>
+                <input type="number" min="0" x-model.number="insertPosition" style="width: 100px; padding: 2px 6px;">
+                <span style="color: var(--fg-muted);">（共 <span x-text="charCount"></span> 字）</span>
+            </div>
+
+            {# 指令输入 #}
+            <label style="display: block; margin-bottom: 12px;">
+                <span style="display: block; font-size: 13px; color: var(--fg-muted); margin-bottom: 4px;">改写/插入指令</span>
+                <textarea x-model="modalInstruction" rows="2"
+                          style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; font-family: inherit;"
+                          placeholder="例如：改写得更生动自然"></textarea>
+            </label>
+
+            {# 执行按钮 + 错误提示 #}
+            <div style="margin-bottom: 12px;">
+                <button type="button" @click="modalType === 'rewrite' ? executeRewrite() : executeInsert()"
+                        :disabled="modalLoading || (modalType === 'rewrite' && !hasSelection) || (modalType === 'insert' && (insertPosition < 0 || insertPosition > charCount))"
+                        :style="modalLoading ? 'background: var(--fg-muted); cursor: wait;' : 'background: #3b82f6; color: white;'">
+                    <span x-show="!modalLoading">▶️ 执行</span>
+                    <span x-show="modalLoading">⏳ 调用 LLM 中...</span>
+                </button>
+                <button type="button" @click="closeModal()" style="margin-left: 8px; background: #6b7280; color: white;">
+                    取消
+                </button>
+                <span x-show="modalError" x-text="modalError" style="color: #dc2626; margin-left: 12px; font-size: 13px;"></span>
+            </div>
+
+            {# 结果预览（执行后显示）#}
+            <div x-show="modalResult" style="border-top: 1px solid #e5e7eb; padding-top: 12px;">
+                <h4 style="margin-top: 0;">
+                    <span x-show="modalType === 'rewrite'">📝 重写结果预览</span>
+                    <span x-show="modalType === 'insert'">📝 待插入内容预览</span>
+                </h4>
+                <div style="padding: 12px; background: #ecfdf5; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-family: 'Microsoft YaHei', sans-serif; font-size: 14px; line-height: 1.6;"
+                     x-text="modalResult"></div>
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    <button type="button" @click="modalType === 'rewrite' ? applyRewrite() : applyInsert()"
+                            style="background: #10b981; color: white;">
+                        ✓ 应用到编辑器
+                    </button>
+                    <button type="button" @click="closeModal()"
+                            style="background: #6b7280; color: white;">
+                        ✗ 不应用
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
