@@ -67,6 +67,13 @@ class LLMConfig(BaseModel):
     # V0.25：从 NOVEL2ALL_LLM_CACHE 环境变量读默认（"1"/"true" 启用，其他关闭）
     cache_enabled: bool = False
     cache_max_size: int = 256  # LRU 上限（防内存爆炸）
+    # V0.29.1：anthropic_compat 重试配置（用于 _call_anthropic_compat / _stream_anthropic_compat）
+    # tenacity 指数退避：min_wait × 2^attempt，clamp 到 [min_wait, max_wait]
+    anthropic_max_retries: int = 3  # 失败重试次数（除首次外）
+    anthropic_retry_min_wait: float = 1.0  # 第一次重试前等待（秒）
+    anthropic_retry_max_wait: float = 10.0  # 最长等待（秒）
+    # V0.29.1：是否记录重试日志（debug 用）
+    anthropic_retry_log: bool = False
 
     def __init__(self, **data: Any) -> None:
         """V0.25：从 .env 自动读 cache_enabled（如果未显式传入）。"""
@@ -608,18 +615,67 @@ class LLMProvider:
         }
 
         url = api_base.rstrip("/") + "/v1/messages"
-        async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
-            resp = await client.post(url, json=body, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
 
-        # Anthropic 响应：content 是数组，每个 element.type="text" 含 text 字段
-        content_blocks = data.get("content", [])
-        parts: list[str] = []
-        for blk in content_blocks:
-            if blk.get("type") == "text":
-                parts.append(blk.get("text", ""))
-        return "".join(parts)
+        # V0.29.1：tenacity 异步重试 + 指数退避
+        # 重试策略：网络错误 + 5xx + 429 都重试，其他 4xx 不重试（客户端错误）
+        # max_retries=3 → 总尝试 4 次（首次 + 3 重试）
+        from tenacity import (
+            AsyncRetrying,
+            RetryError,
+            retry_if_exception,
+            stop_after_attempt,
+            wait_exponential,
+        )
+
+        def _should_retry(exc: BaseException) -> bool:
+            """重试条件：网络错误 + 5xx + 429（其他 4xx 不重试）。"""
+            if isinstance(exc, httpx.TransportError):
+                return True  # 连接超时、DNS 失败、断开等
+            if isinstance(exc, httpx.HTTPStatusError):
+                # 5xx 服务器错误 + 429 限流 → 重试
+                return exc.response.status_code >= 500 or exc.response.status_code == 429
+            return False
+
+        retry_dec = stop_after_attempt(1 + self.config.anthropic_max_retries)
+        wait_dec = wait_exponential(
+            multiplier=self.config.anthropic_retry_min_wait,
+            max=self.config.anthropic_retry_max_wait,
+        )
+
+        last_exc: BaseException | None = None
+        try:
+            async for attempt in AsyncRetrying(
+                stop=retry_dec,
+                wait=wait_dec,
+                retry=retry_if_exception(_should_retry),
+                reraise=True,
+            ):
+                with attempt:
+                    if self.config.anthropic_retry_log:
+                        print(
+                            f"[_call_anthropic_compat] attempt #{attempt.retry_state.attempt_number}"
+                        )
+                    async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
+                        resp = await client.post(url, json=body, headers=headers)
+                        resp.raise_for_status()
+                        data = resp.json()
+
+                    # Anthropic 响应：content 是数组，每个 element.type="text" 含 text 字段
+                    content_blocks = data.get("content", [])
+                    parts: list[str] = []
+                    for blk in content_blocks:
+                        if blk.get("type") == "text":
+                            parts.append(blk.get("text", ""))
+                    return "".join(parts)
+        except RetryError as e:
+            # tenacity 在最后一次重试失败后抛 RetryError（reraise=True 把原始异常放 __cause__）
+            last_exc = e.last_attempt.exception()
+            if last_exc is not None:
+                raise last_exc from None
+            raise
+
+        # 不可达（AsyncRetrying 必须返回或抛）
+        raise RuntimeError("unreachable: AsyncRetrying 应当返回或抛 RetryError")
 
     async def _stream_anthropic_compat(
         self,

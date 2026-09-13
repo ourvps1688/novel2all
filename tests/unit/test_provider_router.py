@@ -1433,6 +1433,281 @@ class TestAnthropicCompatV027:
         assert body["thinking"] == {"type": "disabled"}
 
 
+class TestAnthropicRetryV0291:
+    """V0.29.1：_call_anthropic_compat 加 tenacity retry/backoff。
+
+    重试策略：
+    - 网络错误（httpx.TransportError）→ 重试
+    - 5xx 服务器错误 → 重试
+    - 429 限流 → 重试
+    - 其他 4xx 客户端错误 → 不重试（直接抛）
+    - 指数退避：min_wait × 2^attempt，clamp 到 max_wait
+
+    max_retries=3 → 总尝试 4 次（首次 + 3 重试）
+    """
+
+    @pytest.mark.asyncio
+    async def test_retry_on_transient_error_then_success(self) -> None:
+        import httpx
+
+        """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(
+            anthropic_max_retries=3,
+            anthropic_retry_min_wait=0.01,  # 加速测试
+            anthropic_retry_max_wait=0.05,
+        )
+        provider = LLMProvider(config)
+
+        call_count = 0
+
+        async def fake_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise httpx.ConnectError("Connection failed")
+            # 第二次成功
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "id": "msg_xxx",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Recovered content"}],
+            }
+            mock_resp.raise_for_status = MagicMock()
+            return mock_resp
+
+        with (
+            patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"),
+            patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_post.side_effect = fake_post
+            content = await provider._call_anthropic_compat(
+                model_name="minimax/MiniMax-M3",
+                api_base="https://api.minimax.cn/anthropic",
+                api_key="test-key",
+                messages=[{"role": "user", "content": "hi"}],
+                system=None,
+                temperature=0.7,
+                max_tokens=128,
+                extra_body=None,
+            )
+
+        assert content == "Recovered content"
+        # 第一次失败 + 第二次成功 = 共 2 次调用
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_retry_exhausted_raises_last_exception(self) -> None:
+        """max_retries=3 共 4 次都失败 → 抛最后一次的异常（不是 RetryError）。"""
+        from unittest.mock import AsyncMock, patch
+
+        import httpx
+
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(
+            anthropic_max_retries=3,
+            anthropic_retry_min_wait=0.01,
+            anthropic_retry_max_wait=0.05,
+        )
+        provider = LLMProvider(config)
+
+        call_count = 0
+
+        async def fake_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise httpx.ConnectError(f"Connection failed #{call_count}")
+
+        with (
+            patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"),
+            patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_post.side_effect = fake_post
+            try:
+                await provider._call_anthropic_compat(
+                    model_name="minimax/MiniMax-M3",
+                    api_base="https://api.minimax.cn/anthropic",
+                    api_key="test-key",
+                    messages=[{"role": "user", "content": "hi"}],
+                    system=None,
+                    temperature=0.7,
+                    max_tokens=128,
+                    extra_body=None,
+                )
+                raise AssertionError("应抛异常但没抛")
+            except httpx.ConnectError as e:
+                # 应抛最后一次的异常（message 含 #4，因为是第 4 次调用）
+                assert "#4" in str(e), f"expected last exception (#4), got: {e}"
+
+        # 首次 + 3 重试 = 4 次调用
+        assert call_count == 4
+
+    @pytest.mark.asyncio
+    async def test_no_retry_on_4xx_client_error(self) -> None:
+        """4xx 客户端错误（如 400 bad request）不应重试。"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        import httpx
+
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(
+            anthropic_max_retries=3,
+            anthropic_retry_min_wait=0.01,
+            anthropic_retry_max_wait=0.05,
+        )
+        provider = LLMProvider(config)
+
+        call_count = 0
+
+        async def fake_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            # 400 Bad Request
+            mock_resp = MagicMock()
+            mock_resp.status_code = 400
+            mock_resp.raise_for_status = MagicMock(
+                side_effect=httpx.HTTPStatusError(
+                    "Bad Request", request=MagicMock(), response=mock_resp
+                )
+            )
+            return mock_resp
+
+        with (
+            patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"),
+            patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_post.side_effect = fake_post
+            try:
+                await provider._call_anthropic_compat(
+                    model_name="minimax/MiniMax-M3",
+                    api_base="https://api.minimax.cn/anthropic",
+                    api_key="test-key",
+                    messages=[{"role": "user", "content": "hi"}],
+                    system=None,
+                    temperature=0.7,
+                    max_tokens=128,
+                    extra_body=None,
+                )
+                raise AssertionError("应抛异常但没抛")
+            except httpx.HTTPStatusError as e:
+                assert e.response.status_code == 400
+
+        # 4xx 不重试：只 1 次调用
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_retry_on_429_rate_limit(self) -> None:
+        """429 限流应重试。"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        import httpx
+
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(
+            anthropic_max_retries=3,
+            anthropic_retry_min_wait=0.01,
+            anthropic_retry_max_wait=0.05,
+        )
+        provider = LLMProvider(config)
+
+        call_count = 0
+
+        async def fake_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # 429 Too Many Requests
+                mock_resp = MagicMock()
+                mock_resp.status_code = 429
+                mock_resp.raise_for_status = MagicMock(
+                    side_effect=httpx.HTTPStatusError(
+                        "Too Many Requests", request=MagicMock(), response=mock_resp
+                    )
+                )
+                return mock_resp
+            # 第二次成功
+            mock_resp = MagicMock()
+            mock_resp.json.return_value = {
+                "content": [{"type": "text", "text": "OK after rate limit"}],
+            }
+            mock_resp.raise_for_status = MagicMock()
+            return mock_resp
+
+        with (
+            patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"),
+            patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_post.side_effect = fake_post
+            content = await provider._call_anthropic_compat(
+                model_name="minimax/MiniMax-M3",
+                api_base="https://api.minimax.cn/anthropic",
+                api_key="test-key",
+                messages=[{"role": "user", "content": "hi"}],
+                system=None,
+                temperature=0.7,
+                max_tokens=128,
+                extra_body=None,
+            )
+
+        assert content == "OK after rate limit"
+        assert call_count == 2  # 1 失败 + 1 成功
+
+    @pytest.mark.asyncio
+    async def test_no_retry_when_max_retries_is_zero(self) -> None:
+        """max_retries=0 → 只首次，不重试。"""
+        from unittest.mock import AsyncMock, patch
+
+        import httpx
+
+        from novel2all.core.provider import LLMProvider
+
+        config = LLMConfig(
+            anthropic_max_retries=0,
+            anthropic_retry_min_wait=0.01,
+            anthropic_retry_max_wait=0.05,
+        )
+        provider = LLMProvider(config)
+
+        call_count = 0
+
+        async def fake_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise httpx.ConnectError("immediate failure")
+
+        with (
+            patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"),
+            patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_post.side_effect = fake_post
+            try:
+                await provider._call_anthropic_compat(
+                    model_name="minimax/MiniMax-M3",
+                    api_base="https://api.minimax.cn/anthropic",
+                    api_key="test-key",
+                    messages=[{"role": "user", "content": "hi"}],
+                    system=None,
+                    temperature=0.7,
+                    max_tokens=128,
+                    extra_body=None,
+                )
+                raise AssertionError("应抛异常但没抛")
+            except httpx.ConnectError:
+                pass
+
+        # max_retries=0 → 只 1 次调用
+        assert call_count == 1
+
+
 class TestModelConfigApiKeyEnvV028:
     """V0.28：ModelConfig.api_key_env 字段驱动 _anthropic_api_key_for。
 
