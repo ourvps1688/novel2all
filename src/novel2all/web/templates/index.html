@@ -23,6 +23,11 @@
     <div class="card"><h2>📊 Cache 统计</h2><p>加载中...</p></div>
 </div>
 
+{# V0.51 Cache 智能推荐面板（每 30s 刷新一次，比 stats 慢以减少打扰）#}
+<div hx-get="/page/cache-recommend" hx-trigger="load, every 30s" hx-swap="outerHTML" id="cache-recommend">
+    <div class="card"><h2>💡 Cache 智能推荐</h2><p>加载中...</p></div>
+</div>
+
 <div class="grid">
     <div class="card">
         <h2>📋 Skill 列表</h2>

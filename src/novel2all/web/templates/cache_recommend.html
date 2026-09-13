@@ -1,0 +1,131 @@
+{# V0.51：Cache 配置智能推荐面板 #}
+<div class="card">
+    <h2>
+        💡 Cache 智能推荐
+        <span class="badge" style="background: #fef3c7; color: #92400e; font-size: 11px;">
+            V0.51
+        </span>
+        {# 健康评分 badge #}
+        {% set score_pct = (rec.health_score * 100) | round(0) %}
+        {% if score_pct >= 80 %}
+            {% set score_color = 'var(--success)' %}
+            {% set score_label = '健康' %}
+        {% elif score_pct >= 50 %}
+            {% set score_color = 'var(--warn)' %}
+            {% set score_label = '一般' %}
+        {% else %}
+            {% set score_color = 'var(--error)' %}
+            {% set score_label = '需优化' %}
+        {% endif %}
+        <span class="badge" style="background: {{ score_color }}; color: white; font-size: 11px;">
+            健康度: {{ score_pct }}%（{{ score_label }}）
+        </span>
+        {# 置信度 badge #}
+        <span class="badge" style="background: #f3f4f6; color: var(--fg-muted); font-size: 11px;">
+            置信度: {{ rec.confidence }}
+        </span>
+    </h2>
+
+    {# 数据不足警告 #}
+    {% if rec.notes %}
+    <div style="background: #fef3c7; border-left: 3px solid #f59e0b; padding: 8px 12px; margin: 8px 0; font-size: 13px; color: #92400e; border-radius: 4px;">
+        {% for note in rec.notes %}
+        <div>⚠️ {{ note }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# 当前配置 + 推荐配置对比 #}
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        {# 当前配置 #}
+        <div style="background: #f9fafb; padding: 12px; border-radius: 4px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 13px; color: var(--fg-muted);">当前配置</h3>
+            <div style="font-family: ui-monospace; font-size: 13px; line-height: 1.8;">
+                <div>backend: <code>{{ rec.current.backend }}</code></div>
+                <div>max_size: <code>{{ rec.current.max_size }}</code></div>
+                <div>ttl_seconds: <code>{{ rec.current.ttl_seconds }}</code></div>
+                <div style="margin-top: 8px; color: var(--fg-muted); font-size: 12px;">
+                    运行时数据：size={{ rec.current.size }} · hit_rate={{ (rec.current.hit_rate * 100) | round(1) }}% · 总查询={{ rec.current.total_lookups }}
+                </div>
+            </div>
+        </div>
+        {# 推荐配置 #}
+        <div style="background: #ecfdf5; padding: 12px; border-radius: 4px;">
+            <h3 style="margin: 0 0 8px 0; font-size: 13px; color: #166534;">推荐配置</h3>
+            <div style="font-family: ui-monospace; font-size: 13px; line-height: 1.8;">
+                {% for key, item in rec.recommended.items() %}
+                <div>
+                    {{ key }}:
+                    {% if item.current != item.recommended %}
+                    <code style="background: #fef3c7; padding: 1px 4px; border-radius: 2px;">
+                        {{ item.current }} → {{ item.recommended }}
+                    </code>
+                    {% else %}
+                    <code>{{ item.recommended }}</code>
+                    <span style="color: var(--success); font-size: 11px;">✓</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# Action 列表（按优先级排序） #}
+    {% if rec.actions %}
+    <h3 style="margin-top: 16px; font-size: 14px; color: var(--fg);">🎯 建议操作（{{ rec.actions | length }} 项）</h3>
+    <div style="margin-top: 8px;">
+        {% for action in rec.actions %}
+        <div style="border-left: 3px solid
+            {% if action.priority == 'high' %}var(--error)
+            {% elif action.priority == 'medium' %}var(--warn)
+            {% else %}var(--accent){% endif %};
+            padding: 8px 12px; margin-bottom: 8px;
+            background: {% if action.priority == 'high' %}#fef2f2{% elif action.priority == 'medium' %}#fffbeb{% else %}#eff6ff{% endif %};
+            border-radius: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span class="badge" style="background:
+                    {% if action.priority == 'high' %}var(--error)
+                    {% elif action.priority == 'medium' %}var(--warn)
+                    {% else %}var(--accent){% endif %};
+                    color: white; font-size: 10px;">
+                    {{ action.priority }}
+                </span>
+                <strong style="font-size: 13px;">
+                    {% if action.action == 'switch_backend' %}
+                        切换 backend：{{ action.from }} → {{ action.to }}
+                    {% elif action.action == 'resize_cache' %}
+                        调整 max_size：{{ action.from }} → {{ action.to }}
+                    {% elif action.action == 'adjust_ttl' %}
+                        调整 TTL：{{ action.from }}s → {{ action.to }}s
+                    {% else %}
+                        {{ action.action }}
+                    {% endif %}
+                </strong>
+            </div>
+            <div style="font-size: 12px; color: var(--fg-muted); margin: 4px 0;">
+                {{ action.reason }}
+            </div>
+            {% if action.impact %}
+            <div style="font-size: 12px; color: var(--success); margin: 4px 0;">
+                📈 预期影响：{{ action.impact }}
+            </div>
+            {% endif %}
+            <details style="margin-top: 4px;">
+                <summary style="cursor: pointer; font-size: 11px; color: var(--accent); user-select: none;">
+                    📋 操作步骤
+                </summary>
+                <pre style="margin: 6px 0 0 0; padding: 8px; background: #1f2937; color: #f9fafb; font-size: 11px; border-radius: 3px; white-space: pre-wrap; line-height: 1.5;">{{ action.how }}</pre>
+            </details>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="margin-top: 12px; padding: 8px 12px; background: #ecfdf5; color: #166534; border-radius: 4px; font-size: 13px;">
+        ✅ 当前配置已最优，无需调整
+    </div>
+    {% endif %}
+
+    <p style="margin-top: 12px; font-size: 11px; color: var(--fg-muted);">
+        💡 V0.51: 算法基于 V0.47 benchmark + V0.49 调优指南（docs/cache-tuning-guide.md）
+    </p>
+</div>

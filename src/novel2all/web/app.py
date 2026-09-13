@@ -378,6 +378,58 @@ def create_app() -> FastAPI:
             "elapsed_seconds": result.elapsed_seconds,
         }
 
+    # V0.51：Cache 配置智能推荐端点
+    @app.get("/api/cache/recommend")
+    async def cache_recommend(request: Request) -> dict[str, Any]:
+        """V0.51：根据 cache_stats() + 当前 LLMConfig 推荐 backend / max_size / ttl_seconds。
+
+        返回结构见 CacheRecommendation.to_dict()：
+        - current: 当前配置
+        - recommended: 各字段推荐值 + 理由 + 预期影响 + 置信度
+        - actions: 立即可执行的动作列表（含 how-to 步骤）
+        - health_score: 0.0-1.0
+        - issues: 检测到的问题列表
+        - confidence: 整体置信度（high/medium/low）
+        - notes: 备注（如数据不足警告）
+
+        算法：见 novel2all.core.cache_recommend.recommend_cache_config()
+        """
+        from novel2all.core.cache_recommend import recommend_cache_config
+
+        provider: LLMProvider = request.app.state.provider
+        stats = provider.cache_stats()
+        config = provider.config
+
+        rec = recommend_cache_config(
+            stats=stats,
+            current_backend=config.cache_backend,
+            current_max_size=config.cache_max_size,
+            current_ttl_seconds=config.cache_ttl_seconds,
+        )
+        return rec.to_dict()
+
+    # V0.51：Cache 推荐面板（HTMX partial 渲染）
+    @app.get("/page/cache-recommend", response_class=HTMLResponse)
+    async def page_cache_recommend(request: Request) -> HTMLResponse:
+        """V0.51：HTMX 渲染推荐面板（含健康评分 + 推荐动作列表）。"""
+        from novel2all.core.cache_recommend import recommend_cache_config
+
+        provider: LLMProvider = request.app.state.provider
+        stats = provider.cache_stats()
+        config = provider.config
+
+        rec = recommend_cache_config(
+            stats=stats,
+            current_backend=config.cache_backend,
+            current_max_size=config.cache_max_size,
+            current_ttl_seconds=config.cache_ttl_seconds,
+        )
+        return templates.TemplateResponse(
+            request,
+            "cache_recommend.html",
+            {"rec": rec.to_dict()},
+        )
+
     # V0.30.1：模型选择器 API
     @app.get("/api/models")
     async def list_models() -> list[dict[str, Any]]:
