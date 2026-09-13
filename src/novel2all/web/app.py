@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -25,6 +26,7 @@ from novel2all.core.memory import MemoryManager, Tracker
 from novel2all.core.pipeline import (
     BlockingIssuesError,
     OutlineNotFoundError,
+    PipelineCancelledError,
     WritingPipeline,
 )
 from novel2all.core.project import ProjectStructure
@@ -67,6 +69,9 @@ def create_app() -> FastAPI:
         """
         load_dotenv(".env", override=False)
         app.state.provider = LLMProvider(LLMConfig())
+        # V0.31：活跃 pipeline task 注册表（用于 /api/write/cancel/{task_id} 取消正在运行的写作任务）
+        # key = task_id (uuid4 hex[:8])，value = asyncio.Task
+        app.state.active_pipelines = {}
         logger.info(
             "Web app started: LLMProvider initialized (model=%s, cache_enabled=%s)",
             app.state.provider.config.default_model,
@@ -350,9 +355,16 @@ def create_app() -> FastAPI:
         """V0.30.1：带 model 参数的流式写作端点（V0.29.3 单例 + V0.30 WebUI 集成）。
 
         复用了原 /api/write/stream 的逻辑，但接受 Form 参数（HTMX 友好）。
+
+        V0.31：在 'started' 事件里 yield task_id（uuid4 hex[:8]），
+        注册到 app.state.active_pipelines，让 /api/write/cancel/{task_id} 能取消。
+        Pipeline 抛 PipelineCancelledError 时 yield 'cancelled' 事件（partial content 信息）。
         """
         # V0.30.1：用请求中的 model（不污染单例）
         from novel2all.cli.main import get_llm_for_model
+
+        # V0.31：生成 task_id 提前（即便后续初始化失败也要返回 task_id 用于排查）
+        task_id = uuid.uuid4().hex[:8]
 
         async def event_stream() -> AsyncIterator[str]:
             llm: LLMProvider = get_llm_for_model(model)
@@ -361,16 +373,20 @@ def create_app() -> FastAPI:
             if not project.exists():
                 yield sse_event(
                     "error",
-                    {"message": f"项目未初始化: {root}. 请先跑 novel2all setup."},
+                    {
+                        "message": f"项目未初始化: {root}. 请先跑 novel2all setup.",
+                        "task_id": task_id,
+                    },
                 )
                 return
 
             yield sse_event(
                 "started",
                 {
+                    "task_id": task_id,  # V0.31：让前端能调用 /api/write/cancel/{task_id}
                     "chapter": chapter,
                     "skill": skill,
-                    "model": model or "default",  # V0.30.1: 显示选用的 model
+                    "model": model or "default",
                     "min_chars": min_chars,
                     "skip_pre_write": skip_pre_write,
                     "project_root": str(root),
@@ -412,15 +428,37 @@ def create_app() -> FastAPI:
                 finally:
                     await chunk_queue.put(None)
 
+            pipeline_task = asyncio.create_task(run_pipeline())
+            # V0.31：注册到 app.state.active_pipelines（让 cancel endpoint 能找到）
+            request.app.state.active_pipelines[task_id] = pipeline_task
             try:
-                pipeline_task = asyncio.create_task(run_pipeline())
                 while True:
                     chunk = await chunk_queue.get()
                     if chunk is None:
                         break
                     yield sse_event("chunk", {"text": chunk})
 
-                result = await pipeline_task
+                # V0.31：先取 pipeline_task 结果（可能抛 PipelineCancelledError）
+                try:
+                    result = await pipeline_task
+                except PipelineCancelledError as cancel_exc:
+                    # 用户中途取消 → 已保存 partial content 到 output_path
+                    partial_content = "".join(collected)
+                    yield sse_event(
+                        "cancelled",
+                        {
+                            "task_id": task_id,
+                            "chapter": cancel_exc.chapter,
+                            "partial_chars": cancel_exc.partial_chars,
+                            "output_path": str(cancel_exc.output_path),
+                            "preview": partial_content[:200],
+                            "message": (
+                                f"已在 {cancel_exc.partial_chars} 字处取消，"
+                                f"内容已保存到 {cancel_exc.output_path.name}"
+                            ),
+                        },
+                    )
+                    return
 
                 if result.pre_write_issues:
                     yield sse_event(
@@ -450,6 +488,7 @@ def create_app() -> FastAPI:
                 yield sse_event(
                     "done",
                     {
+                        "task_id": task_id,
                         "output_path": str(result.output_path),
                         "content_chars": result.content_chars,
                         "post_issue_count": len(result.post_write_issues),
@@ -480,6 +519,9 @@ def create_app() -> FastAPI:
                         "error",
                         {"message": f"Pipeline 失败: {type(e).__name__}: {e}"},
                     )
+            finally:
+                # V0.31：无论成功/失败/取消，都从注册表移除
+                request.app.state.active_pipelines.pop(task_id, None)
 
         return StreamingResponse(
             event_stream(),
@@ -489,6 +531,48 @@ def create_app() -> FastAPI:
                 "X-Accel-Buffering": "no",
             },
         )
+
+    # V0.31：取消正在运行的 pipeline 任务
+    @app.post("/api/write/cancel/{task_id}")
+    async def cancel_write_task(task_id: str, request: Request) -> dict[str, Any]:
+        """V0.31：取消 task_id 对应的 pipeline 任务。
+
+        取消后：
+        - pipeline 协程收到 CancelledError，捕获后保存 partial content 到 <chapter>.md
+        - SSE 流发送 'cancelled' 事件（partial_chars + output_path）
+        - 任务从 app.state.active_pipelines 注册表移除
+
+        Returns:
+            200 + {"task_id": ..., "status": "cancelled"} 成功取消
+            404 + {"task_id": ..., "status": "not_found"} task_id 不存在（已完成/已取消）
+        """
+        pipeline_task = request.app.state.active_pipelines.get(task_id)
+        if pipeline_task is None or pipeline_task.done():
+            raise HTTPException(
+                status_code=404,
+                detail=f"task {task_id} 不存在或已完成",
+            )
+        pipeline_task.cancel()
+        logger.info("V0.31 cancel: pipeline task %s cancelled", task_id)
+        return {"task_id": task_id, "status": "cancelling"}
+
+    @app.get("/api/write/active")
+    async def list_active_pipelines(request: Request) -> list[dict[str, Any]]:
+        """V0.31：列出当前活跃的 pipeline task（调试用）。
+
+        Returns:
+            [{"task_id": ..., "done": False, "cancelled": False}, ...]
+        """
+        result = []
+        for tid, task in request.app.state.active_pipelines.items():
+            result.append(
+                {
+                    "task_id": tid,
+                    "done": task.done(),
+                    "cancelled": task.cancelled() if hasattr(task, "cancelled") else False,
+                }
+            )
+        return result
 
     @app.get("/api/tracking")
     async def get_tracking(project_root: str = ".") -> dict:

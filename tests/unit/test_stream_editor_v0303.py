@@ -126,14 +126,17 @@ class TestStreamEditorV0303:
         assert "status === 'error'" in form
 
     def test_write_form_button_disabled_during_running(self) -> None:
-        """运行中按钮应 disabled（:disabled="status === 'running'"）。"""
+        """V0.31：运行中按钮应 disabled（:disabled="status === 'running' || status === 'cancelling'"）。
+
+        V0.31 新增 cancelling 状态（用户按「停止」后），按钮在 cancelling 期间也禁用。
+        """
         from pathlib import Path
 
         form = Path("src/novel2all/web/templates/write_form.html").read_text(encoding="utf-8")
         assert ':disabled="status' in form, "按钮应根据 status 禁用"
-        # 多个 input/select 也应该禁用
-        assert form.count(":disabled=\"status === 'running'\"") >= 2, (
-            "至少 2 个表单元素应根据 running 状态禁用"
+        # V0.31：取消状态也算禁用，至少 2 个表单元素（input + select + 提交按钮）应禁用
+        assert form.count(":disabled=\"status === 'running' || status === 'cancelling'\"") >= 2, (
+            "至少 2 个表单元素应根据 running/cancelling 状态禁用"
         )
 
     def test_write_form_endpoint_still_works(self) -> None:

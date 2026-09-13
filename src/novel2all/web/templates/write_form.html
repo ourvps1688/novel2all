@@ -1,32 +1,81 @@
-{# V0.30.3 流式编辑器升级 — Alpine.js 状态机 + HTMX SSE + 错误处理 + 字数统计 #}
+{# V0.31 流式编辑器升级 — Alpine.js 5 态状态机 + HTMX SSE + 取消按钮 + task_id 追踪 #}
 <div class="card"
      x-data="{
-        status: 'idle',  // idle | running | done | error
+        status: 'idle',  // idle | running | cancelling | done | error | cancelled
         content: '',
         charCount: 0,
         errorMsg: '',
-        appendChunk(text) {
-            this.content += text;
-            this.charCount = this.content.length;
-        },
-        startRun() {
+        taskId: '',
+        cancelledAt: 0,  // 取消时的字数
+        startRun(taskId) {
+            this.taskId = taskId;
             this.status = 'running';
             this.content = '';
             this.charCount = 0;
             this.errorMsg = '';
+            this.cancelledAt = 0;
+        },
+        appendChunk(data) {
+            if (data && data.text) {
+                this.content += data.text;
+                this.charCount = this.content.length;
+            }
         },
         endRun() {
-            this.status = 'done';
+            if (this.status !== 'cancelling') {
+                this.status = 'done';
+            }
         },
         failRun(msg) {
             this.status = 'error';
             this.errorMsg = msg;
+        },
+        handleCancelled(data) {
+            // V0.31：处理 'cancelled' SSE 事件
+            this.status = 'cancelled';
+            this.cancelledAt = data.partial_chars || this.charCount;
+        },
+        async cancelRun() {
+            // V0.31：调 /api/write/cancel/{task_id} 取消正在运行的 pipeline
+            if (!this.taskId || this.status !== 'running') return;
+            this.status = 'cancelling';
+            try {
+                const resp = await fetch('/api/write/cancel/' + this.taskId, {
+                    method: 'POST',
+                });
+                if (!resp.ok && resp.status !== 404) {
+                    console.error('Cancel failed:', resp.status);
+                }
+            } catch (e) {
+                console.error('Cancel error:', e);
+            }
+        },
+        onSseEvent(detail) {
+            // V0.31：根据 SSE event 名分派
+            // htmx-sse 把所有事件统一为 htmx:sseMessage，detail.event 是 server 端的 event 名
+            const evtName = detail.event;
+            const data = detail.data || {};
+            if (evtName === 'started') {
+                this.taskId = data.task_id || this.taskId;
+            } else if (evtName === 'chunk') {
+                this.appendChunk(data);
+            } else if (evtName === 'cancelled') {
+                this.handleCancelled(data);
+            } else if (evtName === 'done') {
+                // done 由 hx-on::sse-after-message 处理
+            } else if (evtName === 'error') {
+                this.failRun(data.message || '未知错误');
+            }
         }
-     }">
+     }"
+     @htmx:sseMessage.window="onSseEvent($event.detail)">
     <h2>✍️ 写章节
         <span x-show="status === 'running'" class="badge" style="background: #dbeafe; color: #1e40af;">⏳ 写作中</span>
+        <span x-show="status === 'cancelling'" class="badge" style="background: #fef3c7; color: #92400e;">⚠ 取消中</span>
         <span x-show="status === 'done'" class="badge status-ok">✓ 完成</span>
+        <span x-show="status === 'cancelled'" class="badge" style="background: #fed7aa; color: #9a3412;">⊘ 已取消</span>
         <span x-show="status === 'error'" class="badge" style="background: #fecaca; color: #991b1b;">✗ 错误</span>
+        <span x-show="taskId" class="badge" style="background: #f3f4f6; color: #6b7280; font-family: ui-monospace; font-size: 11px;" x-text="'task: ' + taskId"></span>
     </h2>
 
     <form hx-post="/api/write/stream/model"
@@ -34,27 +83,27 @@
           hx-swap="none"
           hx-ext="sse"
           sse-swap="message"
-          hx-on::sse-before-message="startRun()"
+          hx-on::sse-before-message="startRun($event.detail.data.task_id || (window.__currentTaskId || ''))"
           hx-on::sse-message="appendChunk($event.detail.data)"
           hx-on::sse-after-message="endRun()"
-          @submit="if (status === 'running') { $event.preventDefault(); return false; }">
+          @submit="if (status === 'running' || status === 'cancelling') { $event.preventDefault(); return false; }">
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
             <label>
                 <span style="display: block; font-size: 13px; color: var(--fg-muted);">章节号</span>
                 <input type="number" name="chapter" min="1" value="1" required
                        style="width: 100%;"
-                       :disabled="status === 'running'">
+                       :disabled="status === 'running' || status === 'cancelling'">
             </label>
             <label>
                 <span style="display: block; font-size: 13px; color: var(--fg-muted);">Skill</span>
                 <input type="text" name="skill" value="story-long-write"
                        style="width: 100%;"
-                       :disabled="status === 'running'">
+                       :disabled="status === 'running' || status === 'cancelling'">
             </label>
             <label>
                 <span style="display: block; font-size: 13px; color: var(--fg-muted);">Model</span>
                 <select name="model" style="width: 100%;"
-                        :disabled="status === 'running'">
+                        :disabled="status === 'running' || status === 'cancelling'">
                     <option value="">（用全局 default）</option>
                     {% for m in models %}
                     <option value="{{ m.name }}"
@@ -65,21 +114,34 @@
                 </select>
             </label>
         </div>
-        <button type="submit"
-                :disabled="status === 'running'"
-                :style="status === 'running' ? 'background: var(--fg-muted); cursor: wait;' : ''">
-            <span x-show="status === 'idle' || status === 'done' || status === 'error'">开始写（流式）</span>
-            <span x-show="status === 'running'">⏳ 写作中...</span>
-        </button>
+        <div style="display: flex; gap: 8px;">
+            <button type="submit"
+                    :disabled="status === 'running' || status === 'cancelling'"
+                    :style="(status === 'running' || status === 'cancelling') ? 'background: var(--fg-muted); cursor: wait;' : ''">
+                <span x-show="status === 'idle' || status === 'done' || status === 'error' || status === 'cancelled'">开始写（流式）</span>
+                <span x-show="status === 'running'">⏳ 写作中...</span>
+                <span x-show="status === 'cancelling'">⚠ 取消中...</span>
+            </button>
+            {# V0.31：取消按钮（仅 running 状态显示）#}
+            <button type="button"
+                    x-show="status === 'running'"
+                    @click="cancelRun()"
+                    style="background: #f59e0b; color: white;">
+                🛑 停止
+            </button>
+        </div>
     </form>
 
     {# 状态条 + 字数统计 #}
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--fg-muted);">
         <div>
             <span x-show="status === 'running'">📝 正在生成...</span>
+            <span x-show="status === 'cancelling'">⚠ 正在保存已生成内容...</span>
             <span x-show="status === 'done'">✓ 已完成</span>
+            <span x-show="status === 'cancelled'"
+                  x-text="'⊘ 已取消，已保存 ' + cancelledAt + ' 字（点击「开始写」覆盖重写）'"></span>
             <span x-show="status === 'error'" x-text="'✗ 错误: ' + errorMsg"></span>
-            <span x-show="status === 'idle'">💡 提示：V0.30.3 支持断线重连（HTMX SSE 1.x 原生）</span>
+            <span x-show="status === 'idle'">💡 提示：V0.31 支持「停止」按钮中途取消（已生成内容会保存）</span>
         </div>
         <div>
             <strong>字数：</strong><span x-text="charCount" style="font-family: ui-monospace; color: var(--accent);"></span>

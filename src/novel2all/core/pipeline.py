@@ -6,10 +6,16 @@
 - stream_callback 让调用方（CLI / Web SSE）能实时拿到 LLM 输出片段
 - 失败清晰：BlockingIssuesError / OutlineNotFoundError / LLMAuthError 让上层能针对性处理
 - 不依赖真实 LLM（用 mock LLM provider 也能跑完整流程，便于测试）
+
+V0.31 取消/恢复：
+- 监听 asyncio.CancelledError（在 LLM 流式循环中），保存已生成的 partial content
+- 返回 WriteResult(cancelled=True)，不调 update_after_writing（章节未完成）
+- 恢复策略：下次写同一章节时检测 output_path 已存在 → 覆盖（用户决定从头重写）
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -50,18 +56,35 @@ class LLMAuthError(PipelineError):
     """LLM 鉴权失败（key 缺失或无效）。"""
 
 
+class PipelineCancelledError(PipelineError):
+    """V0.31：pipeline 被用户取消（asyncio.CancelledError 处理后转成 PipelineError）。
+
+    携带已生成的 partial content 信息，方便上层 SSE 端点 yield 'cancelled' 事件。
+    """
+
+    def __init__(self, chapter: int, partial_chars: int, output_path: Path) -> None:
+        super().__init__(f"第 {chapter} 章在 {partial_chars} 字处被取消")
+        self.chapter = chapter
+        self.partial_chars = partial_chars
+        self.output_path = output_path
+
+
 # === 结果类型 ===
 
 
 @dataclass
 class WriteResult:
-    """一次写作的完整结果。"""
+    """一次写作的完整结果。
+
+    V0.31 新增 cancelled 字段：True 表示用户中途取消（不调 update_after_writing）。
+    """
 
     chapter: int
     output_path: Path
     content: str
     content_chars: int
     state: TrackingState
+    cancelled: bool = False  # V0.31: 是否用户取消
     post_write_issues: list[ConsistencyIssue] = field(default_factory=list)
     pre_write_issues: list[ConsistencyIssue] = field(default_factory=list)
 
@@ -160,6 +183,7 @@ class WritingPipeline:
         )
 
         # 5. 流式调用 LLM（V0.23+：自动应用 DeepSeek 双模型路由 + thinking 控制）
+        # V0.31：在 async for 中捕获 CancelledError，保存 partial content 并抛 PipelineCancelledError
         content_chunks: list[str] = []
         try:
             async for chunk in self.llm.stream(
@@ -175,6 +199,25 @@ class WritingPipeline:
                     except Exception as e:
                         # stream_callback 异常不应中断生成
                         logger.warning("stream_callback error: %s", e)
+        except asyncio.CancelledError:
+            # V0.31：用户中途取消。保存 partial content 到 output_path，
+            # 但**不**调 update_after_writing（章节未完成）。
+            partial = "".join(content_chunks)
+            output_path = self.project.chapter_prose(chapter)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(partial, encoding="utf-8")
+            logger.info(
+                "V0.31 pipeline 取消: 第 %s 章已保存 %d 字到 %s",
+                chapter,
+                len(partial),
+                output_path,
+            )
+            # 抛出可被上层捕获的 PipelineCancelledError（保留 cancel 上下文）
+            raise PipelineCancelledError(
+                chapter=chapter,
+                partial_chars=len(partial),
+                output_path=output_path,
+            ) from None
         except Exception as e:
             error_msg = str(e).lower()
             if "auth" in error_msg or "key" in error_msg or "401" in error_msg:
@@ -208,6 +251,7 @@ class WritingPipeline:
             content=content,
             content_chars=len(content),
             state=state,
+            cancelled=False,
             post_write_issues=post_issues,
             pre_write_issues=pre_issues,
         )
