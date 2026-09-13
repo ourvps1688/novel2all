@@ -1,11 +1,19 @@
-"""V0.33 Cache 后端抽象 + TTL + 持久化 + V0.37 跨进程文件锁 + V0.40 SQLite backend。
+"""V0.33 Cache 后端抽象 + TTL + 持久化 + V0.37 跨进程文件锁 + V0.40 SQLite + V0.45 Redis。
 
 设计：
+- V0.46 CacheBase：抽象基类 - 提取 4 backend 公共 __init__ + stats() + close() 样板
 - CacheBackend Protocol：统一 get / set / size / clear / stats 接口
 - MemoryLRUBackend：V0.29 真 LRU + V0.33 TTL（OrderedDict + 时间戳检查）
 - JSONFileBackend：持久化（重启后 cache 保留）+ TTL + V0.37 文件锁
 - V0.37 CacheLock：跨平台文件锁（fcntl on POSIX / msvcrt on Windows）
 - V0.40 SQLiteBackend：ACID + WAL 模式 + 跨 POSIX/Windows 安全（SQLite 内置锁）
+- V0.45 RedisBackend：分布式 / 跨机器 / 跨进程
+
+V0.46 CacheBase 抽象：
+- Template Method 模式：基类提供 stats() 字典构造 + 默认 close() no-op
+- 子类覆盖 _stats_persist_path / _stats_lock_backend / _stats_extras 钩子
+- 子类继承 backend_name: ClassVar[str] 类属性
+- 消除 ~80 行 4 backend 重复样板（__init__ 公共字段 + stats 字典结构）
 
 V0.40 新增 SQLiteBackend（解决 V0.37 跨 OS 锁不互斥限制）：
 - SQLite 内置锁机制（POSIX/Windows 通用），无需 fcntl/msvcrt
@@ -21,10 +29,10 @@ SQLite backend 直接存 TEXT，无需额外编码（用 encode_key 统一接口
 Stats：
 - hits / misses / hit_rate（跨实例累计？仅内存，文件加载时重置）
 - size / max_size / enabled
-- backend（"memory" | "json" | "sqlite"）
+- backend（"memory" | "json" | "sqlite" | "redis"）
 - ttl_seconds（0 = 不过期）
-- persist_path（仅 json / sqlite backend）
-- lock_backend（V0.37：fcntl / msvcrt / none；V0.40 sqlite: "sqlite"）
+- persist_path（仅 json / sqlite / redis backend）
+- lock_backend（V0.37：fcntl / msvcrt / none；V0.40 sqlite: "sqlite"；V0.45 redis: "redis"）
 """
 
 from __future__ import annotations
@@ -37,9 +45,10 @@ import sys
 import tempfile
 import threading
 import time
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Protocol, Self
+from typing import Any, ClassVar, Protocol, Self
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +104,151 @@ class CacheBackend(Protocol):
 
         MemoryLRU / JSONFile 是 no-op，SQLite 会关闭所有池中连接。
         """
+
+
+# === V0.46 CacheBase：抽象基类 - 提取 4 backend 公共样板 ===
+# Template Method 模式：基类提供 stats() 字典构造 + 默认 close() no-op
+# 子类必须：设 backend_name ClassVar + 实现 get/set/size/clear/keys
+# 子类可覆盖：_stats_persist_path / _stats_lock_backend / _stats_extras 钩子
+
+
+class CacheBase(ABC):
+    """V0.46：Cache 后端抽象基类 - 消除 4 backend 重复样板。
+
+    设计：Template Method 模式 + 钩子方法（hook methods）。
+
+    强制实现（来自 CacheBackend Protocol）：
+        - get(key) -> value | None
+        - set(key, value)
+        - size() -> int
+        - clear()
+        - keys() -> list[str]
+
+    公共状态（基类初始化）：
+        - _max_size / _ttl_seconds / _hits / _misses
+
+    子类必须设置：
+        - backend_name: ClassVar[str]   # e.g., "memory" / "json" / "sqlite" / "redis"
+
+    子类可覆盖（钩子）：
+        - _stats_persist_path() -> str | None   # 默认 None
+        - _stats_lock_backend() -> str          # 默认 "none"
+        - _stats_extras() -> dict[str, Any]     # 默认 {}
+        - close()                               # 默认 no-op（MemoryLRU/JSONFile 用默认）
+
+    子类 __init__ 规范：
+        - 必须调用 super().__init__(max_size=..., ttl_seconds=...)
+        - 子类特有的 init 参数（path / url / namespace）由子类自己处理
+
+    收益：
+        - 消除 4 backend __init__ 重复字段（4 行 × 4 = 16 行）
+        - 消除 4 backend stats() 字典结构（10 行 × 4 = 40 行）
+        - 消除 2 backend close() no-op（2 行 × 2 = 4 行）
+        - 消除 4 backend clear() 中 _hits/_misses 重置（2 行 × 4 = 8 行）
+        - 单一来源：未来加新 backend 只需 set backend_name + 覆盖钩子
+    """
+
+    backend_name: ClassVar[str] = "unknown"
+
+    def __init__(self, *, max_size: int = 256, ttl_seconds: int = 0) -> None:
+        """V0.46：基类初始化公共字段。
+
+        子类必须在自己 __init__ 内调用 super().__init__(max_size=..., ttl_seconds=...)
+        才能继承这些公共状态。
+        """
+        self._max_size = max_size
+        self._ttl_seconds = ttl_seconds
+        self._hits = 0
+        self._misses = 0
+
+    # === Stats 钩子（子类覆盖以提供 backend-specific 字段）===
+
+    def _stats_persist_path(self) -> str | None:
+        """V0.46：子类覆盖返回持久化路径。
+
+        默认 None（内存后端）。
+        JSONFile/SQLite 返回 str(self._path)；Redis 返回 self._url。
+        """
+        return None
+
+    def _stats_lock_backend(self) -> str:
+        """V0.46：子类覆盖返回锁后端名。
+
+        默认 "none"（无锁）。MemoryLRU 也用默认。
+        JSONFile 返回 self._lock_backend (fcntl/msvcrt/none)；
+        SQLite 返回 "sqlite"；Redis 返回 "redis"。
+        """
+        return "none"
+
+    def _stats_extras(self) -> dict[str, Any]:
+        """V0.46：子类覆盖返回额外 stats 字段。
+
+        默认空字典。
+        SQLite 加 conn_pool_size；Redis 加 namespace + used_memory_bytes。
+        """
+        return {}
+
+    def stats(self) -> dict[str, Any]:
+        """V0.46：统一 stats 字典构造（提取自 4 backend 的样板）。
+
+        顺序保证向前兼容（与 V0.45 RedisBackend.stats() 完全相同字段顺序）。
+        子类覆盖 _stats_* 钩子即可定制；无需重写整个 stats()。
+        """
+        total = self._hits + self._misses
+        hit_rate = self._hits / total if total > 0 else 0.0
+        result: dict[str, Any] = {
+            "enabled": True,
+            "backend": self.backend_name,
+            "size": self.size(),
+            "max_size": self._max_size,
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_rate": round(hit_rate, 4),
+            "ttl_seconds": self._ttl_seconds,
+            "persist_path": self._stats_persist_path(),
+            "lock_backend": self._stats_lock_backend(),
+        }
+        # V0.46：合并子类额外字段（SQLite/Redis 用）
+        result.update(self._stats_extras())
+        return result
+
+    def _reset_stats(self) -> None:
+        """V0.46：清零 hits/misses（供 clear() 复用，避免 4 backend 重复 2 行）。"""
+        self._hits = 0
+        self._misses = 0
+
+    def close(self) -> None:
+        """V0.46：默认 no-op（MemoryLRU / JSONFile 用此默认）。
+
+        SQLite / Redis 子类覆盖以关闭连接池 / Redis client。
+        """
+
+    # === CacheBackend Protocol 抽象方法（子类必须实现）===
+
+    @abstractmethod
+    def get(self, key: tuple | str) -> str | None:
+        """获取缓存值（含 TTL 检查 + LRU 更新 + 命中统计）。"""
+        ...
+
+    @abstractmethod
+    def set(self, key: tuple | str, value: str) -> None:
+        """设置缓存值（含 LRU 淘汰 + 持久化 + TTL 记录）。"""
+        ...
+
+    @abstractmethod
+    def size(self) -> int:
+        """当前缓存条目数。"""
+        ...
+
+    @abstractmethod
+    def clear(self) -> None:
+        """清空缓存（清数据 + 重置 stats）。"""
+        ...
+
+    @abstractmethod
+    def keys(self) -> list[str]:
+        """返回所有 encoded keys（按 LRU 顺序：最旧在前）。"""
+        ...
         ...
 
 
@@ -229,26 +383,31 @@ class CacheLock:
             pass
 
 
-# === MemoryLRUBackend：进程内 LRU + TTL（V0.33 升级 V0.29）===
+# === MemoryLRUBackend：进程内 LRU + TTL（V0.33 升级 V0.29，V0.46 继承 CacheBase）===
 
 
-class MemoryLRUBackend:
-    """V0.29 真 LRU + V0.33 TTL。
+class MemoryLRUBackend(CacheBase):
+    """V0.29 真 LRU + V0.33 TTL（V0.46 继承 CacheBase 消除样板）。
 
     LRU：OrderedDict，get 时 move_to_end 更新最近使用位置；
         set 时如超 max_size 调 popitem(last=False) 淘汰最旧条目。
 
     TTL：每个 entry 记 expires_at（time.time() + ttl_seconds）；
         0 = 永不过期。get 时检查，过期则删除 + 返回 None。
+
+    V0.46 收益：
+    - 删除 __init__ 中 4 行公共字段（super() 处理）
+    - 删除 stats() 整个方法（继承 CacheBase.stats() + backend_name="memory"）
+    - 删除 close() 方法（继承默认 no-op）
+    - clear() 用 self._reset_stats() 替代 2 行手写
     """
 
+    backend_name = "memory"
+
     def __init__(self, max_size: int = 256, ttl_seconds: int = 0) -> None:
+        super().__init__(max_size=max_size, ttl_seconds=ttl_seconds)
         self._cache: OrderedDict[str, str] = OrderedDict()
         self._expires_at: dict[str, float | None] = {}  # key -> expires_at (None = 永不过期)
-        self._max_size = max_size
-        self._ttl_seconds = ttl_seconds
-        self._hits = 0
-        self._misses = 0
 
     def get(self, key: tuple | str) -> str | None:
         encoded = encode_key(key)
@@ -299,34 +458,14 @@ class MemoryLRUBackend:
     def clear(self) -> None:
         self._cache.clear()
         self._expires_at.clear()
-        self._hits = 0
-        self._misses = 0
-
-    def close(self) -> None:
-        """V0.42：no-op（MemoryLRU 无资源需释放）。"""
-
-    def stats(self) -> dict[str, Any]:
-        total = self._hits + self._misses
-        hit_rate = self._hits / total if total > 0 else 0.0
-        return {
-            "enabled": True,
-            "backend": "memory",
-            "size": self.size(),
-            "max_size": self._max_size,
-            "hits": self._hits,
-            "misses": self._misses,
-            "hit_rate": round(hit_rate, 4),
-            "ttl_seconds": self._ttl_seconds,
-            "persist_path": None,
-            "lock_backend": "none",  # V0.40: memory 无需锁
-        }
+        self._reset_stats()  # V0.46：替代 self._hits = 0; self._misses = 0
 
 
 # === JSONFileBackend：持久化 LRU + TTL（V0.33）===
 
 
-class JSONFileBackend:
-    """V0.33 持久化 cache 后端（JSON 文件 + LRU + TTL）。
+class JSONFileBackend(CacheBase):
+    """V0.33 持久化 cache 后端（JSON 文件 + LRU + TTL，V0.46 继承 CacheBase）。
 
     行为：
     - 启动时从 JSON 文件加载（过滤掉 TTL 过期的）
@@ -343,23 +482,31 @@ class JSONFileBackend:
     注意：
     - V0.37：_save() 用 CacheLock 跨进程互斥（解决 race condition）
     - 不实现 LRU 写入顺序（按 expires_at + last_accessed_at 计算"最旧"）
+
+    V0.46：继承 CacheBase - backend_name="json" + 覆盖 _stats_persist_path/_stats_lock_backend
     """
 
     FILE_VERSION = 1
+    backend_name = "json"
 
     def __init__(self, path: Path, max_size: int = 256, ttl_seconds: int = 0) -> None:
+        super().__init__(max_size=max_size, ttl_seconds=ttl_seconds)
         self._path = Path(path)
-        self._max_size = max_size
-        self._ttl_seconds = ttl_seconds
         # 内存中的 entry 列表（按 last_accessed_at 排序）
         self._entries: list[dict[str, Any]] = []
         self._key_index: dict[str, int] = {}  # key -> index in _entries
-        self._hits = 0
-        self._misses = 0
         # V0.37：探测可用的文件锁后端
         self._lock_backend = CacheLock(self._path).backend
         # 启动时加载
         self._load()
+
+    def _stats_persist_path(self) -> str | None:
+        """V0.46：JSONFile stats 用 path 作为 persist_path。"""
+        return str(self._path)
+
+    def _stats_lock_backend(self) -> str:
+        """V0.46：JSONFile 用探测到的 CacheLock 后端（fcntl/msvcrt/none）。"""
+        return self._lock_backend
 
     def _load(self) -> None:
         """启动时从文件加载 entries（过滤 TTL 过期）。"""
@@ -493,39 +640,19 @@ class JSONFileBackend:
     def clear(self) -> None:
         self._entries.clear()
         self._key_index.clear()
-        self._hits = 0
-        self._misses = 0
+        self._reset_stats()  # V0.46：替代 self._hits = 0; self._misses = 0
         self._save()  # 写空 entries
-
-    def stats(self) -> dict[str, Any]:
-        total = self._hits + self._misses
-        hit_rate = self._hits / total if total > 0 else 0.0
-        return {
-            "enabled": True,
-            "backend": "json",
-            "size": self.size(),
-            "max_size": self._max_size,
-            "hits": self._hits,
-            "misses": self._misses,
-            "hit_rate": round(hit_rate, 4),
-            "ttl_seconds": self._ttl_seconds,
-            "persist_path": str(self._path),
-            "lock_backend": self._lock_backend,  # V0.37: fcntl | msvcrt | none
-        }
 
     def keys(self) -> list[str]:
         """V0.43：返回所有 encoded keys（按 LRU 顺序：最旧在前）。"""
         return [entry["key"] for entry in self._entries]
 
-    def close(self) -> None:
-        """V0.42：no-op（JSONFile 无连接池）。"""
-
 
 # === SQLiteBackend：V0.40 新增（解决 V0.37 跨 OS 锁不互斥限制）===
 
 
-class SQLiteBackend:
-    """V0.40 SQLite cache backend — V0.42 升级：连接池 + 自动 backup。
+class SQLiteBackend(CacheBase):
+    """V0.40 SQLite cache backend — V0.42 升级：连接池 + 自动 backup（V0.46 继承 CacheBase）。
 
     优势（vs JSONFileBackend）：
     - **跨 OS 安全**：SQLite 内置锁机制，POSIX/Windows 通用（无需 fcntl/msvcrt）
@@ -553,9 +680,12 @@ class SQLiteBackend:
     - WAL 模式：reader 不阻塞 writer
     - 跨进程：SQLite 内置文件锁 + 写串行化（自动）
     - **V0.42 自动 backup**：启动时 PRAGMA integrity_check，损坏则重命名为 .corrupt.{ts}
+
+    V0.46：继承 CacheBase - backend_name="sqlite" + 覆盖 _stats_persist_path/_stats_lock_backend/_stats_extras
     """
 
     FILE_VERSION = 2  # V0.40 升级版本（与 JSONFileBackend 不兼容）
+    backend_name = "sqlite"
 
     def __init__(
         self,
@@ -563,12 +693,9 @@ class SQLiteBackend:
         max_size: int = 256,
         ttl_seconds: int = 0,
     ) -> None:
+        super().__init__(max_size=max_size, ttl_seconds=ttl_seconds)
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._max_size = max_size
-        self._ttl_seconds = ttl_seconds
-        self._hits = 0
-        self._misses = 0
 
         # V0.42：连接池 — 每线程独立 connection（threading.local）
         self._local = threading.local()
@@ -592,6 +719,18 @@ class SQLiteBackend:
             max_size,
             ttl_seconds,
         )
+
+    def _stats_persist_path(self) -> str | None:
+        """V0.46：SQLite stats 用 .db 文件路径。"""
+        return str(self._path)
+
+    def _stats_lock_backend(self) -> str:
+        """V0.46：SQLite 用内置 SQLite 锁（POSIX/Windows 通用）。"""
+        return "sqlite"
+
+    def _stats_extras(self) -> dict[str, Any]:
+        """V0.46：SQLite 额外返回连接池大小。"""
+        return {"conn_pool_size": len(self._conns)}
 
     def _check_and_recover(self) -> None:
         """V0.42：启动时检查 DB 完整性，损坏则 backup + 重启。
@@ -775,25 +914,7 @@ class SQLiteBackend:
         """清空 cache + 重置 stats。"""
         conn = self._get_conn()
         conn.execute("DELETE FROM cache")
-        self._hits = 0
-        self._misses = 0
-
-    def stats(self) -> dict[str, Any]:
-        total = self._hits + self._misses
-        hit_rate = self._hits / total if total > 0 else 0.0
-        return {
-            "enabled": True,
-            "backend": "sqlite",
-            "size": self.size(),
-            "max_size": self._max_size,
-            "hits": self._hits,
-            "misses": self._misses,
-            "hit_rate": round(hit_rate, 4),
-            "ttl_seconds": self._ttl_seconds,
-            "persist_path": str(self._path),
-            "lock_backend": "sqlite",
-            "conn_pool_size": len(self._conns),  # V0.42: 连接池大小
-        }
+        self._reset_stats()  # V0.46：替代 self._hits = 0; self._misses = 0
 
     def close(self) -> None:
         """V0.42：关闭所有连接池中的 connection。"""
@@ -810,8 +931,8 @@ class SQLiteBackend:
 # === RedisBackend：V0.45 新增（分布式 cache）===
 
 
-class RedisBackend:
-    """V0.45：Redis cache backend — 分布式 / 跨机器 / 跨进程。
+class RedisBackend(CacheBase):
+    """V0.45：Redis cache backend — 分布式 / 跨机器 / 跨进程（V0.46 继承 CacheBase）。
 
     优势（vs SQLite/Memory/JSON）：
     - **分布式**：多机器 / 多容器共享 cache（web 集群 + CLI 跨机器）
@@ -836,9 +957,12 @@ class RedisBackend:
     - redis-py 客户端自带连接池（ConnectionPool）
     - 单线程 asyncio 兼容：redis.asyncio.Redis
     - 多线程：每个线程自动从池获取连接
+
+    V0.46：继承 CacheBase - backend_name="redis" + 覆盖 _stats_persist_path/_stats_lock_backend/_stats_extras
     """
 
     FILE_VERSION = 3  # V0.45 升级版本
+    backend_name = "redis"
 
     def __init__(
         self,
@@ -847,7 +971,7 @@ class RedisBackend:
         ttl_seconds: int = 0,
         namespace: str = "novel2all",
     ) -> None:
-        """V0.45：初始化 Redis backend。
+        """V0.45：初始化 Redis backend（V0.46 调用 super() 处理公共字段）。
 
         Args:
             url: Redis 连接 URL（默认 redis://localhost:6379/0）
@@ -862,12 +986,9 @@ class RedisBackend:
                 "V0.45 RedisBackend 需要 redis 包。请运行：pip install 'redis>=5.0.0'"
             ) from e
 
+        super().__init__(max_size=max_size, ttl_seconds=ttl_seconds)
         self._url = url
-        self._max_size = max_size
-        self._ttl_seconds = ttl_seconds
         self._namespace = namespace
-        self._hits = 0
-        self._misses = 0
 
         # 创建连接池（redis-py 自动管理线程安全）
         self._client = redis.Redis.from_url(
@@ -884,6 +1005,26 @@ class RedisBackend:
         except Exception as e:
             logger.error("V0.45 RedisBackend: Redis 连接失败 %s: %s", url, e)
             raise
+
+    def _stats_persist_path(self) -> str | None:
+        """V0.46：Redis stats 用连接 URL 作为 persist_path。"""
+        return self._url
+
+    def _stats_lock_backend(self) -> str:
+        """V0.46：Redis 用内置单线程命令队列（自动串行化）。"""
+        return "redis"
+
+    def _stats_extras(self) -> dict[str, Any]:
+        """V0.46：Redis 额外返回 namespace + 内存使用量。"""
+        try:
+            redis_info = self._client.info(section="memory")
+            used_memory = redis_info.get("used_memory", 0)
+        except Exception:
+            used_memory = 0
+        return {
+            "namespace": self._namespace,
+            "used_memory_bytes": used_memory,
+        }
 
     def _key(self, key: tuple | str) -> str:
         """V0.45：生成 Redis key（带 namespace 前缀）。"""
@@ -941,8 +1082,7 @@ class RedisBackend:
                     break
         except Exception as e:
             logger.warning("V0.45 RedisBackend: clear 失败: %s", e)
-        self._hits = 0
-        self._misses = 0
+        self._reset_stats()  # V0.46：替代 self._hits = 0; self._misses = 0
 
     def keys(self) -> list[str]:
         """V0.45：返回所有 encoded keys（带 namespace 前缀）。"""
@@ -964,29 +1104,6 @@ class RedisBackend:
         except Exception as e:
             logger.warning("V0.45 RedisBackend: keys 失败: %s", e)
         return result
-
-    def stats(self) -> dict[str, Any]:
-        total = self._hits + self._misses
-        hit_rate = self._hits / total if total > 0 else 0.0
-        try:
-            redis_info = self._client.info(section="memory")
-            used_memory = redis_info.get("used_memory", 0)
-        except Exception:
-            used_memory = 0
-        return {
-            "enabled": True,
-            "backend": "redis",
-            "size": self.size(),
-            "max_size": self._max_size,
-            "hits": self._hits,
-            "misses": self._misses,
-            "hit_rate": round(hit_rate, 4),
-            "ttl_seconds": self._ttl_seconds,
-            "persist_path": self._url,
-            "lock_backend": "redis",  # V0.45: Redis 内置单线程队列
-            "namespace": self._namespace,
-            "used_memory_bytes": used_memory,
-        }
 
     def close(self) -> None:
         """V0.45：关闭 Redis 连接池。"""
