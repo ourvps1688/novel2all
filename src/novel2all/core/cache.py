@@ -1,9 +1,10 @@
-"""V0.33 Cache 后端抽象 + TTL + 持久化。
+"""V0.33 Cache 后端抽象 + TTL + 持久化 + V0.37 跨进程文件锁。
 
 设计：
 - CacheBackend Protocol：统一 get / set / size / clear / stats 接口
 - MemoryLRUBackend：V0.29 真 LRU + V0.33 TTL（OrderedDict + 时间戳检查）
-- JSONFileBackend：持久化（重启后 cache 保留）+ TTL
+- JSONFileBackend：持久化（重启后 cache 保留）+ TTL + V0.37 文件锁
+- V0.37 CacheLock：跨平台文件锁（fcntl on POSIX / msvcrt on Windows）
 
 Key 类型：原 LLMProvider 用 tuple(model, sys_hash, user_hash, temperature) 作为 key，
 JSON 后端需要可序列化 → 把 tuple 转成 ":" 拼接的字符串。
@@ -18,18 +19,20 @@ Stats：
 V0.33 持久化策略（简单优先）：
 - 每次 set → 写入 JSON 文件（用临时文件 + atomic rename 防止损坏）
 - 启动时 → 加载 JSON 文件，检查 TTL 过期
-- 不实现文件锁（单进程假设；多进程会有 race condition，但 V0.33 接受）
+- V0.37：set 时加 CacheLock（跨进程互斥），避免两个进程同时写损坏文件
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
+import sys
 import tempfile
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, Self
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +75,137 @@ class CacheBackend(Protocol):
     def stats(self) -> dict[str, Any]:
         """返回统计信息（用于 /api/cache/stats 面板）。"""
         ...
+
+
+# === V0.37 CacheLock：跨平台文件锁 ===
+# 解决多进程并发写 JSONFileBackend 时的 race condition
+# - POSIX (Linux/macOS): fcntl.flock() 自动释放 + 跨进程互斥
+# - Windows: msvcrt.locking() 显式锁定 1 字节
+# - 不可用时：降级为无锁模式 + warning（单进程仍安全）
+
+
+class CacheLock:
+    """V0.37：跨进程文件锁（用于 JSONFileBackend 写入互斥）。
+
+    用法：
+        with CacheLock(path):
+            # 读 / 修改 / 写 cache 文件（原子操作）
+
+    设计：
+    - 锁文件 = path + ".lock"（与 cache 文件同目录）
+    - 锁内容 = 1 字节（POSIX flock 不需要内容，Windows msvcrt 需要）
+    - 自动清理：__exit__ 时 close fd + 尝试删除 lock 文件
+    - 降级：如果 fcntl/msvcrt 都不可用，warning + 无锁（单进程安全）
+
+    注意：
+    - 不同 OS 的锁**不互斥**（POSIX 锁 vs Windows 锁）。多 OS 共享 cache 文件不安全。
+    - 同 OS 多进程：✅ 互斥（fcntl.flock 自动跨进程）
+    """
+
+    def __init__(self, target_path: Path) -> None:
+        self.target_path = Path(target_path)
+        self.lock_path = self.target_path.with_suffix(self.target_path.suffix + ".lock")
+        self._fd: Any = None
+        self._backend: str = "none"  # V0.37：默认无锁（探测失败时）
+        # 探测可用后端
+        if sys.platform == "win32":
+            try:
+                import msvcrt  # noqa: F401
+
+                self._backend = "msvcrt"
+            except ImportError:
+                pass
+        else:
+            try:
+                import fcntl  # noqa: F401
+
+                self._backend = "fcntl"
+            except ImportError:
+                pass
+        if self._backend == "none":
+            logger.warning(
+                "V0.37 CacheLock: 平台 %s 无 fcntl/msvcrt 模块，降级为无锁模式（多进程不安全）",
+                sys.platform,
+            )
+
+    @property
+    def backend(self) -> str:
+        """返回实际使用的锁后端（fcntl / msvcrt / none）。"""
+        return self._backend
+
+    def __enter__(self) -> Self:
+        """获取排他锁。失败时抛 BlockingIOError。"""
+        if self._backend == "none":
+            return self
+        # V0.37：使用 append 模式 + 二进制 + os.open() 避免 Windows 权限问题
+        # "w" 模式会 truncate，可能在另一进程持有文件时失败
+        if self._backend == "msvcrt":
+            # Windows: 用 os.open() 显式 O_CREAT | O_RDWR + 共享读（让其他进程能读但 lock 互斥）
+            self._fd = os.fdopen(
+                os.open(
+                    str(self.lock_path),
+                    os.O_CREAT | os.O_RDWR | os.O_BINARY,
+                    0o644,
+                ),
+                "rb+",
+            )
+            # 确保文件至少 1 字节（msvcrt.locking 需要）
+            try:
+                self._fd.seek(0, 2)  # 移到末尾
+                if self._fd.tell() == 0:
+                    self._fd.write(b"\x00")
+                    self._fd.flush()
+                self._fd.seek(0)
+            except OSError:
+                pass
+        else:
+            # POSIX: 文本模式 + "w" 模式（fcntl 不在意文件内容）
+            self._fd = open(self.lock_path, "w", encoding="utf-8")
+            self._fd.write("0")
+            self._fd.flush()
+        try:
+            if self._backend == "fcntl":
+                import fcntl
+
+                fcntl.flock(self._fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            elif self._backend == "msvcrt":
+                import msvcrt
+
+                msvcrt.locking(self._fd.fileno(), msvcrt.LK_NBLCK, 1)
+        except (BlockingIOError, OSError, PermissionError) as e:
+            try:
+                self._fd.close()
+            except OSError:
+                pass
+            self._fd = None
+            # V0.37：转 PermissionError 为 BlockingIOError（统一异常类型）
+            if isinstance(e, PermissionError):
+                raise BlockingIOError(str(e)) from e
+            raise
+        return self
+
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        """释放锁 + 清理 lock 文件。"""
+        if self._fd is not None:
+            try:
+                if self._backend == "fcntl":
+                    import fcntl
+
+                    fcntl.flock(self._fd.fileno(), fcntl.LOCK_UN)
+                elif self._backend == "msvcrt":
+                    import msvcrt
+
+                    msvcrt.locking(self._fd.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError as e:
+                logger.warning("V0.37 CacheLock: 释放锁失败: %s", e)
+            finally:
+                self._fd.close()
+                self._fd = None
+        # 尝试删除 lock 文件（best effort）
+        try:
+            self.lock_path.unlink()
+        except OSError:
+            pass
 
 
 # === MemoryLRUBackend：进程内 LRU + TTL（V0.33 升级 V0.29）===
@@ -182,7 +316,7 @@ class JSONFileBackend:
       }
 
     注意：
-    - 多进程并发写同一文件有 race condition（V0.33 接受；V0.34+ 加文件锁）
+    - V0.37：_save() 用 CacheLock 跨进程互斥（解决 race condition）
     - 不实现 LRU 写入顺序（按 expires_at + last_accessed_at 计算"最旧"）
     """
 
@@ -197,6 +331,8 @@ class JSONFileBackend:
         self._key_index: dict[str, int] = {}  # key -> index in _entries
         self._hits = 0
         self._misses = 0
+        # V0.37：探测可用的文件锁后端
+        self._lock_backend = CacheLock(self._path).backend
         # 启动时加载
         self._load()
 
@@ -243,29 +379,34 @@ class JSONFileBackend:
         self._key_index = {entry["key"]: i for i, entry in enumerate(self._entries)}
 
     def _save(self) -> None:
-        """写回文件（用临时文件 + atomic rename 防止损坏）。"""
+        """V0.37：写回文件（用临时文件 + atomic rename + CacheLock 跨进程互斥）。
+
+        多进程并发写：两个进程同时 set() 会导致文件损坏（最后一个写入胜出，丢失另一个的修改）。
+        V0.37 加 CacheLock（fcntl on POSIX / msvcrt on Windows）确保原子性。
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        # 写入临时文件 → rename
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=self._path.parent,
-                prefix=f".{self._path.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as tmp:
-                json.dump(
-                    {"version": self.FILE_VERSION, "entries": self._entries},
-                    tmp,
-                    ensure_ascii=False,
-                    indent=None,  # 紧凑（不浪费空间）
-                )
-                tmp_path = tmp.name
-            # atomic rename（Windows 上可能不支持，但通常能用）
-            Path(tmp_path).replace(self._path)
-        except OSError as e:
-            logger.error("V0.33 JSONFileBackend: 写入失败 %s: %s", self._path, e)
+        # V0.37：用 CacheLock 跨进程互斥
+        with CacheLock(self._path):
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=self._path.parent,
+                    prefix=f".{self._path.name}.",
+                    suffix=".tmp",
+                    delete=False,
+                ) as tmp:
+                    json.dump(
+                        {"version": self.FILE_VERSION, "entries": self._entries},
+                        tmp,
+                        ensure_ascii=False,
+                        indent=None,  # 紧凑（不浪费空间）
+                    )
+                    tmp_path = tmp.name
+                # atomic rename（Windows 上可能不支持，但通常能用）
+                Path(tmp_path).replace(self._path)
+            except OSError as e:
+                logger.error("V0.37 JSONFileBackend: 写入失败 %s: %s", self._path, e)
 
     def get(self, key: tuple | str) -> str | None:
         encoded = encode_key(key)
@@ -277,7 +418,7 @@ class JSONFileBackend:
         # V0.33：检查 TTL
         expires_at = entry.get("expires_at")
         if expires_at is not None and expires_at < time.time():
-            # 过期 → 删除
+            # 过期 → 删除（V0.37：加锁避免并发写）
             del self._entries[idx]
             del self._key_index[encoded]
             self._rebuild_index()
@@ -344,4 +485,5 @@ class JSONFileBackend:
             "hit_rate": round(hit_rate, 4),
             "ttl_seconds": self._ttl_seconds,
             "persist_path": str(self._path),
+            "lock_backend": self._lock_backend,  # V0.37: fcntl | msvcrt | none
         }
