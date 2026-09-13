@@ -1,25 +1,30 @@
-"""V0.33 Cache 后端抽象 + TTL + 持久化 + V0.37 跨进程文件锁。
+"""V0.33 Cache 后端抽象 + TTL + 持久化 + V0.37 跨进程文件锁 + V0.40 SQLite backend。
 
 设计：
 - CacheBackend Protocol：统一 get / set / size / clear / stats 接口
 - MemoryLRUBackend：V0.29 真 LRU + V0.33 TTL（OrderedDict + 时间戳检查）
 - JSONFileBackend：持久化（重启后 cache 保留）+ TTL + V0.37 文件锁
 - V0.37 CacheLock：跨平台文件锁（fcntl on POSIX / msvcrt on Windows）
+- V0.40 SQLiteBackend：ACID + WAL 模式 + 跨 POSIX/Windows 安全（SQLite 内置锁）
+
+V0.40 新增 SQLiteBackend（解决 V0.37 跨 OS 锁不互斥限制）：
+- SQLite 内置锁机制（POSIX/Windows 通用），无需 fcntl/msvcrt
+- WAL 模式：reader 不阻塞 writer
+- ACID 事务：INSERT OR REPLACE 原子 upsert
+- 进程/线程安全：sqlite3 模块内已处理
+- 适合：长期运行 + 多进程 + 跨 OS 共享 cache 文件
 
 Key 类型：原 LLMProvider 用 tuple(model, sys_hash, user_hash, temperature) 作为 key，
 JSON 后端需要可序列化 → 把 tuple 转成 ":" 拼接的字符串。
+SQLite backend 直接存 TEXT，无需额外编码（用 encode_key 统一接口）。
 
 Stats：
 - hits / misses / hit_rate（跨实例累计？仅内存，文件加载时重置）
 - size / max_size / enabled
-- backend（"memory" | "json"）
+- backend（"memory" | "json" | "sqlite"）
 - ttl_seconds（0 = 不过期）
-- persist_path（仅 json backend）
-
-V0.33 持久化策略（简单优先）：
-- 每次 set → 写入 JSON 文件（用临时文件 + atomic rename 防止损坏）
-- 启动时 → 加载 JSON 文件，检查 TTL 过期
-- V0.37：set 时加 CacheLock（跨进程互斥），避免两个进程同时写损坏文件
+- persist_path（仅 json / sqlite backend）
+- lock_backend（V0.37：fcntl / msvcrt / none；V0.40 sqlite: "sqlite"）
 """
 
 from __future__ import annotations
@@ -27,8 +32,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 import sys
 import tempfile
+import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -294,6 +301,7 @@ class MemoryLRUBackend:
             "hit_rate": round(hit_rate, 4),
             "ttl_seconds": self._ttl_seconds,
             "persist_path": None,
+            "lock_backend": "none",  # V0.40: memory 无需锁
         }
 
 
@@ -487,3 +495,208 @@ class JSONFileBackend:
             "persist_path": str(self._path),
             "lock_backend": self._lock_backend,  # V0.37: fcntl | msvcrt | none
         }
+
+
+# === SQLiteBackend：V0.40 新增（解决 V0.37 跨 OS 锁不互斥限制）===
+
+
+class SQLiteBackend:
+    """V0.40：SQLite cache backend — OS-agnostic 持久化 + 跨进程安全。
+
+    优势（vs JSONFileBackend）：
+    - **跨 OS 安全**：SQLite 内置锁机制，POSIX/Windows 通用（无需 fcntl/msvcrt）
+    - **ACID 事务**：INSERT OR REPLACE 原子 upsert
+    - **并发读**：WAL 模式让 reader 不阻塞 writer
+    - **零新依赖**：sqlite3 是 Python 标准库
+    - **可跨 OS 共享 cache 文件**：从 Linux 拷贝到 Windows 直接可用
+
+    劣势：
+    - 性能略低于纯内存（但收益 > 复杂度）
+    - 单文件最大 ~140TB（远超需求）
+    - WAL 模式会产生 -wal / -shm 辅助文件
+
+    Schema：
+        CREATE TABLE cache (
+            key TEXT PRIMARY KEY,        -- 编码后的 cache key（encode_key 输出）
+            value TEXT NOT NULL,          -- 缓存内容
+            expires_at REAL,              -- 过期时间戳（NULL = 永不过期）
+            last_accessed_at REAL NOT NULL, -- V0.29 LRU 用
+            created_at REAL NOT NULL       -- 调试用
+        );
+
+    进程/线程安全：
+    - sqlite3 默认同线程连接（check_same_thread=False 让多线程共享）
+    - WAL 模式：reader 不阻塞 writer
+    - 跨进程：SQLite 内置文件锁 + 写串行化（自动）
+    """
+
+    FILE_VERSION = 2  # V0.40 升级版本（与 JSONFileBackend 不兼容）
+
+    def __init__(
+        self,
+        path: Path,
+        max_size: int = 256,
+        ttl_seconds: int = 0,
+    ) -> None:
+        self._path = Path(path)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._max_size = max_size
+        self._ttl_seconds = ttl_seconds
+        self._hits = 0
+        self._misses = 0
+        # V0.40：多线程安全锁（SQLite 同连接多线程不安全，FastAPI 线程池需要）
+        self._lock = threading.Lock()
+
+        # sqlite3 连接（autocommit + WAL）
+        # check_same_thread=False 让多线程共享（FastAPI 线程池）
+        # timeout=5.0 防止无限等待锁
+        self._conn = sqlite3.connect(
+            str(self._path),
+            isolation_level=None,  # autocommit 模式（手动 BEGIN/COMMIT）
+            timeout=5.0,
+            check_same_thread=False,
+        )
+        # 启用 WAL 模式（reader 不阻塞 writer）
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")  # 性能/安全平衡
+        self._init_schema()
+        # 启动时清理过期 + LRU eviction
+        self._cleanup_expired()
+        self._evict_if_needed()
+        logger.info(
+            "V0.40 SQLiteBackend: %s (max_size=%d, ttl=%d)",
+            self._path,
+            max_size,
+            ttl_seconds,
+        )
+
+    def _init_schema(self) -> None:
+        """初始化 schema（含 last_accessed_at 索引，加速 LRU eviction）。"""
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cache (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                expires_at REAL,
+                last_accessed_at REAL NOT NULL,
+                created_at REAL NOT NULL
+            )
+            """
+        )
+        # LRU 索引：按 last_accessed_at ASC 排序时加速
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_last_accessed ON cache(last_accessed_at)"
+        )
+
+    def _cleanup_expired(self) -> None:
+        """V0.40：启动时清理过期条目（避免返回 stale）。
+
+        expires_at 已包含 ttl_seconds（set 时存的是 now+ttl），所以只需
+        检查 expires_at < now 即可。
+        """
+        if self._ttl_seconds > 0:
+            now = time.time()
+            deleted = self._conn.execute(
+                "DELETE FROM cache WHERE expires_at IS NOT NULL AND expires_at < ?",
+                (now,),
+            ).rowcount
+            if deleted > 0:
+                logger.info("V0.40 SQLiteBackend: 启动时清理 %d 条过期", deleted)
+
+    def _evict_if_needed(self) -> None:
+        """V0.29 真 LRU：超过 max_size 时删除最旧（按 last_accessed_at ASC）。"""
+        count = self._conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+        if count <= self._max_size:
+            return
+        to_delete = count - self._max_size
+        # 用 subquery 删除最旧的 N 条
+        self._conn.execute(
+            """
+            DELETE FROM cache WHERE key IN (
+                SELECT key FROM cache ORDER BY last_accessed_at ASC LIMIT ?
+            )
+            """,
+            (to_delete,),
+        )
+
+    def get(self, key: tuple | str) -> str | None:
+        """获取 cache value（含 TTL 检查 + LRU 更新）。"""
+        encoded = encode_key(key)
+        now = time.time()
+        with self._lock:
+            # 读取 + 过期检查（一次查询）
+            row = self._conn.execute(
+                "SELECT value, expires_at FROM cache WHERE key = ?",
+                (encoded,),
+            ).fetchone()
+            if row is None:
+                self._misses += 1
+                return None
+            value, expires_at = row
+            if expires_at is not None and expires_at < now:
+                # 过期 → 删除
+                self._conn.execute("DELETE FROM cache WHERE key = ?", (encoded,))
+                self._misses += 1
+                return None
+            # 命中 → 更新 last_accessed_at（V0.29 真 LRU）
+            self._conn.execute(
+                "UPDATE cache SET last_accessed_at = ? WHERE key = ?",
+                (now, encoded),
+            )
+            self._hits += 1
+            return value
+
+    def set(self, key: tuple | str, value: str) -> None:
+        """设置 cache value（INSERT OR REPLACE 原子 upsert + LRU eviction）。"""
+        encoded = encode_key(key)
+        now = time.time()
+        expires_at = now + self._ttl_seconds if self._ttl_seconds > 0 else None
+        with self._lock:
+            # INSERT OR REPLACE：原子 upsert（SQLite 内置）
+            self._conn.execute(
+                """
+                INSERT INTO cache (key, value, expires_at, last_accessed_at, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value=excluded.value,
+                    expires_at=excluded.expires_at,
+                    last_accessed_at=excluded.last_accessed_at
+                """,
+                (encoded, value, expires_at, now, now),
+            )
+            # LRU eviction（触发淘汰，但不阻塞读）
+            self._evict_if_needed()
+
+    def size(self) -> int:
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+
+    def clear(self) -> None:
+        """清空 cache + 重置 stats。"""
+        with self._lock:
+            self._conn.execute("DELETE FROM cache")
+        self._hits = 0
+        self._misses = 0
+
+    def stats(self) -> dict[str, Any]:
+        total = self._hits + self._misses
+        hit_rate = self._hits / total if total > 0 else 0.0
+        return {
+            "enabled": True,
+            "backend": "sqlite",
+            "size": self.size(),
+            "max_size": self._max_size,
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_rate": round(hit_rate, 4),
+            "ttl_seconds": self._ttl_seconds,
+            "persist_path": str(self._path),
+            "lock_backend": "sqlite",  # V0.40: SQLite 内置锁（跨 OS）
+        }
+
+    def close(self) -> None:
+        """V0.40：显式关闭连接（多 backend 切换 / 进程退出时）。"""
+        try:
+            self._conn.close()
+        except Exception as e:
+            logger.warning("V0.40 SQLiteBackend: 关闭连接时错误: %s", e)

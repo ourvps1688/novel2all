@@ -78,9 +78,10 @@ class LLMConfig(BaseModel):
     cache_enabled: bool = False
     cache_max_size: int = 256  # LRU 上限（防内存爆炸）
     # V0.33：cache 后端选择 + TTL + 持久化
-    cache_backend: str = "memory"  # "memory" | "json"
+    # V0.40：新增 "sqlite" backend（OS-agnostic + 跨进程安全 + 跨 OS 共享）
+    cache_backend: str = "memory"  # "memory" | "json" | "sqlite"
     cache_ttl_seconds: int = 0  # 0 = 永不过期；>0 = N 秒后过期
-    cache_persist_path: str | None = None  # json backend 的文件路径
+    cache_persist_path: str | None = None  # json/sqlite backend 的文件路径
     # V0.29.1：anthropic_compat 重试配置（用于 _call_anthropic_compat / _stream_anthropic_compat）
     # tenacity 指数退避：min_wait × 2^attempt，clamp 到 [min_wait, max_wait]
     anthropic_max_retries: int = 3  # 失败重试次数（除首次外）
@@ -110,11 +111,13 @@ class LLMProvider:
         self.config = config or LLMConfig()
         self._configure_env()
         # V0.33：cache 后端抽象（MemoryLRUBackend / JSONFileBackend）
+        # V0.40：新增 SQLiteBackend（OS-agnostic + 跨进程安全）
         # 默认是进程内 OrderedDict 实现（行为与 V0.29 一致）；
-        # 通过 LLMConfig.cache_backend / cache_persist_path 可切换到 JSON 持久化。
+        # 通过 LLMConfig.cache_backend / cache_persist_path 可切换到 JSON / SQLite 持久化。
         from novel2all.core.cache import (
             JSONFileBackend,
             MemoryLRUBackend,
+            SQLiteBackend,
         )
 
         if self.config.cache_backend == "json":
@@ -127,7 +130,19 @@ class LLMProvider:
                 max_size=self.config.cache_max_size,
                 ttl_seconds=self.config.cache_ttl_seconds,
             )
+        elif self.config.cache_backend == "sqlite":
+            # V0.40：SQLite 持久化（跨 OS + 跨进程安全 + ACID）
+            persist_path = self.config.cache_persist_path
+            if not persist_path:
+                # 默认路径：.novel2all/cache.db
+                persist_path = ".novel2all/cache.db"
+            self._cache = SQLiteBackend(
+                path=Path(persist_path),
+                max_size=self.config.cache_max_size,
+                ttl_seconds=self.config.cache_ttl_seconds,
+            )
         else:
+            # "memory"（默认）
             self._cache = MemoryLRUBackend(
                 max_size=self.config.cache_max_size,
                 ttl_seconds=self.config.cache_ttl_seconds,
