@@ -169,11 +169,16 @@ class ModelConfig(BaseModel):
     - api_base：自定义 endpoint URL（None = 用 litellm 默认）
     - extra_body：每次调用注入的额外参数（thinking、enable_thinking 等）
     - headers：自定义 HTTP header
+    - api_key_env：API key 环境变量名（V0.28+）
+        Anthropic Messages API 兼容路径（_call_anthropic_compat）从该环境变量读 key
+        例如 "MINIMAX_API_KEY" / "ANTHROPIC_API_KEY"
+        None = 不走 anthropic_compat（走 litellm 默认）
     """
 
     api_base: str | None = None
     extra_body: dict[str, Any] | None = None
     headers: dict[str, str] | None = None
+    api_key_env: str | None = None
 
 
 MODEL_CONFIG: dict[str, ModelConfig] = {
@@ -197,6 +202,15 @@ MODEL_CONFIG: dict[str, ModelConfig] = {
     "minimax/MiniMax-M3": ModelConfig(
         api_base="https://api.minimax.cn/anthropic",
         extra_body={"thinking": {"type": "disabled"}},
+        api_key_env="MINIMAX_API_KEY",
+    ),
+    # Anthropic Claude（OpenAI 兼容走 litellm；api_key_env 让 _anthropic_api_key_for 透明工作）
+    # V0.28+：未来如需走 Anthropic Messages API 直连国内/代理，加 api_base="..." 即可
+    "anthropic/claude-sonnet-4-20250514": ModelConfig(
+        api_key_env="ANTHROPIC_API_KEY",
+    ),
+    "anthropic/claude-opus-4-20250514": ModelConfig(
+        api_key_env="ANTHROPIC_API_KEY",
     ),
     # 千问 OpenAI 兼容（DashScope）
     "openai/qwen3.8-flash": ModelConfig(

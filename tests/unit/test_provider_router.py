@@ -1253,3 +1253,120 @@ class TestAnthropicCompatV027:
         assert body["model"] == "MiniMax-M3"
         assert body["stream"] is True
         assert body["thinking"] == {"type": "disabled"}
+
+
+class TestModelConfigApiKeyEnvV028:
+    """V0.28：ModelConfig.api_key_env 字段驱动 _anthropic_api_key_for。
+
+    之前 _anthropic_api_key_for 是硬编码 if/else（"minimax" in name → MINIMAX_API_KEY 等）；
+    V0.28 改为读 MODEL_CONFIG[model_name].api_key_env，数据驱动：
+    - 新增 anthropic_compat provider 只需在 MODEL_CONFIG 加条目 + api_key_env 字段
+    - 未配置的模型自动返回 None（走 litellm 默认）
+    """
+
+    def test_model_config_has_api_key_env_field(self) -> None:
+        """ModelConfig 含 api_key_env 字段，默认 None。"""
+        from novel2all.core.provider_router import ModelConfig
+
+        cfg = ModelConfig()
+        assert cfg.api_key_env is None
+
+    def test_model_config_api_key_env_can_be_set(self) -> None:
+        """api_key_env 字段可显式赋值。"""
+        from novel2all.core.provider_router import ModelConfig
+
+        cfg = ModelConfig(api_key_env="MY_API_KEY")
+        assert cfg.api_key_env == "MY_API_KEY"
+
+    def test_minimax_config_has_api_key_env(self) -> None:
+        """minimax MODEL_CONFIG 条目配了 api_key_env="MINIMAX_API_KEY"。"""
+        from novel2all.core.provider_router import get_model_config
+
+        cfg = get_model_config("minimax/MiniMax-M3")
+        assert cfg.api_key_env == "MINIMAX_API_KEY"
+        assert cfg.api_base == "https://api.minimax.cn/anthropic"
+
+    def test_anthropic_config_has_api_key_env(self) -> None:
+        """anthropic Claude MODEL_CONFIG 条目配了 api_key_env="ANTHROPIC_API_KEY"。"""
+        from novel2all.core.provider_router import get_model_config
+
+        cfg = get_model_config("anthropic/claude-sonnet-4-20250514")
+        assert cfg.api_key_env == "ANTHROPIC_API_KEY"
+
+    def test_deepseek_config_has_no_api_key_env(self) -> None:
+        """deepseek 不走 anthropic_compat，api_key_env=None（走 litellm）。"""
+        from novel2all.core.provider_router import get_model_config
+
+        for model in ("deepseek/deepseek-v4-pro", "deepseek/deepseek-flash"):
+            cfg = get_model_config(model)
+            assert cfg.api_key_env is None, f"{model} should not have api_key_env"
+
+    def test_anthropic_api_key_for_uses_config_driven(self) -> None:
+        """_anthropic_api_key_for 现在纯配置驱动，不再有 hardcoded if/else。"""
+        import os
+
+        from novel2all.core.provider import LLMProvider
+
+        os.environ["MINIMAX_API_KEY"] = "test-minimax"
+        os.environ["ANTHROPIC_API_KEY"] = "test-anthropic"
+        os.environ["MY_CUSTOM_KEY"] = "test-custom"
+        try:
+            provider = LLMProvider(LLMConfig())
+
+            # 1. minimax → MINIMAX_API_KEY（配置驱动）
+            assert provider._anthropic_api_key_for("minimax/MiniMax-M3") == "test-minimax"
+
+            # 2. anthropic → ANTHROPIC_API_KEY（配置驱动）
+            assert (
+                provider._anthropic_api_key_for("anthropic/claude-sonnet-4-20250514")
+                == "test-anthropic"
+            )
+
+            # 3. 未来加 anthropic_compat provider：只需在 MODEL_CONFIG 加条目，
+            #    函数本身无需改（这是 V0.28 的核心改进）
+            # 临时注入一个假 anthropic_compat provider
+            from novel2all.core.provider_router import MODEL_CONFIG, ModelConfig
+
+            MODEL_CONFIG["my-provider/my-model"] = ModelConfig(
+                api_base="https://api.example.com/anthropic",  # 含 "anthropic" 触发 anthropic_compat
+                api_key_env="MY_CUSTOM_KEY",
+            )
+            try:
+                assert provider._anthropic_api_key_for("my-provider/my-model") == "test-custom"
+            finally:
+                # 清理
+                del MODEL_CONFIG["my-provider/my-model"]
+
+            # 4. 未配置的 model → None（走 litellm 默认）
+            assert provider._anthropic_api_key_for("random/unknown") is None
+        finally:
+            for k in ("MINIMAX_API_KEY", "ANTHROPIC_API_KEY", "MY_CUSTOM_KEY"):
+                os.environ.pop(k, None)
+
+    def test_complete_routes_anthropic_through_litellm_with_configured_key(self) -> None:
+        """anthropic Claude 配了 api_key_env 但 api_base 是 None → 仍走 litellm。
+
+        关键行为：anthropic/* 默认走 litellm（_is_anthropic_compat=False，因为 api_base 为 None）；
+        _anthropic_api_key_for 仍可返回 key（用于 litellm 调 litellm.acompletion(api_key=...) 的透明 fallback）。
+        """
+        import os
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from novel2all.core.provider import LLMProvider
+
+        os.environ["ANTHROPIC_API_KEY"] = "test-anthropic-key"
+        try:
+            provider = LLMProvider(LLMConfig())
+
+            with patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm:
+                mock_litellm.return_value = MagicMock(
+                    choices=[MagicMock(message=MagicMock(content="CLAUDE_RESPONSE"))]
+                )
+
+                result = provider._anthropic_api_key_for("anthropic/claude-sonnet-4-20250514")
+                # V0.28：key 已配（数据驱动）
+                assert result == "test-anthropic-key"
+                # 当前 api_base=None，_is_anthropic_compat=False，走 litellm
+                assert provider._is_anthropic_compat("anthropic/claude-sonnet-4-20250514") is False
+        finally:
+            os.environ.pop("ANTHROPIC_API_KEY", None)

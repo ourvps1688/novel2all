@@ -523,22 +523,20 @@ class LLMProvider:
         return bool(cfg.api_base and "anthropic" in cfg.api_base)
 
     def _anthropic_api_key_for(self, model_name: str) -> str | None:
-        """V0.27：从环境变量读 anthropic 兼容端点的 API key。
+        """V0.28：从 MODEL_CONFIG 读 anthropic 兼容端点的 API key 环境变量。
 
-        规则（按 model_name 启发式，未来可改为 MODEL_CONFIG 加字段）：
-        - "minimax" in model_name → MINIMAX_API_KEY
-        - "anthropic"/"claude" in model_name → ANTHROPIC_API_KEY
-        - 其他 anthropic_compat 模型 → 返回 None（调用方需显式提供）
+        V0.28 重构：之前是硬编码 "minimax"/"anthropic"/"claude" 启发式匹配；
+        改为读 MODEL_CONFIG[model_name].api_key_env 字段（数据驱动）。
+        新增 anthropic_compat provider 只需在 MODEL_CONFIG 加 api_key_env 字段，
+        无需改本函数。
 
         Returns:
             API key 字符串，未设置则返回 None。
         """
-        name_lower = model_name.lower()
-        if "minimax" in name_lower:
-            return os.environ.get("MINIMAX_API_KEY")
-        if "anthropic" in name_lower or "claude" in name_lower:
-            return os.environ.get("ANTHROPIC_API_KEY")
-        return None
+        model_cfg = self._get_model_config(model_name)
+        if not model_cfg.api_key_env:
+            return None
+        return os.environ.get(model_cfg.api_key_env)
 
     async def _call_anthropic_compat(
         self,
