@@ -1381,6 +1381,9 @@ class TestAnthropicCompatV027:
                 for line in sse_lines:
                     yield line
 
+            async def aclose(self) -> None:
+                return None
+
         class FakeStreamContext:
             """async with client.stream(...) as resp: 的 resp 上下文"""
 
@@ -1404,7 +1407,11 @@ class TestAnthropicCompatV027:
             async def __aexit__(self, *args):
                 return None
 
+            async def aclose(self) -> None:
+                return None
+
             def stream(self, method: str, url: str, **kwargs):
+                # V0.30.0a：httpx 0.28 client.stream() 返回 context manager（不是 coroutine）
                 FakeClient.captured_kwargs = {"method": method, "url": url, **kwargs}
                 return FakeStreamContext()
 

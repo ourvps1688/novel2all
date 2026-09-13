@@ -729,10 +729,21 @@ class LLMProvider:
         - content_block_delta: data.delta.type="text_delta", data.delta.text="..."
         - 其他事件（message_start/content_block_start/content_block_stop/message_stop）忽略
 
+        V0.30.0a：tenacity retry "建立连接" 阶段（connect + raise_for_status）
+        - 网络抖动（连接超时/5xx/429）→ 重试
+        - stream yield 阶段失败 → **不重试**（重试会重复输出已 yield 的内容）
+        - HTMX 端 SSE 自动重连处理"stream 中断"
+
         Yields:
             text_delta 字符串（拼起来即完整响应）。
         """
         import httpx
+        from tenacity import (
+            AsyncRetrying,
+            retry_if_exception,
+            stop_after_attempt,
+            wait_exponential,
+        )
 
         bare_model = model_name.split("/", 1)[-1] if "/" in model_name else model_name
         user_messages = [
@@ -758,11 +769,92 @@ class LLMProvider:
         }
 
         url = api_base.rstrip("/") + "/v1/messages"
-        async with (
-            httpx.AsyncClient(timeout=self.config.timeout_seconds) as client,
-            client.stream("POST", url, json=body, headers=headers) as resp,
-        ):
-            resp.raise_for_status()
+
+        def _should_retry(exc: BaseException) -> bool:
+            """V0.30.0a：连接阶段重试条件（同 _call_anthropic_compat V0.29.1）。
+
+            - TransportError（连接超时/DNS 失败/断开）：重试
+            - HTTPStatusError 5xx：重试
+            - HTTPStatusError 429：重试
+            - 其他 4xx：不重试
+            """
+            if isinstance(exc, httpx.TransportError):
+                return True
+            if isinstance(exc, httpx.HTTPStatusError):
+                return exc.response.status_code >= 500 or exc.response.status_code == 429
+            return False
+
+        # V0.30.0a：tenacity retry "建立连接" 阶段（不动 yield 部分）
+        # 手动管理 stream lifecycle（__aenter__ + __aexit__）让 connect 阶段能 retry
+        async def _connect_with_retry() -> tuple[httpx.AsyncClient, Any, httpx.Response]:
+            """connect 阶段（retry 包内）：
+            - 1. 建 client
+            - 2. __aenter__ stream（建 HTTP 连接）
+            - 3. raise_for_status（验证 2xx）
+            - 4. 返回 (client, stream_ctx, resp) — 外层会负责 __aexit__
+
+            失败时 tenacity 重新调用，旧的 (client, stream_ctx) 在 __aexit__ 关闭。
+            """
+            client = httpx.AsyncClient(timeout=self.config.timeout_seconds)
+            stream_ctx = client.stream("POST", url, json=body, headers=headers)
+            resp = await stream_ctx.__aenter__()
+            try:
+                resp.raise_for_status()
+            except BaseException:
+                # raise_for_status 失败：清理 stream_ctx + client
+                try:
+                    await stream_ctx.__aexit__(None, None, None)
+                finally:
+                    try:
+                        await client.aclose()
+                    except Exception:
+                        pass
+                raise
+            return client, stream_ctx, resp
+
+        retry_dec = stop_after_attempt(1 + self.config.anthropic_max_retries)
+        wait_dec = wait_exponential(
+            multiplier=self.config.anthropic_retry_min_wait,
+            max=self.config.anthropic_retry_max_wait,
+        )
+
+        client: httpx.AsyncClient | None = None
+        stream_ctx: Any = None
+        resp: httpx.Response | None = None
+        try:
+            async for attempt in AsyncRetrying(
+                stop=retry_dec,
+                wait=wait_dec,
+                retry=retry_if_exception(_should_retry),
+                reraise=True,
+            ):
+                with attempt:
+                    if self.config.anthropic_retry_log:
+                        logger.debug(
+                            "[_stream_anthropic_compat] connect attempt #%d",
+                            attempt.retry_state.attempt_number,
+                        )
+                    client, stream_ctx, resp = await _connect_with_retry()
+        except BaseException:
+            # tenacity 把原异常重抛（reraise=True）
+            # 兜底清理（_connect_with_retry 内部已尽量清理）
+            if stream_ctx is not None:
+                try:
+                    await stream_ctx.__aexit__(None, None, None)
+                except Exception:
+                    pass
+            if client is not None:
+                try:
+                    await client.aclose()
+                except Exception:
+                    pass
+            raise
+
+        # 此时 resp 已成功（status 2xx）— 进入 yield 阶段（不 retry）
+        # V0.30.0a 限制：yield 阶段失败（如网络中断）不 retry（避免重复输出已 yield 内容）
+        # HTMX SSE 自动重连（前端层面）处理这种 case
+        assert resp is not None  # type guard（retry 成功时一定设了）
+        try:
             async for line in resp.aiter_lines():
                 if not line or not line.startswith("data: "):
                     continue
@@ -780,3 +872,14 @@ class LLMProvider:
                         text = delta.get("text", "")
                         if text:
                             yield text
+        finally:
+            # 清理：先 __aexit__ stream_ctx，再 aclose client
+            assert stream_ctx is not None and client is not None  # type guard
+            try:
+                await stream_ctx.__aexit__(None, None, None)
+            except Exception:
+                pass
+            try:
+                await client.aclose()
+            except Exception:
+                pass
