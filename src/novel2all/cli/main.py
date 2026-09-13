@@ -376,6 +376,84 @@ def write_chapter(
 
 
 @app.command()
+def cache_migrate(
+    src: str = typer.Option(..., "--src", help="源 cache 文件路径（json 或 sqlite）"),
+    dst: str = typer.Option(..., "--dst", help="目标 cache 文件路径（json 或 sqlite）"),
+    src_backend: str = typer.Option(
+        "auto", "--src-backend", help="源 backend（json / sqlite / auto）"
+    ),
+    dst_backend: str = typer.Option(
+        "auto", "--dst-backend", help="目标 backend（json / sqlite / auto）"
+    ),
+    max_size: int = typer.Option(1024, "--max-size", help="目标 max_size"),
+    ttl: int = typer.Option(0, "--ttl", help="目标 TTL（秒），0 = 永不过期"),
+) -> None:
+    """V0.43：在不同 cache backend 之间平滑迁移（零数据丢失）。
+
+    典型场景：JSONFile 升级到 SQLite（更好并发、跨 OS 共享）。
+
+    自动检测 backend 类型（从文件后缀：.json / .db）。
+
+    示例：
+        novel2all cache-migrate --src .novel2all/cache.json --dst .novel2all/cache.db
+    """
+    from novel2all.core.migration import migrate_cache
+
+    # auto-detect backend from extension
+    if src_backend == "auto":
+        if src.endswith(".json"):
+            src_backend = "json"
+        elif src.endswith((".db", ".sqlite")):
+            src_backend = "sqlite"
+        else:
+            console.print(f"[red]无法自动检测 src backend（{src}），请显式指定 --src-backend[/red]")
+            raise typer.Exit(1)
+    if dst_backend == "auto":
+        if dst.endswith(".json"):
+            dst_backend = "json"
+        elif dst.endswith((".db", ".sqlite")):
+            dst_backend = "sqlite"
+        else:
+            console.print(f"[red]无法自动检测 dst backend（{dst}），请显式指定 --dst-backend[/red]")
+            raise typer.Exit(1)
+
+    if src_backend == "memory" or dst_backend == "memory":
+        console.print("[red]memory backend 不支持迁移（无持久化）[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold cyan]迁移 cache: {src_backend} → {dst_backend}[/bold cyan]")
+    console.print(f"  src: {src}")
+    console.print(f"  dst: {dst}")
+
+    def progress(done: int, total: int) -> None:
+        pct = (done / total * 100) if total > 0 else 100
+        console.print(f"  进度: {done}/{total} ({pct:.1f}%)")
+
+    result = migrate_cache(
+        src_backend=src_backend,
+        dst_backend=dst_backend,
+        src_path=src,
+        dst_path=dst,
+        max_size=max_size,
+        ttl_seconds=ttl,
+        progress_callback=progress,
+    )
+
+    console.print(f"\n[green]{result.summary()}[/green]")
+
+    if result.errors:
+        console.print(f"\n[red]警告：{len(result.errors)} 条迁移失败[/red]")
+        for err in result.errors[:5]:
+            console.print(f"  - {err}")
+        raise typer.Exit(1)
+
+    if result.migrated > 0:
+        console.print(
+            f"\n[bold yellow]提示：迁移成功！建议备份或删除源文件 {src}（手动）[/bold yellow]"
+        )
+
+
+@app.command()
 def web(
     host: str = typer.Option("127.0.0.1", "--host", "-h"),
     port: int = typer.Option(8765, "--port", "-p"),

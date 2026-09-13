@@ -83,6 +83,20 @@ class CacheBackend(Protocol):
         """返回统计信息（用于 /api/cache/stats 面板）。"""
         ...
 
+    def keys(self) -> list[str]:
+        """V0.43：返回所有 cache keys（按 LRU 顺序：最旧在前）。
+
+        用于 cache 迁移（memory → json / sqlite 等）。
+        """
+        ...
+
+    def close(self) -> None:
+        """V0.42：显式关闭后端（释放资源，如 SQLite 连接池）。
+
+        MemoryLRU / JSONFile 是 no-op，SQLite 会关闭所有池中连接。
+        """
+        ...
+
 
 # === V0.37 CacheLock：跨平台文件锁 ===
 # 解决多进程并发写 JSONFileBackend 时的 race condition
@@ -287,6 +301,9 @@ class MemoryLRUBackend:
         self._expires_at.clear()
         self._hits = 0
         self._misses = 0
+
+    def close(self) -> None:
+        """V0.42：no-op（MemoryLRU 无资源需释放）。"""
 
     def stats(self) -> dict[str, Any]:
         total = self._hits + self._misses
@@ -495,6 +512,13 @@ class JSONFileBackend:
             "persist_path": str(self._path),
             "lock_backend": self._lock_backend,  # V0.37: fcntl | msvcrt | none
         }
+
+    def keys(self) -> list[str]:
+        """V0.43：返回所有 encoded keys（按 LRU 顺序：最旧在前）。"""
+        return [entry["key"] for entry in self._entries]
+
+    def close(self) -> None:
+        """V0.42：no-op（JSONFile 无连接池）。"""
 
 
 # === SQLiteBackend：V0.40 新增（解决 V0.37 跨 OS 锁不互斥限制）===
@@ -740,6 +764,12 @@ class SQLiteBackend:
         """V0.42：用 thread-local conn。"""
         conn = self._get_conn()
         return conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+
+    def keys(self) -> list[str]:
+        """V0.43：返回所有 encoded keys（按 LRU 顺序：最旧在前）。"""
+        conn = self._get_conn()
+        rows = conn.execute("SELECT key FROM cache ORDER BY last_accessed_at ASC").fetchall()
+        return [r[0] for r in rows]
 
     def clear(self) -> None:
         """清空 cache + 重置 stats。"""

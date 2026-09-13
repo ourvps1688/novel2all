@@ -298,6 +298,82 @@ def create_app() -> FastAPI:
         provider: LLMProvider = request.app.state.provider
         return provider.cache_stats()
 
+    # V0.43：Cache 迁移端点（POST 表单）
+    @app.post("/api/cache/migrate")
+    async def cache_migrate(
+        src: str = Form(...),
+        dst: str = Form(...),
+        src_backend: str = Form("auto"),
+        dst_backend: str = Form("auto"),
+        max_size: int = Form(1024),
+        ttl_seconds: int = Form(0),
+    ) -> dict[str, Any]:
+        """V0.43：在不同 cache backend 之间平滑迁移（零数据丢失）。
+
+        Form 参数：
+        - src: 源 cache 文件路径
+        - dst: 目标 cache 文件路径
+        - src_backend/dst_backend: "json" / "sqlite" / "auto"（按扩展名自动检测）
+        - max_size: 目标 max_size
+        - ttl_seconds: 目标 TTL
+
+        返回：MigrationResult 转 dict（含 migrated/errors/elapsed 等）
+        """
+        from novel2all.core.migration import migrate_cache
+
+        # auto-detect backend
+        if src_backend == "auto":
+            if src.endswith(".json"):
+                src_backend = "json"
+            elif src.endswith((".db", ".sqlite")):
+                src_backend = "sqlite"
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"无法自动检测 src backend（{src}）",
+                )
+        if dst_backend == "auto":
+            if dst.endswith(".json"):
+                dst_backend = "json"
+            elif dst.endswith((".db", ".sqlite")):
+                dst_backend = "sqlite"
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"无法自动检测 dst backend（{dst}）",
+                )
+
+        if src_backend == "memory" or dst_backend == "memory":
+            raise HTTPException(
+                status_code=400,
+                detail="memory backend 不支持迁移（无持久化）",
+            )
+
+        try:
+            result = migrate_cache(
+                src_backend=src_backend,
+                dst_backend=dst_backend,
+                src_path=src,
+                dst_path=dst,
+                max_size=max_size,
+                ttl_seconds=ttl_seconds,
+            )
+        except Exception as e:
+            logger.exception("V0.43 cache_migrate failed")
+            raise HTTPException(status_code=500, detail=f"迁移失败: {e}")
+
+        return {
+            "src_backend": result.src_backend,
+            "dst_backend": result.dst_backend,
+            "src_path": result.src_path,
+            "dst_path": result.dst_path,
+            "total_entries": result.total_entries,
+            "migrated": result.migrated,
+            "skipped_expired": result.skipped_expired,
+            "errors": result.errors,
+            "elapsed_seconds": result.elapsed_seconds,
+        }
+
     # V0.30.1：模型选择器 API
     @app.get("/api/models")
     async def list_models() -> list[dict[str, Any]]:
