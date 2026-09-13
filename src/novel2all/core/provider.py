@@ -8,6 +8,12 @@ V0.29 prompt cache（真 LRU）：
 - 超过 cache_max_size 时 popitem(last=False) 淘汰最旧条目
 - 设计为**透明** cache：调用方无感知，cost_estimate 自动算 cache_hit
 - 适用场景：同一 system prompt + 类似 user prompt 重复调用（如 extractor 批处理章节）
+
+V0.33 cache 后端抽象 + TTL + 持久化：
+- CacheBackend Protocol（memory + json file）
+- LLMProvider._cache 改为 CacheBackend 实例（不再是裸 OrderedDict）
+- LLMConfig 加 cache_backend / cache_ttl_seconds / cache_persist_path 配置
+- 行为保持向后兼容：默认 cache_backend="memory" + cache_ttl_seconds=0（无 TTL）
 """
 
 from __future__ import annotations
@@ -16,8 +22,8 @@ import hashlib
 import json
 import logging
 import os
-from collections import OrderedDict
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -71,6 +77,10 @@ class LLMConfig(BaseModel):
     # V0.25：从 NOVEL2ALL_LLM_CACHE 环境变量读默认（"1"/"true" 启用，其他关闭）
     cache_enabled: bool = False
     cache_max_size: int = 256  # LRU 上限（防内存爆炸）
+    # V0.33：cache 后端选择 + TTL + 持久化
+    cache_backend: str = "memory"  # "memory" | "json"
+    cache_ttl_seconds: int = 0  # 0 = 永不过期；>0 = N 秒后过期
+    cache_persist_path: str | None = None  # json backend 的文件路径
     # V0.29.1：anthropic_compat 重试配置（用于 _call_anthropic_compat / _stream_anthropic_compat）
     # tenacity 指数退避：min_wait × 2^attempt，clamp 到 [min_wait, max_wait]
     anthropic_max_retries: int = 3  # 失败重试次数（除首次外）
@@ -99,13 +109,29 @@ class LLMProvider:
     def __init__(self, config: LLMConfig | None = None):
         self.config = config or LLMConfig()
         self._configure_env()
-        # V0.29：prompt cache 改为 OrderedDict 实现真 LRU
-        # 读 cache 时 move_to_end（更新"最近使用"位置）
-        # 写 cache 超 max_size 时 popitem(last=False) 淘汰最旧
-        # 之前 V0.24 实现：超过 max_size 时清空整个 cache（粗暴）
-        self._cache: OrderedDict[tuple[str, str, str, float], str] = OrderedDict()
-        self._cache_hits: int = 0
-        self._cache_misses: int = 0
+        # V0.33：cache 后端抽象（MemoryLRUBackend / JSONFileBackend）
+        # 默认是进程内 OrderedDict 实现（行为与 V0.29 一致）；
+        # 通过 LLMConfig.cache_backend / cache_persist_path 可切换到 JSON 持久化。
+        from novel2all.core.cache import (
+            JSONFileBackend,
+            MemoryLRUBackend,
+        )
+
+        if self.config.cache_backend == "json":
+            persist_path = self.config.cache_persist_path
+            if not persist_path:
+                # 默认路径：.novel2all/cache.json
+                persist_path = ".novel2all/cache.json"
+            self._cache: Any = JSONFileBackend(
+                path=Path(persist_path),
+                max_size=self.config.cache_max_size,
+                ttl_seconds=self.config.cache_ttl_seconds,
+            )
+        else:
+            self._cache = MemoryLRUBackend(
+                max_size=self.config.cache_max_size,
+                ttl_seconds=self.config.cache_ttl_seconds,
+            )
 
     def _configure_env(self) -> None:
         """从 config 同步设置环境变量（LiteLLM 需要）。"""
@@ -146,14 +172,12 @@ class LLMProvider:
         # 决定模型：显式 model= > task router > config.default_model
         model_name = self._resolve_model(task=task, explicit_model=model)
 
-        # V0.29：cache lookup（命中则直接返回 + move_to_end 更新 LRU）
+        # V0.33：cache lookup（通过 CacheBackend.get，命中则直接返回 + 自动 LRU 更新）
         cache_key = self._make_cache_key(model_name, system, prompt, temperature)
-        if self.config.cache_enabled and cache_key in self._cache:
-            self._cache_hits += 1
-            self._cache.move_to_end(cache_key)  # V0.29 真 LRU：更新"最近使用"
-            return self._cache[cache_key]
         if self.config.cache_enabled:
-            self._cache_misses += 1
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         messages: list[dict[str, str]] = []
         if system:
@@ -228,50 +252,46 @@ class LLMProvider:
         return (model, sys_h, usr_h, temperature)
 
     def _cache_store(self, key: tuple[str, str, str, float], content: str) -> None:
-        """存储到 cache（V0.29 真 LRU）。
+        """存储到 cache（V0.33：通过 CacheBackend.set，LRU/TTL 由后端管理）。
 
-        V0.24 旧实现：超过 cache_max_size 时清空整个 cache（粗暴）
-        V0.29 新实现：用 OrderedDict，超过 max_size 时 popitem(last=False) 淘汰最旧条目
-
-        LRU 语义：
-        - 写入新条目：放最末（最近写入）
-        - 读 cache：move_to_end 更新"最近使用"
-        - 超 max_size：淘汰最旧（OrderedDict 头部）
+        V0.29 真 LRU + V0.33 TTL + 持久化 → 全部委托给 self._cache 后端。
         """
-        if key in self._cache:
-            # 已存在 → 更新内容 + move_to_end
-            self._cache[key] = content
-            self._cache.move_to_end(key)
-            return
-        if len(self._cache) >= self.config.cache_max_size:
-            # 真 LRU：淘汰最旧条目（OrderedDict 头部）
-            self._cache.popitem(last=False)
-        self._cache[key] = content
+        self._cache.set(key, content)
 
     def cache_stats(self) -> dict[str, Any]:
-        """返回 cache 统计（V0.24）。
+        """返回 cache 统计（V0.33：通过 CacheBackend.stats）。
 
-        用于 benchmark / 监控 cache 命中率。
+        V0.33 扩展：增加 backend / ttl_seconds / persist_path 字段，
+        让 /api/cache/stats 面板能展示后端类型。
         """
-        total = self._cache_hits + self._cache_misses
-        hit_rate = self._cache_hits / total if total > 0 else 0.0
-        return {
-            "enabled": self.config.cache_enabled,
-            "size": len(self._cache),
-            "max_size": self.config.cache_max_size,
-            "hits": self._cache_hits,
-            "misses": self._cache_misses,
-            "hit_rate": round(hit_rate, 4),
-        }
+        stats = self._cache.stats()
+        # V0.33：补充 cache_enabled（后端 stats 假设 enabled=True）
+        stats["enabled"] = self.config.cache_enabled
+        return stats
+
+    @property
+    def _cache_hits(self) -> int:
+        """V0.33 向后兼容：暴露 backend 的 hits（部分测试用此属性）。"""
+        return getattr(self._cache, "_hits", 0)
+
+    @_cache_hits.setter
+    def _cache_hits(self, value: int) -> None:
+        if hasattr(self._cache, "_hits"):
+            self._cache._hits = value
+
+    @property
+    def _cache_misses(self) -> int:
+        """V0.33 向后兼容：暴露 backend 的 misses。"""
+        return getattr(self._cache, "_misses", 0)
+
+    @_cache_misses.setter
+    def _cache_misses(self, value: int) -> None:
+        if hasattr(self._cache, "_misses"):
+            self._cache._misses = value
 
     def cache_clear(self) -> None:
-        """清空 cache（V0.24）。
-
-        用于测试或强制重新调用 API。
-        """
+        """清空 cache（V0.33：通过 CacheBackend.clear，hits/misses 一并重置）。"""
         self._cache.clear()
-        self._cache_hits = 0
-        self._cache_misses = 0
 
     async def complete_structured(
         self,
@@ -387,19 +407,16 @@ class LLMProvider:
         """
         model_name = self._resolve_model(task=task, explicit_model=model)
 
-        # V0.29：cache 命中 → 返回 cached stream（move_to_end 更新 LRU）
+        # V0.33：cache 命中 → 返回 cached stream（通过 CacheBackend.get）
         cache_key = self._make_cache_key(model_name, system, prompt, temperature)
-        if self.config.cache_enabled and cache_key in self._cache:
-            self._cache_hits += 1
-            self._cache.move_to_end(cache_key)  # V0.29 真 LRU
-            cached_content = self._cache[cache_key]
-
-            async def _cached_stream() -> Any:
-                yield cached_content
-
-            return _cached_stream()
         if self.config.cache_enabled:
-            self._cache_misses += 1
+            cached_content = self._cache.get(cache_key)
+            if cached_content is not None:
+
+                async def _cached_stream() -> Any:
+                    yield cached_content
+
+                return _cached_stream()
 
         # litellm 由 _stream_and_cache 闭包导入（V0.24 重构）
 

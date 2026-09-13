@@ -20,13 +20,13 @@ V0.23 升级：
 from __future__ import annotations
 
 import inspect
-from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from typing import ClassVar
 from unittest.mock import patch
 
 import pytest
 
+from novel2all.core.cache import MemoryLRUBackend
 from novel2all.core.provider import LLMConfig, LLMProvider
 from novel2all.core.provider_router import (
     DEFAULT_TASK_FALLBACKS,
@@ -640,9 +640,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict()
-        provider._cache_hits = 0
-        provider._cache_misses = 0
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         # 拦截 litellm.acompletion
@@ -669,15 +667,15 @@ class TestPromptCacheV024:
             result1 = await provider.complete(prompt="hello", system="sys")
             assert result1 == "RESPONSE_1"
             assert call_count[0] == 1
-            assert provider._cache_misses == 1
-            assert provider._cache_hits == 0
+            assert provider._cache._misses == 1
+            assert provider._cache._hits == 0
 
             # 调用 2：cache hit → 不调 API
             result2 = await provider.complete(prompt="hello", system="sys")
             assert result2 == "RESPONSE_1"  # 来自 cache
             assert call_count[0] == 1  # 没调 API
-            assert provider._cache_misses == 1
-            assert provider._cache_hits == 1
+            assert provider._cache._misses == 1
+            assert provider._cache._hits == 1
         finally:
             litellm.acompletion = original_acompletion
 
@@ -689,9 +687,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict()
-        provider._cache_hits = 0
-        provider._cache_misses = 0
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -713,10 +709,10 @@ class TestPromptCacheV024:
             await provider.complete(prompt="prompt_A")
             await provider.complete(prompt="prompt_B")
             # 两次都 cache miss（不同 prompt）
-            assert provider._cache_misses == 2
-            assert provider._cache_hits == 0
+            assert provider._cache._misses == 2
+            assert provider._cache._hits == 0
             # cache 应有 2 个 entries
-            assert len(provider._cache) == 2
+            assert provider._cache.size() == 2
         finally:
             litellm.acompletion = original
 
@@ -728,9 +724,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict()
-        provider._cache_hits = 0
-        provider._cache_misses = 0
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -751,7 +745,7 @@ class TestPromptCacheV024:
             await provider.complete(prompt="p", temperature=0.7)
             await provider.complete(prompt="p", temperature=0.3)  # 不同 temp
             # 两次 cache miss
-            assert provider._cache_misses == 2
+            assert provider._cache._misses == 2
         finally:
             litellm.acompletion = original
 
@@ -763,9 +757,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=False, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict()
-        provider._cache_hits = 0
-        provider._cache_misses = 0
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -781,8 +773,8 @@ class TestPromptCacheV024:
             await provider.complete(prompt="p")
             await provider.complete(prompt="p")
             # 不存 cache，两次都调 API
-            assert len(provider._cache) == 0
-            assert provider._cache_misses == 0  # 不计数
+            assert provider._cache.size() == 0
+            assert provider._cache._misses == 0  # 不计数
         finally:
             litellm.acompletion = original
 
@@ -794,9 +786,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, cache_max_size=3, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict()
-        provider._cache_hits = 0
-        provider._cache_misses = 0
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -813,7 +803,7 @@ class TestPromptCacheV024:
             for i in range(5):
                 await provider.complete(prompt=f"p_{i}")
             # cache 永远 ≤ 3
-            assert len(provider._cache) <= 3
+            assert provider._cache.size() <= 3
         finally:
             litellm.acompletion = original
 
@@ -825,9 +815,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict()
-        provider._cache_hits = 0
-        provider._cache_misses = 0
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -860,15 +848,17 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict([("key1", "value1")])
-        provider._cache_hits = 5
-        provider._cache_misses = 3
+        _cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        _cache.set("key1", "value1")
+        _cache._hits = 5
+        _cache._misses = 3
+        provider._cache = _cache
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         provider.cache_clear()
-        assert len(provider._cache) == 0
-        assert provider._cache_hits == 0
-        assert provider._cache_misses == 0
+        assert provider._cache.size() == 0
+        assert provider._cache._hits == 0
+        assert provider._cache._misses == 0
 
     def test_cache_key_uses_sha256(self) -> None:
         """_make_cache_key 用 sha256 截 16 字符。"""
@@ -877,9 +867,7 @@ class TestPromptCacheV024:
         config = LLMConfig(default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = OrderedDict()
-        provider._cache_hits = 0
-        provider._cache_misses = 0
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
 
         key1 = provider._make_cache_key("model", "system", "user", 0.7)
         key2 = provider._make_cache_key("model", "system", "user", 0.7)
@@ -971,7 +959,7 @@ class TestCacheLRUV029:
 
         config = LLMConfig(cache_enabled=True, cache_max_size=2)
         provider = LLMProvider(config)
-        provider._cache = OrderedDict()
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
 
         async def fake_acompletion(**kwargs):
             return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="R"))])
@@ -989,7 +977,7 @@ class TestCacheLRUV029:
             asyncio.run(provider.complete(prompt="p3"))
 
             # 验证：cache 里有 p2 + p3，p1 被淘汰
-            assert len(provider._cache) == 2
+            assert provider._cache.size() == 2
             keys = list(provider._cache.keys())
             assert len(keys) == 2
         finally:
@@ -1001,7 +989,7 @@ class TestCacheLRUV029:
 
         config = LLMConfig(cache_enabled=True, cache_max_size=2)
         provider = LLMProvider(config)
-        provider._cache = OrderedDict()
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
 
         async def fake_acompletion(**kwargs):
             prompt = kwargs.get("messages", [{}])[-1].get("content", "")
@@ -1049,7 +1037,7 @@ class TestCacheLRUV029:
 
         config = LLMConfig(cache_enabled=True, cache_max_size=3)
         provider = LLMProvider(config)
-        provider._cache = OrderedDict()
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
 
         async def fake_acompletion(**kwargs):
             return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="R"))])
@@ -1091,7 +1079,7 @@ class TestCacheLRUV029:
 
         config = LLMConfig(cache_enabled=True, cache_max_size=2)
         provider = LLMProvider(config)
-        provider._cache = OrderedDict()
+        provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
 
         async def fake_acompletion(**kwargs):
             prompt = kwargs.get("messages", [{}])[-1].get("content", "")
@@ -1114,8 +1102,8 @@ class TestCacheLRUV029:
             key_p1 = provider._make_cache_key("deepseek/deepseek-flash", None, "p1", 0.7)
             provider._cache_store(key_p1, "NEW_p1_content")
 
-            assert len(provider._cache) == 2  # 没淘汰
-            assert provider._cache[key_p1] == "NEW_p1_content"
+            assert provider._cache.size() == 2  # 没淘汰
+            assert provider._cache.get(key_p1) == "NEW_p1_content"
         finally:
             litellm.acompletion = original
 
@@ -1124,10 +1112,10 @@ class TestCacheLRUV029:
         config = LLMConfig(cache_enabled=True)
         provider = LLMProvider(config)
         # 初始化后必须是 OrderedDict
-        assert isinstance(provider._cache, OrderedDict)
+        assert isinstance(provider._cache, MemoryLRUBackend)
         # 必须支持 OrderedDict 特有的 API
-        assert hasattr(provider._cache, "move_to_end")
-        assert hasattr(provider._cache, "popitem")
+        assert hasattr(provider._cache, "_cache") and hasattr(provider._cache._cache, "move_to_end")
+        assert hasattr(provider._cache, "_cache") and hasattr(provider._cache._cache, "popitem")
 
 
 class TestAnthropicCompatV027:
