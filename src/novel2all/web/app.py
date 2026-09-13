@@ -12,6 +12,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -279,6 +280,12 @@ def create_app() -> FastAPI:
         provider: LLMProvider = request.app.state.provider
         stats = provider.cache_stats()
         return templates.TemplateResponse(request, "cache_panel.html", {"stats": stats})
+
+    # V0.34：章节编辑器（手动编辑 + AI 扩写引导）
+    @app.get("/page/chapter-edit", response_class=HTMLResponse)
+    async def page_chapter_edit(request: Request) -> HTMLResponse:
+        """V0.34：章节编辑器页面（Alpine.js 加载章节内容 + textarea + 保存/扩写按钮）。"""
+        return templates.TemplateResponse(request, "chapter_edit.html")
 
     @app.get("/api/cache/stats")
     async def cache_stats(request: Request) -> dict[str, Any]:
@@ -639,6 +646,99 @@ def create_app() -> FastAPI:
             "content": text_content,
             "char_count": len(text_content),
             "first_line": text_content.split("\n", 1)[0].strip()[:120],
+        }
+
+    # V0.34：手动保存编辑后的章节
+    @app.post("/api/chapter/{chapter}/save")
+    async def save_chapter_content(
+        chapter: int,
+        request: Request,
+        content: str = Form(...),
+        project_root: str = Form("."),
+    ) -> dict[str, Any]:
+        """V0.34：保存用户手动编辑的章节内容（覆盖章节文件）。
+
+        流程：
+        1. 写入 chapter_prose(chapter) 文件
+        2. 同步 _tracking-state.json 的 last_updated_chapter（让 UI 知道最新进度）
+        3. 不调 update_after_writing（手动编辑不走 LLM 提取）
+
+        Returns:
+            200 + {"chapter": ..., "char_count": ..., "output_path": "..."}
+            404 + 错误信息
+        """
+        root = Path(project_root).resolve()
+        project = ProjectStructure(root=root)
+        if not project.exists():
+            raise HTTPException(status_code=404, detail="Project not initialized")
+
+        prose_path = project.chapter_prose(chapter)
+        prose_path.parent.mkdir(parents=True, exist_ok=True)
+        prose_path.write_text(content, encoding="utf-8")
+
+        # 同步 tracking state（不更新角色/伏笔/时间线，因为没有 LLM 提取）
+        tracker = Tracker(root / "_tracking-state.json")
+        if tracker.exists():
+            state = tracker.read()
+            if state.last_updated_chapter is None or chapter > state.last_updated_chapter:
+                state.last_updated_chapter = chapter
+                state.last_updated_at = datetime.now(tz=UTC)
+                tracker.write(state)
+
+        logger.info(
+            "V0.34 save: 第 %s 章已手动保存 %d 字到 %s",
+            chapter,
+            len(content),
+            prose_path,
+        )
+        return {
+            "chapter": chapter,
+            "char_count": len(content),
+            "output_path": str(prose_path),
+        }
+
+    # V0.34：AI 扩写（从当前字数继续写）
+    @app.post("/api/chapter/{chapter}/expand")
+    async def expand_chapter(
+        chapter: int,
+        request: Request,
+        project_root: str = Form("."),
+        skill: str = Form("story-long-write"),
+        min_chars: int = Form(1000),
+    ) -> dict[str, Any]:
+        """V0.34：AI 扩写 — 从当前章节末尾继续写 N 字（基于 V0.32 智能恢复）。
+
+        流程：
+        1. 读取 chapter_prose(chapter) 当前内容
+        2. 调 pipeline.write_chapter(resume_from_chars=len(current))
+        3. 走 LLM → 流式 SSE 输出（与 V0.32 一致）
+
+        注意：实际流式输出在 /api/write/stream/model；本端点仅作为元数据检查。
+        实际扩写请用 POST /api/write/stream/model + resume_from_chars。
+        """
+        root = Path(project_root).resolve()
+        project = ProjectStructure(root=root)
+        if not project.exists():
+            raise HTTPException(status_code=404, detail="Project not initialized")
+        prose_path = project.chapter_prose(chapter)
+        if not prose_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Chapter {chapter} not found. Use /api/write/stream/model first.",
+            )
+        current_content = prose_path.read_text(encoding="utf-8")
+        return {
+            "chapter": chapter,
+            "current_chars": len(current_content),
+            "expand_endpoint": "/api/write/stream/model",
+            "form_params": {
+                "chapter": chapter,
+                "project_root": str(root).replace("\\", "/"),
+                "skill": skill,
+                "min_chars": min_chars,
+                "resume_from_chars": len(current_content),
+            },
+            "hint": "POST 表单到 /api/write/stream/model 触发扩写",
         }
 
     @app.get("/api/outlines")

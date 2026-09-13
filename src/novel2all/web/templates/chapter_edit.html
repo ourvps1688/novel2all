@@ -1,0 +1,177 @@
+{# V0.34 章节编辑器 — 手动编辑 + AI 扩写引导 #}
+<div class="card"
+     x-data="{
+        status: 'idle',  // idle | loading | loaded | saving | saved | error | expanding
+        chapter: 1,
+        content: '',
+        originalContent: '',
+        charCount: 0,
+        modified: false,
+        errorMsg: '',
+        async loadChapter(ch) {
+            this.chapter = ch;
+            this.status = 'loading';
+            this.errorMsg = '';
+            try {
+                const resp = await fetch('/api/chapter/' + ch + '/content');
+                if (!resp.ok) {
+                    this.status = 'error';
+                    this.errorMsg = '章节 ' + ch + ' 不存在';
+                    return;
+                }
+                const data = await resp.json();
+                this.content = data.content;
+                this.originalContent = data.content;
+                this.charCount = data.content.length;
+                this.modified = false;
+                this.status = 'loaded';
+            } catch (e) {
+                this.status = 'error';
+                this.errorMsg = String(e);
+            }
+        },
+        async saveChapter() {
+            if (!this.content || this.status !== 'loaded') return;
+            this.status = 'saving';
+            try {
+                const form = new FormData();
+                form.append('content', this.content);
+                form.append('project_root', '.');
+                const resp = await fetch('/api/chapter/' + this.chapter + '/save', {
+                    method: 'POST',
+                    body: form,
+                });
+                if (!resp.ok) {
+                    this.status = 'error';
+                    this.errorMsg = '保存失败: ' + resp.status;
+                    return;
+                }
+                const data = await resp.json();
+                this.originalContent = this.content;
+                this.modified = false;
+                this.status = 'saved';
+                setTimeout(() => { this.status = 'loaded'; }, 1500);
+            } catch (e) {
+                this.status = 'error';
+                this.errorMsg = String(e);
+            }
+        },
+        async expandChapter() {
+            // V0.34：AI 扩写（从当前章节末尾继续）
+            if (this.chapter < 1) return;
+            try {
+                // 1. 调 expand endpoint 获取扩写元数据
+                const metaResp = await fetch('/api/chapter/' + this.chapter + '/expand', {
+                    method: 'POST',
+                    body: (() => {
+                        const f = new FormData();
+                        f.append('project_root', '.');
+                        return f;
+                    })(),
+                });
+                if (!metaResp.ok) {
+                    this.status = 'error';
+                    this.errorMsg = '扩写元数据获取失败: ' + metaResp.status;
+                    return;
+                }
+                const meta = await metaResp.json();
+                this.status = 'expanding';
+                // 2. 跳转到 write-form 页 + 自动触发续写（用户手动点击「继续写」）
+                alert(
+                    'V0.34 扩写已准备：第 ' + this.chapter + ' 章当前 ' + meta.current_chars + ' 字。\n\n' +
+                    '下一步：\n' +
+                    '1. 切换到「写章节」页\n' +
+                    '2. 选择章节号 ' + this.chapter + '\n' +
+                    '3. LLM 会从 ' + meta.current_chars + ' 字继续写\n\n' +
+                    '(完整集成在 V0.34.1 实现)'
+                );
+                this.status = 'loaded';
+            } catch (e) {
+                this.status = 'error';
+                this.errorMsg = String(e);
+            }
+        },
+        onContentInput() {
+            this.charCount = this.content.length;
+            this.modified = this.content !== this.originalContent;
+            if (this.status === 'saved') this.status = 'loaded';
+        },
+        discardChanges() {
+            if (confirm('确定丢弃所有修改？')) {
+                this.content = this.originalContent;
+                this.charCount = this.content.length;
+                this.modified = false;
+            }
+        }
+     }">
+    <h2>📝 章节编辑器
+        <span x-show="status === 'loading'" class="badge" style="background: #dbeafe; color: #1e40af;">⏳ 加载中</span>
+        <span x-show="status === 'loaded'" class="badge status-ok">✓ 已加载</span>
+        <span x-show="status === 'saving'" class="badge" style="background: #fef3c7; color: #92400e;">💾 保存中</span>
+        <span x-show="status === 'saved'" class="badge status-ok">✓ 已保存</span>
+        <span x-show="status === 'expanding'" class="badge" style="background: #dbeafe; color: #1e40af;">🤖 扩写中</span>
+        <span x-show="status === 'error'" class="badge" style="background: #fecaca; color: #991b1b;">✗ 错误</span>
+        <span x-show="modified" class="badge" style="background: #fde68a; color: #92400e;">● 未保存</span>
+    </h2>
+
+    {# 章节号选择 + 操作按钮 #}
+    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
+        <label style="flex: 0 0 auto;">
+            <span style="display: block; font-size: 13px; color: var(--fg-muted);">章节号</span>
+            <input type="number" min="1" x-model.number="chapter" style="width: 100px;"
+                   :disabled="status === 'loading' || status === 'saving'">
+        </label>
+        <button type="button" @click="loadChapter(chapter)"
+                :disabled="status === 'loading' || status === 'saving'"
+                style="background: #3b82f6; color: white;">
+            📂 加载章节
+        </button>
+        <button type="button" @click="saveChapter()"
+                :disabled="status !== 'loaded' || !modified"
+                :style="(status !== 'loaded' || !modified) ? 'background: var(--fg-muted); cursor: not-allowed;' : 'background: #10b981; color: white;'">
+            💾 保存修改
+        </button>
+        <button type="button" @click="discardChanges()"
+                :disabled="!modified"
+                :style="!modified ? 'background: var(--fg-muted); cursor: not-allowed;' : 'background: #6b7280; color: white;'">
+            ↩️ 撤销修改
+        </button>
+        <button type="button" @click="expandChapter()"
+                :disabled="status !== 'loaded'"
+                :style="status !== 'loaded' ? 'background: var(--fg-muted); cursor: not-allowed;' : 'background: #8b5cf6; color: white;'">
+            🤖 AI 扩写
+        </button>
+    </div>
+
+    {# 状态条 + 字数统计 #}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: var(--fg-muted);">
+        <div>
+            <span x-show="status === 'idle'">💡 输入章节号 → 加载 → 编辑 → 保存</span>
+            <span x-show="status === 'loading'">⏳ 正在加载章节内容...</span>
+            <span x-show="status === 'loaded' && !modified">📄 已加载，可编辑</span>
+            <span x-show="status === 'loaded' && modified" style="color: #92400e;">● 有未保存修改</span>
+            <span x-show="status === 'saving'">💾 正在保存...</span>
+            <span x-show="status === 'saved'" style="color: #10b981;">✓ 保存成功！</span>
+            <span x-show="status === 'error'" x-text="'✗ ' + errorMsg" style="color: #dc2626;"></span>
+        </div>
+        <div>
+            <strong>字数：</strong>
+            <span x-text="charCount" style="font-family: ui-monospace; color: var(--accent);"></span>
+            <span x-show="originalContent" style="color: var(--fg-muted); margin-left: 8px;">
+                (原 <span x-text="originalContent.length"></span> 字)
+            </span>
+        </div>
+    </div>
+
+    {# 编辑器 textarea #}
+    <textarea x-model="content"
+              @input="onContentInput()"
+              :disabled="status === 'loading' || status === 'saving'"
+              :placeholder="status === 'idle' ? '加载章节后在此编辑...' : ''"
+              style="width: 100%; min-height: 400px; padding: 12px; border: 1px solid #d1d5db; border-radius: var(--radius); font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; font-size: 14px; line-height: 1.6; resize: vertical; box-sizing: border-box;"
+              spellcheck="false"></textarea>
+
+    <p style="margin-top: 8px; font-size: 12px; color: var(--fg-muted);">
+        💡 V0.34 支持手动编辑 + 「AI 扩写」从当前末尾续写（基于 V0.32 智能恢复）。保存后 _tracking-state.json 的 last_updated_chapter 同步更新。
+    </p>
+</div>

@@ -43,6 +43,11 @@
     <div class="card"><h2>✍️ 写章节</h2><p>加载中...</p></div>
 </div>
 
+{# V0.34 章节编辑器（手动编辑 + AI 扩写引导）#}
+<div hx-get="/page/chapter-edit" hx-trigger="load" hx-swap="outerHTML" id="chapter-edit">
+    <div class="card"><h2>📝 章节编辑器</h2><p>加载中...</p></div>
+</div>
+
 <div class="card">
     <h2>📚 章节</h2>
     <div hx-get="/api/chapters" hx-trigger="load" hx-swap="innerHTML">
