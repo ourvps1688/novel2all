@@ -2,9 +2,10 @@
 
 基于 LiteLLM 统一接口，支持 Anthropic / OpenAI / DeepSeek 等。
 
-V0.24 prompt cache：
-- 应用层 cache（dict-based，零新依赖），key = (model, system_hash, user_hash, temperature)
-- 命中时直接返回缓存响应（不调 API）
+V0.29 prompt cache（真 LRU）：
+- 应用层 cache（OrderedDict-based，零新依赖），key = (model, system_hash, user_hash, temperature)
+- 命中时直接返回缓存 + move_to_end 更新 LRU（V0.29+ 之前是粗暴清空）
+- 超过 cache_max_size 时 popitem(last=False) 淘汰最旧条目
 - 设计为**透明** cache：调用方无感知，cost_estimate 自动算 cache_hit
 - 适用场景：同一 system prompt + 类似 user prompt 重复调用（如 extractor 批处理章节）
 """
@@ -14,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections import OrderedDict
 from collections.abc import AsyncIterator
 from typing import Any, TypeVar
 
@@ -86,9 +88,11 @@ class LLMProvider:
     def __init__(self, config: LLMConfig | None = None):
         self.config = config or LLMConfig()
         self._configure_env()
-        # V0.24：prompt cache（应用层 dict-based）
-        # 透明 cache：调用方完全无感知
-        self._cache: dict[tuple[str, str, str, float], str] = {}
+        # V0.29：prompt cache 改为 OrderedDict 实现真 LRU
+        # 读 cache 时 move_to_end（更新"最近使用"位置）
+        # 写 cache 超 max_size 时 popitem(last=False) 淘汰最旧
+        # 之前 V0.24 实现：超过 max_size 时清空整个 cache（粗暴）
+        self._cache: OrderedDict[tuple[str, str, str, float], str] = OrderedDict()
         self._cache_hits: int = 0
         self._cache_misses: int = 0
 
@@ -131,10 +135,11 @@ class LLMProvider:
         # 决定模型：显式 model= > task router > config.default_model
         model_name = self._resolve_model(task=task, explicit_model=model)
 
-        # V0.24：cache lookup（命中则直接返回，不调 API）
+        # V0.29：cache lookup（命中则直接返回 + move_to_end 更新 LRU）
         cache_key = self._make_cache_key(model_name, system, prompt, temperature)
         if self.config.cache_enabled and cache_key in self._cache:
             self._cache_hits += 1
+            self._cache.move_to_end(cache_key)  # V0.29 真 LRU：更新"最近使用"
             return self._cache[cache_key]
         if self.config.cache_enabled:
             self._cache_misses += 1
@@ -212,14 +217,24 @@ class LLMProvider:
         return (model, sys_h, usr_h, temperature)
 
     def _cache_store(self, key: tuple[str, str, str, float], content: str) -> None:
-        """存储到 cache（V0.24）。
+        """存储到 cache（V0.29 真 LRU）。
 
-        LRU 简单实现：超过 cache_max_size 时清空（粗暴但安全）。
+        V0.24 旧实现：超过 cache_max_size 时清空整个 cache（粗暴）
+        V0.29 新实现：用 OrderedDict，超过 max_size 时 popitem(last=False) 淘汰最旧条目
+
+        LRU 语义：
+        - 写入新条目：放最末（最近写入）
+        - 读 cache：move_to_end 更新"最近使用"
+        - 超 max_size：淘汰最旧（OrderedDict 头部）
         """
+        if key in self._cache:
+            # 已存在 → 更新内容 + move_to_end
+            self._cache[key] = content
+            self._cache.move_to_end(key)
+            return
         if len(self._cache) >= self.config.cache_max_size:
-            # 简单 LRU：超过上限时清空整个 cache
-            # （更精细的 LRU 需要 OrderedDict + 双向链表，V0.24 不优化）
-            self._cache.clear()
+            # 真 LRU：淘汰最旧条目（OrderedDict 头部）
+            self._cache.popitem(last=False)
         self._cache[key] = content
 
     def cache_stats(self) -> dict[str, Any]:
@@ -332,10 +347,11 @@ class LLMProvider:
         """
         model_name = self._resolve_model(task=task, explicit_model=model)
 
-        # V0.24：cache 命中 → 返回 cached stream
+        # V0.29：cache 命中 → 返回 cached stream（move_to_end 更新 LRU）
         cache_key = self._make_cache_key(model_name, system, prompt, temperature)
         if self.config.cache_enabled and cache_key in self._cache:
             self._cache_hits += 1
+            self._cache.move_to_end(cache_key)  # V0.29 真 LRU
             cached_content = self._cache[cache_key]
 
             async def _cached_stream() -> Any:

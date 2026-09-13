@@ -20,6 +20,7 @@ V0.23 升级：
 from __future__ import annotations
 
 import inspect
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from typing import ClassVar
 from unittest.mock import patch
@@ -639,7 +640,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
@@ -688,7 +689,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
@@ -727,7 +728,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
@@ -762,7 +763,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=False, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
@@ -793,7 +794,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, cache_max_size=3, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
@@ -824,7 +825,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
@@ -859,7 +860,7 @@ class TestPromptCacheV024:
         config = LLMConfig(cache_enabled=True, default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {"key1": "value1"}
+        provider._cache = OrderedDict([("key1", "value1")])
         provider._cache_hits = 5
         provider._cache_misses = 3
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
@@ -876,7 +877,7 @@ class TestPromptCacheV024:
         config = LLMConfig(default_model="mock/model")
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
 
@@ -950,6 +951,183 @@ class TestCacheEnabledFromEnv:
             assert config.cache_enabled is True
         finally:
             os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
+
+
+class TestCacheLRUV029:
+    """V0.29：prompt cache 真 LRU 实现。
+
+    V0.24 旧实现：超过 cache_max_size 时清空整个 cache（粗暴）
+    V0.29 新实现：OrderedDict + move_to_end（读）+ popitem(last=False)（超 max_size 时淘汰最旧）
+
+    关键语义：
+    - 写入新条目：放 OrderedDict 末尾（最近写入）
+    - 读 cache 命中：move_to_end 更新"最近使用"
+    - 写新条目且超 max_size：popitem(last=False) 淘汰 OrderedDict 头部（最久未用）
+    """
+
+    def test_cache_evicts_least_recently_used(self) -> None:
+        """写满 max_size 后，新条目触发淘汰最久未用的。"""
+        from types import SimpleNamespace
+
+        config = LLMConfig(cache_enabled=True, cache_max_size=2)
+        provider = LLMProvider(config)
+        provider._cache = OrderedDict()
+
+        async def fake_acompletion(**kwargs):
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="R"))])
+
+        import litellm
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            # 写 3 条（max_size=2）→ 应淘汰第 1 条（最久未用）
+            import asyncio
+
+            asyncio.run(provider.complete(prompt="p1"))
+            asyncio.run(provider.complete(prompt="p2"))
+            asyncio.run(provider.complete(prompt="p3"))
+
+            # 验证：cache 里有 p2 + p3，p1 被淘汰
+            assert len(provider._cache) == 2
+            keys = list(provider._cache.keys())
+            assert len(keys) == 2
+        finally:
+            litellm.acompletion = original
+
+    def test_cache_access_updates_lru_position(self) -> None:
+        """命中 cache 时 move_to_end 更新 LRU 位置。"""
+        from types import SimpleNamespace
+
+        config = LLMConfig(cache_enabled=True, cache_max_size=2)
+        provider = LLMProvider(config)
+        provider._cache = OrderedDict()
+
+        async def fake_acompletion(**kwargs):
+            prompt = kwargs.get("messages", [{}])[-1].get("content", "")
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=f"R_{prompt}"))]
+            )
+
+        import litellm
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            import asyncio
+
+            # 写 p1, p2（cache=[p1, p2]）
+            asyncio.run(provider.complete(prompt="p1"))
+            asyncio.run(provider.complete(prompt="p2"))
+            keys_before = list(provider._cache.keys())
+            assert len(keys_before) == 2
+
+            # 命中 p1（应该 move_to_end，把 p1 移到末尾，p2 变成首）
+            result = asyncio.run(provider.complete(prompt="p1"))
+            assert result == "R_p1"
+            keys_after = list(provider._cache.keys())
+            # cache 现在顺序应该是 [p2, p1]（p2 在头部，因为 p1 被访问后移到了末尾）
+            assert keys_after[0] == keys_before[1]  # p2 现在在头部
+            assert keys_after[1] == keys_before[0]  # p1 现在在末尾
+
+            # 现在写 p3 → 应该淘汰 p2（最久未用），保留 p1 + p3
+            asyncio.run(provider.complete(prompt="p3"))
+            keys_final = list(provider._cache.keys())
+            assert len(keys_final) == 2
+            # p2 应该被淘汰（cache 里现在 [p1, p3]）
+            # p1 是 keys_after[1]，p3 是新写入
+            assert keys_final[0] == keys_after[1]  # p1 仍在头部
+            assert keys_final[1] != keys_after[0]  # p3 在末尾（新）
+            # 而且 p2 不在 cache 里
+            assert keys_after[0] not in keys_final
+        finally:
+            litellm.acompletion = original
+
+    def test_cache_eviction_preserves_lru_order(self) -> None:
+        """淘汰后剩余条目保持 LRU 顺序（从最久到最近）。"""
+        from types import SimpleNamespace
+
+        config = LLMConfig(cache_enabled=True, cache_max_size=3)
+        provider = LLMProvider(config)
+        provider._cache = OrderedDict()
+
+        async def fake_acompletion(**kwargs):
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="R"))])
+
+        import litellm
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            import asyncio
+
+            # 写 3 条（cache=[p1, p2, p3]，max_size=3 刚好）
+            asyncio.run(provider.complete(prompt="p1"))
+            asyncio.run(provider.complete(prompt="p2"))
+            asyncio.run(provider.complete(prompt="p3"))
+            keys_full = list(provider._cache.keys())
+            assert len(keys_full) == 3
+
+            # 命中 p1（移到末尾，cache=[p2, p3, p1]）
+            asyncio.run(provider.complete(prompt="p1"))
+            keys_after_hit = list(provider._cache.keys())
+            assert keys_after_hit == [keys_full[1], keys_full[2], keys_full[0]]
+
+            # 写 p4（触发淘汰：p2 是最久未用的，cache=[p3, p1, p4]）
+            asyncio.run(provider.complete(prompt="p4"))
+            keys_evicted = list(provider._cache.keys())
+            # p2 应该被淘汰
+            assert keys_full[1] not in keys_evicted
+            # 剩余 [p3, p1, p4]
+            assert keys_evicted[0] == keys_full[2]  # p3
+            assert keys_evicted[1] == keys_full[0]  # p1（之前被访问过）
+            assert keys_evicted[2] != keys_full[0] and keys_evicted[2] != keys_full[2]  # p4（新的）
+        finally:
+            litellm.acompletion = original
+
+    def test_cache_update_existing_key(self) -> None:
+        """重复写入相同 key 应更新内容且不淘汰。"""
+        from types import SimpleNamespace
+
+        config = LLMConfig(cache_enabled=True, cache_max_size=2)
+        provider = LLMProvider(config)
+        provider._cache = OrderedDict()
+
+        async def fake_acompletion(**kwargs):
+            prompt = kwargs.get("messages", [{}])[-1].get("content", "")
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=f"R_{prompt}"))]
+            )
+
+        import litellm
+
+        original = litellm.acompletion
+        litellm.acompletion = fake_acompletion
+        try:
+            import asyncio
+
+            asyncio.run(provider.complete(prompt="p1"))
+            asyncio.run(provider.complete(prompt="p2"))
+            # 此时 cache=[p1, p2]，max_size=2
+
+            # 直接 store 相同 p1（模拟覆盖）—— 应该 move_to_end，不淘汰 p2
+            key_p1 = provider._make_cache_key("deepseek/deepseek-flash", None, "p1", 0.7)
+            provider._cache_store(key_p1, "NEW_p1_content")
+
+            assert len(provider._cache) == 2  # 没淘汰
+            assert provider._cache[key_p1] == "NEW_p1_content"
+        finally:
+            litellm.acompletion = original
+
+    def test_cache_uses_ordered_dict_not_dict(self) -> None:
+        """验证 _cache 是 OrderedDict 实例（不是普通 dict）。"""
+        config = LLMConfig(cache_enabled=True)
+        provider = LLMProvider(config)
+        # 初始化后必须是 OrderedDict
+        assert isinstance(provider._cache, OrderedDict)
+        # 必须支持 OrderedDict 特有的 API
+        assert hasattr(provider._cache, "move_to_end")
+        assert hasattr(provider._cache, "popitem")
 
 
 class TestAnthropicCompatV027:
