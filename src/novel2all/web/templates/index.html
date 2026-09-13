@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}项目状态 - novel2all{% endblock %}
+
+{% block content %}
+{# V0.30.0 项目状态页：HTMX hx-get /page/status 实时刷新 #}
+<div class="card"
+     hx-get="/page/status"
+     hx-trigger="load, every 10s"
+     hx-swap="innerHTML"
+     id="project-status">
+    <h2>📁 项目状态</h2>
+    <p>加载中...</p>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>📋 Skill 列表</h2>
+        <div hx-get="/page/skills" hx-trigger="load" hx-swap="innerHTML">
+            加载中...
+        </div>
+    </div>
+    <div class="card">
+        <h2>👤 Role 列表</h2>
+        <div hx-get="/page/roles" hx-trigger="load" hx-swap="innerHTML">
+            加载中...
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📚 章节</h2>
+    <div hx-get="/api/chapters" hx-trigger="load" hx-swap="innerHTML">
+        加载中...
+    </div>
+</div>
+{% endblock %}

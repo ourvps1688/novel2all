@@ -1,0 +1,148 @@
+{# V0.30.0 基础模板：HTMX 2.x + Alpine.js 3.x + Jinja2 #}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}novel2all Web UI{% endblock %}</title>
+
+    {# 本地静态资源（无 CDN 依赖，零网络 + 离线可用） #}
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/alpine.min.js" defer></script>
+
+    {# 全局样式：紧凑、易读、无依赖 #}
+    <style>
+        :root {
+            --bg: #fafafa;
+            --bg-card: #ffffff;
+            --fg: #1a1a1a;
+            --fg-muted: #6b7280;
+            --border: #e5e7eb;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --success: #16a34a;
+            --warn: #d97706;
+            --error: #dc2626;
+            --radius: 6px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--fg);
+            line-height: 1.5;
+        }
+        header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 {
+            font-size: 18px;
+            margin: 0;
+            font-weight: 600;
+        }
+        header nav a {
+            color: var(--fg-muted);
+            text-decoration: none;
+            margin-left: 16px;
+            font-size: 14px;
+        }
+        header nav a:hover { color: var(--fg); }
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .card h2 {
+            font-size: 16px;
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--fg-muted);
+        }
+        .badge.model-invocable {
+            background: #dbeafe;
+            color: #1e40af;
+            border-color: #93c5fd;
+        }
+        button, .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover, .btn:hover { background: var(--accent-hover); }
+        button:disabled { background: var(--fg-muted); cursor: not-allowed; }
+        input, select, textarea {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 6px 10px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        pre, code {
+            font-family: ui-monospace, SFMono-Regular, "Cascadia Code", monospace;
+            font-size: 13px;
+        }
+        .status-ok { color: var(--success); }
+        .status-warn { color: var(--warn); }
+        .status-error { color: var(--error); }
+        [x-cloak] { display: none !important; }
+    </style>
+
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <header>
+        <h1>📖 novel2all</h1>
+        <nav>
+            <a href="/" hx-get="/" hx-target="main" hx-swap="innerHTML" hx-push-url="true">项目状态</a>
+            <a href="/skills" hx-get="/page/skills" hx-target="main" hx-swap="innerHTML" hx-push-url="true">Skill</a>
+            <a href="/roles" hx-get="/page/roles" hx-target="main" hx-swap="innerHTML" hx-push-url="true">Role</a>
+        </nav>
+    </header>
+    <main id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    {# 全局 HTMX 配置 #}
+    <script>
+        // HTMX 默认行为：网络错误时显示错误条
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            console.error('HTMX response error:', evt.detail);
+        });
+        document.body.addEventListener('htmx:sendError', function(evt) {
+            console.error('HTMX send error:', evt.detail);
+        });
+    </script>
+    {% block body_extra %}{% endblock %}
+</body>
+</html>

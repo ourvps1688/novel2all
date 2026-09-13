@@ -1,0 +1,16 @@
+{# V0.30.0 roles partial — HTMX 增量更新 #}
+{% if roles %}
+    <ul style="list-style: none; padding: 0; margin: 0;">
+        {% for r in roles %}
+        <li style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+            <strong>{{ r.name }}</strong>
+            <div style="color: var(--fg-muted); font-size: 13px; margin-top: 4px;">{{ r.description }}</div>
+            {% if r.preferred_model %}
+            <div style="margin-top: 4px;"><span class="badge">model: {{ r.preferred_model }}</span></div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="status-warn">未发现 role（检查 <code>roles/</code> 目录）</p>
+{% endif %}

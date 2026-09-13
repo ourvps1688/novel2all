@@ -1,0 +1,19 @@
+{# V0.30.0 project-status partial — HTMX 增量更新 #}
+{% if not initialized %}
+<p class="status-warn">⚠ 项目未初始化</p>
+<p>项目根：<code>{{ project_root }}</code></p>
+<p>运行 <code>novel2all setup</code> 初始化项目。</p>
+{% else %}
+<p class="status-ok">✓ 已初始化</p>
+<p><strong>项目名：</strong>{{ project_name }}</p>
+<p><strong>类型：</strong>{{ genre }}</p>
+<p><strong>风格锚点：</strong>{{ style_anchor }}</p>
+<p><strong>目标：</strong>{{ total_chapters_target }} 章 / {{ total_word_count_target }} 字</p>
+<p><strong>已完成：</strong>{{ last_updated_chapter }} 章</p>
+<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px;">
+    <div><span class="badge">角色：{{ character_count }}</span></div>
+    <div><span class="badge">活跃伏笔：{{ active_foreshadowing_count }}</span></div>
+    <div><span class="badge">时间线：{{ timeline_count }}</span></div>
+    <div><span class="badge">章节摘要：{{ summary_count }}</span></div>
+</div>
+{% endif %}
