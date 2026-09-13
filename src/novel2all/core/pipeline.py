@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -66,6 +67,8 @@ class WriteResult:
 
 
 # === Pipeline ===
+
+logger = logging.getLogger(__name__)
 
 
 class WritingPipeline:
@@ -171,9 +174,7 @@ class WritingPipeline:
                         stream_callback(chunk)
                     except Exception as e:
                         # stream_callback 异常不应中断生成
-                        import sys
-
-                        print(f"stream_callback error: {e}", file=sys.stderr)
+                        logger.warning("stream_callback error: %s", e)
         except Exception as e:
             error_msg = str(e).lower()
             if "auth" in error_msg or "key" in error_msg or "401" in error_msg:
@@ -184,11 +185,11 @@ class WritingPipeline:
 
         # 6. 字数校验（低于阈值则警告但不阻断）
         if len(content) < min_chars:
-            import sys
-
-            print(
-                f"⚠ 第 {chapter} 章仅 {len(content)} 字，少于预期 {min_chars}",
-                file=sys.stderr,
+            logger.warning(
+                "⚠ 第 %s 章仅 %d 字，少于预期 %d",
+                chapter,
+                len(content),
+                min_chars,
             )
 
         # 7. 写文件

@@ -5,9 +5,12 @@ Role 是 subagent：被 Skill 调用来执行专门任务（角色设计 / 写�
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class RoleDefinition(BaseModel):
@@ -38,9 +41,7 @@ class RoleRegistry:
                 role = self._load_role(role_md)
                 self._registry[role.name] = role
             except (OSError, ValueError, KeyError) as e:
-                import sys
-
-                print(f"Failed to load role at {role_md}: {e}", file=sys.stderr)
+                logger.warning("Failed to load role at %s: %s", role_md, e)
 
         return list(self._registry.values())
 

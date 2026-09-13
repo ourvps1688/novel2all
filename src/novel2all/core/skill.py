@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import frontmatter
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class SkillDefinition(BaseModel):
@@ -45,9 +48,7 @@ class SkillRegistry:
                 self._registry[skill.name] = skill
             except (OSError, ValueError, KeyError) as e:
                 # 单个 skill 失败不影响其他
-                import sys
-
-                print(f"Failed to load skill at {skill_md}: {e}", file=sys.stderr)
+                logger.warning("Failed to load skill at %s: %s", skill_md, e)
 
         return list(self._registry.values())
 

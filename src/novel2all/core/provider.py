@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 from collections import OrderedDict
 from collections.abc import AsyncIterator
@@ -22,6 +23,9 @@ from typing import Any, TypeVar
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
+
+
+logger = logging.getLogger(__name__)
 
 
 def _strip_proxy_env() -> None:
@@ -652,8 +656,9 @@ class LLMProvider:
             ):
                 with attempt:
                     if self.config.anthropic_retry_log:
-                        print(
-                            f"[_call_anthropic_compat] attempt #{attempt.retry_state.attempt_number}"
+                        logger.debug(
+                            "[_call_anthropic_compat] attempt #%d",
+                            attempt.retry_state.attempt_number,
                         )
                     async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
                         resp = await client.post(url, json=body, headers=headers)
