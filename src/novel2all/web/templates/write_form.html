@@ -1,26 +1,60 @@
-{# V0.30.1 写章节表单 — HTMX 触发 SSE 流式端点 #}
-<div class="card">
-    <h2>✍️ 写章节</h2>
+{# V0.30.3 流式编辑器升级 — Alpine.js 状态机 + HTMX SSE + 错误处理 + 字数统计 #}
+<div class="card"
+     x-data="{
+        status: 'idle',  // idle | running | done | error
+        content: '',
+        charCount: 0,
+        errorMsg: '',
+        appendChunk(text) {
+            this.content += text;
+            this.charCount = this.content.length;
+        },
+        startRun() {
+            this.status = 'running';
+            this.content = '';
+            this.charCount = 0;
+            this.errorMsg = '';
+        },
+        endRun() {
+            this.status = 'done';
+        },
+        failRun(msg) {
+            this.status = 'error';
+            this.errorMsg = msg;
+        }
+     }">
+    <h2>✍️ 写章节
+        <span x-show="status === 'running'" class="badge" style="background: #dbeafe; color: #1e40af;">⏳ 写作中</span>
+        <span x-show="status === 'done'" class="badge status-ok">✓ 完成</span>
+        <span x-show="status === 'error'" class="badge" style="background: #fecaca; color: #991b1b;">✗ 错误</span>
+    </h2>
+
     <form hx-post="/api/write/stream/model"
           hx-target="#write-output"
-          hx-swap="innerHTML"
+          hx-swap="none"
           hx-ext="sse"
           sse-swap="message"
-          hx-on::sse-message="document.getElementById('write-output').textContent += $event.detail.data">
+          hx-on::sse-before-message="startRun()"
+          hx-on::sse-message="appendChunk($event.detail.data)"
+          hx-on::sse-after-message="endRun()"
+          @submit="if (status === 'running') { $event.preventDefault(); return false; }">
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
             <label>
                 <span style="display: block; font-size: 13px; color: var(--fg-muted);">章节号</span>
                 <input type="number" name="chapter" min="1" value="1" required
-                       style="width: 100%;">
+                       style="width: 100%;"
+                       :disabled="status === 'running'">
             </label>
             <label>
-                <span style="display: block; font-size: block; font-size: 13px; color: var(--fg-muted);">Skill</span>
+                <span style="display: block; font-size: 13px; color: var(--fg-muted);">Skill</span>
                 <input type="text" name="skill" value="story-long-write"
-                       style="width: 100%;">
+                       style="width: 100%;"
+                       :disabled="status === 'running'">
             </label>
             <label>
                 <span style="display: block; font-size: 13px; color: var(--fg-muted);">Model</span>
-                <select name="model" style="width: 100%;">
+                <select name="model" style="width: 100%;"
+                        :disabled="status === 'running'">
                     <option value="">（用全局 default）</option>
                     {% for m in models %}
                     <option value="{{ m.name }}"
@@ -31,10 +65,29 @@
                 </select>
             </label>
         </div>
-        <button type="submit">开始写（流式）</button>
+        <button type="submit"
+                :disabled="status === 'running'"
+                :style="status === 'running' ? 'background: var(--fg-muted); cursor: wait;' : ''">
+            <span x-show="status === 'idle' || status === 'done' || status === 'error'">开始写（流式）</span>
+            <span x-show="status === 'running'">⏳ 写作中...</span>
+        </button>
     </form>
+
+    {# 状态条 + 字数统计 #}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--fg-muted);">
+        <div>
+            <span x-show="status === 'running'">📝 正在生成...</span>
+            <span x-show="status === 'done'">✓ 已完成</span>
+            <span x-show="status === 'error'" x-text="'✗ 错误: ' + errorMsg"></span>
+            <span x-show="status === 'idle'">💡 提示：V0.30.3 支持断线重连（HTMX SSE 1.x 原生）</span>
+        </div>
+        <div>
+            <strong>字数：</strong><span x-text="charCount" style="font-family: ui-monospace; color: var(--accent);"></span>
+        </div>
+    </div>
 
     <h3 style="margin-top: 16px; font-size: 14px;">输出（实时流）</h3>
     <pre id="write-output"
-         style="background: #f5f5f5; padding: 12px; border-radius: var(--radius); min-height: 100px; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all;"></pre>
+         x-text="content"
+         style="background: #f5f5f5; padding: 12px; border-radius: var(--radius); min-height: 200px; max-height: 500px; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 14px; line-height: 1.6;"></pre>
 </div>
