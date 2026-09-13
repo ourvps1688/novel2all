@@ -40,11 +40,12 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run tests
-        run: uv run pytest tests/ -v --tb=short --color=yes
+        # V0.30.5: 默认跳过 e2e（playwright tests 在专属 e2e job 跑）
+        run: uv run pytest tests/ -v --tb=short --color=yes -m "not e2e"
 
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        run: uv run pytest tests/ --cov=src/novel2all --cov-report=xml --cov-report=term-missing
+        run: uv run pytest tests/ --cov=src/novel2all --cov-report=xml --cov-report=term-missing -m "not e2e"
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -53,6 +54,45 @@ jobs:
           file: ./coverage.xml
           flags: unittests
           fail_ci_if_error: false
+
+  # ===== V0.30.5: Playwright WebUI E2E 测试 =====
+  e2e-playwright:
+    name: E2E (playwright / ${{ matrix.os }} / py${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.13']
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      # V0.30.5: 安装 chromium 浏览器（依赖系统库，因此 ubuntu 加 --with-deps）
+      - name: Install Playwright Chromium (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: uv run playwright install chromium --with-deps
+
+      - name: Install Playwright Chromium (Windows)
+        if: matrix.os == 'windows-latest'
+        run: uv run playwright install chromium
+
+      - name: Run Playwright E2E tests
+        run: uv run pytest tests/e2e/test_web_ui_playwright_v0305.py -v --tb=short --color=yes -m e2e
 
   # ===== Lint 检查 =====
   lint:
@@ -175,7 +215,7 @@ jobs:
   build:
     name: Build package
     runs-on: ubuntu-latest
-    needs: [test, lint, manifest]
+    needs: [test, lint, manifest, e2e-playwright]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
