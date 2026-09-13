@@ -24,7 +24,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 from pydantic import BaseModel
 
@@ -307,6 +307,21 @@ class LLMProvider:
     def cache_clear(self) -> None:
         """清空 cache（V0.33：通过 CacheBackend.clear，hits/misses 一并重置）。"""
         self._cache.clear()
+
+    def close(self) -> None:
+        """V0.42：显式关闭 cache backend（释放 SQLite 连接池等资源）。
+
+        推荐在应用退出时调用（FastAPI lifespan / context manager）。
+        MemoryLRU / JSONFile 暂为 no-op，SQLite 会关闭所有池中连接。
+        """
+        if hasattr(self._cache, "close"):
+            self._cache.close()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
 
     async def complete_structured(
         self,

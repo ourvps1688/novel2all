@@ -87,6 +87,8 @@ def create_app() -> FastAPI:
                 "Web app shutting down: cache stats=%s",
                 stats,
             )
+            # V0.42：显式关闭 cache backend（SQLite 连接池等）
+            app.state.provider.close()
             del app.state.provider
 
     app = FastAPI(

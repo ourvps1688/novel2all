@@ -207,8 +207,9 @@ def test_sqlite_backend_wal_mode_active(tmp_path: Path) -> None:
     """V0.40：默认启用 WAL 模式（reader 不阻塞 writer）。"""
     path = tmp_path / "cache.db"
     cache = SQLiteBackend(path=path, max_size=10, ttl_seconds=0)
-    # 检查 journal_mode
-    mode = cache._conn.execute("PRAGMA journal_mode").fetchone()[0]
+    # V0.42：thread-local conn
+    conn = cache._get_conn()
+    mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
     assert mode.lower() == "wal", f"应启用 WAL 模式，实际={mode}"
     cache.close()
 
@@ -217,8 +218,9 @@ def test_sqlite_backend_schema_has_required_columns(tmp_path: Path) -> None:
     """V0.40：schema 应含 key/value/expires_at/last_accessed_at/created_at。"""
     path = tmp_path / "cache.db"
     cache = SQLiteBackend(path=path, max_size=10, ttl_seconds=0)
-    # PRAGMA table_info
-    cols = cache._conn.execute("PRAGMA table_info(cache)").fetchall()
+    # V0.42：thread-local conn
+    conn = cache._get_conn()
+    cols = conn.execute("PRAGMA table_info(cache)").fetchall()
     col_names = [c[1] for c in cols]
     for required in ("key", "value", "expires_at", "last_accessed_at", "created_at"):
         assert required in col_names, f"schema 应含 {required}，实际={col_names}"
@@ -229,7 +231,9 @@ def test_sqlite_backend_has_lru_index(tmp_path: Path) -> None:
     """V0.40：last_accessed_at 索引加速 LRU 淘汰。"""
     path = tmp_path / "cache.db"
     cache = SQLiteBackend(path=path, max_size=10, ttl_seconds=0)
-    indexes = cache._conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
+    # V0.42：thread-local conn
+    conn = cache._get_conn()
+    indexes = conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
     index_names = [i[0] for i in indexes]
     assert "idx_last_accessed" in index_names, f"应含 LRU 索引，实际={index_names}"
     cache.close()

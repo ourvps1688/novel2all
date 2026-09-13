@@ -501,7 +501,7 @@ class JSONFileBackend:
 
 
 class SQLiteBackend:
-    """V0.40：SQLite cache backend — OS-agnostic 持久化 + 跨进程安全。
+    """V0.40 SQLite cache backend — V0.42 升级：连接池 + 自动 backup。
 
     优势（vs JSONFileBackend）：
     - **跨 OS 安全**：SQLite 内置锁机制，POSIX/Windows 通用（无需 fcntl/msvcrt）
@@ -524,10 +524,11 @@ class SQLiteBackend:
             created_at REAL NOT NULL       -- 调试用
         );
 
-    进程/线程安全：
-    - sqlite3 默认同线程连接（check_same_thread=False 让多线程共享）
+    进程/线程安全（V0.42 升级）：
+    - **连接池**：每线程独立 connection（threading.local），无需全局锁
     - WAL 模式：reader 不阻塞 writer
     - 跨进程：SQLite 内置文件锁 + 写串行化（自动）
+    - **V0.42 自动 backup**：启动时 PRAGMA integrity_check，损坏则重命名为 .corrupt.{ts}
     """
 
     FILE_VERSION = 2  # V0.40 升级版本（与 JSONFileBackend 不兼容）
@@ -544,35 +545,116 @@ class SQLiteBackend:
         self._ttl_seconds = ttl_seconds
         self._hits = 0
         self._misses = 0
-        # V0.40：多线程安全锁（SQLite 同连接多线程不安全，FastAPI 线程池需要）
-        self._lock = threading.Lock()
 
-        # sqlite3 连接（autocommit + WAL）
-        # check_same_thread=False 让多线程共享（FastAPI 线程池）
-        # timeout=5.0 防止无限等待锁
-        self._conn = sqlite3.connect(
-            str(self._path),
-            isolation_level=None,  # autocommit 模式（手动 BEGIN/COMMIT）
-            timeout=5.0,
-            check_same_thread=False,
-        )
-        # 启用 WAL 模式（reader 不阻塞 writer）
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")  # 性能/安全平衡
-        self._init_schema()
-        # 启动时清理过期 + LRU eviction
-        self._cleanup_expired()
-        self._evict_if_needed()
+        # V0.42：连接池 — 每线程独立 connection（threading.local）
+        self._local = threading.local()
+        # 维护所有已创建 connection 的引用（用于 close）
+        self._conns: list[sqlite3.Connection] = []
+        self._conns_lock = threading.Lock()  # 仅保护 _conns 列表
+
+        # V0.42：启动时检查完整性 + 自动 backup
+        self._check_and_recover()
+
+        # 初始化 schema（用主连接 + LRU eviction）
+        main_conn = self._get_conn()
+        main_conn.execute("PRAGMA journal_mode=WAL")
+        main_conn.execute("PRAGMA synchronous=NORMAL")
+        self._init_schema(main_conn)
+        self._cleanup_expired(main_conn)
+        self._evict_if_needed(main_conn)
         logger.info(
-            "V0.40 SQLiteBackend: %s (max_size=%d, ttl=%d)",
+            "V0.42 SQLiteBackend: %s (max_size=%d, ttl=%d, conn_pool=on)",
             self._path,
             max_size,
             ttl_seconds,
         )
 
-    def _init_schema(self) -> None:
-        """初始化 schema（含 last_accessed_at 索引，加速 LRU eviction）。"""
-        self._conn.execute(
+    def _check_and_recover(self) -> None:
+        """V0.42：启动时检查 DB 完整性，损坏则 backup + 重启。
+
+        先尝试用 SQLite header magic 判断（避免触发 integrity_check 的"file is not
+        a database"异常锁住文件）。如果 magic 不对，直接 backup 重建。
+        如果 magic 对但 integrity_check 失败（如部分损坏），也 backup 重建。
+        """
+        if not self._path.exists():
+            return
+
+        # Step 1: 快速 magic 检查（"SQLite format 3" 16 字节头）
+        try:
+            with open(self._path, "rb") as f:
+                header = f.read(16)
+            if not header.startswith(b"SQLite format 3"):
+                logger.warning(
+                    "V0.42 SQLiteBackend: DB 文件 magic 错误（%r），视为损坏",
+                    header[:8],
+                )
+                self._rename_corrupt()
+                return
+        except OSError as e:
+            logger.warning("V0.42 SQLiteBackend: 读取文件失败: %s", e)
+            self._rename_corrupt()
+            return
+
+        # Step 2: 用 integrity_check 深度检查（确保连接在 finally 中关闭）
+        test_conn: sqlite3.Connection | None = None
+        try:
+            test_conn = sqlite3.connect(str(self._path), timeout=5.0)
+            result = test_conn.execute("PRAGMA integrity_check").fetchone()
+            if result and result[0] == "ok":
+                return
+            logger.warning("V0.42 SQLiteBackend: integrity_check 失败: %s", result)
+        except Exception as e:
+            logger.warning("V0.42 SQLiteBackend: integrity_check 异常: %s（视为损坏）", e)
+        finally:
+            if test_conn is not None:
+                try:
+                    test_conn.close()
+                except Exception:
+                    pass
+
+        # 损坏 → rename
+        self._rename_corrupt()
+
+    def _rename_corrupt(self) -> None:
+        """V0.42：将损坏的 DB 文件重命名为 .corrupt.{timestamp}.db。"""
+        timestamp = int(time.time())
+        backup_path = self._path.with_suffix(f".corrupt.{timestamp}.db")
+        # Windows 上需要先尝试删除可能残留的 -wal / -shm 文件
+        for suffix in ("-wal", "-shm", "-journal"):
+            extra = self._path.with_suffix(self._path.suffix + suffix)
+            if extra.exists():
+                try:
+                    extra.unlink()
+                except OSError:
+                    pass
+        try:
+            self._path.rename(backup_path)
+            logger.warning(
+                "V0.42 SQLiteBackend: 损坏 DB 已备份到 %s，新 DB 将重建",
+                backup_path,
+            )
+        except OSError as e:
+            logger.error("V0.42 SQLiteBackend: 备份失败（%s），将尝试在损坏 DB 上启动", e)
+
+    def _get_conn(self) -> sqlite3.Connection:
+        """V0.42：获取当前线程的 connection（thread-local）。"""
+        if not hasattr(self._local, "conn") or self._local.conn is None:
+            conn = sqlite3.connect(
+                str(self._path),
+                isolation_level=None,
+                timeout=5.0,
+                check_same_thread=False,
+            )
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            self._local.conn = conn
+            with self._conns_lock:
+                self._conns.append(conn)
+        return self._local.conn
+
+    def _init_schema(self, conn: sqlite3.Connection) -> None:
+        """初始化 schema（含 last_accessed_at 索引）。"""
+        conn.execute(
             """
             CREATE TABLE IF NOT EXISTS cache (
                 key TEXT PRIMARY KEY,
@@ -583,34 +665,26 @@ class SQLiteBackend:
             )
             """
         )
-        # LRU 索引：按 last_accessed_at ASC 排序时加速
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_last_accessed ON cache(last_accessed_at)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_last_accessed ON cache(last_accessed_at)")
 
-    def _cleanup_expired(self) -> None:
-        """V0.40：启动时清理过期条目（避免返回 stale）。
-
-        expires_at 已包含 ttl_seconds（set 时存的是 now+ttl），所以只需
-        检查 expires_at < now 即可。
-        """
+    def _cleanup_expired(self, conn: sqlite3.Connection) -> None:
+        """V0.42：清理过期条目。"""
         if self._ttl_seconds > 0:
             now = time.time()
-            deleted = self._conn.execute(
+            deleted = conn.execute(
                 "DELETE FROM cache WHERE expires_at IS NOT NULL AND expires_at < ?",
                 (now,),
             ).rowcount
             if deleted > 0:
-                logger.info("V0.40 SQLiteBackend: 启动时清理 %d 条过期", deleted)
+                logger.info("V0.42 SQLiteBackend: 启动时清理 %d 条过期", deleted)
 
-    def _evict_if_needed(self) -> None:
-        """V0.29 真 LRU：超过 max_size 时删除最旧（按 last_accessed_at ASC）。"""
-        count = self._conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+    def _evict_if_needed(self, conn: sqlite3.Connection) -> None:
+        """V0.29 真 LRU。"""
+        count = conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
         if count <= self._max_size:
             return
         to_delete = count - self._max_size
-        # 用 subquery 删除最旧的 N 条
-        self._conn.execute(
+        conn.execute(
             """
             DELETE FROM cache WHERE key IN (
                 SELECT key FROM cache ORDER BY last_accessed_at ASC LIMIT ?
@@ -620,61 +694,57 @@ class SQLiteBackend:
         )
 
     def get(self, key: tuple | str) -> str | None:
-        """获取 cache value（含 TTL 检查 + LRU 更新）。"""
+        """V0.42：thread-local conn，无全局锁。"""
         encoded = encode_key(key)
         now = time.time()
-        with self._lock:
-            # 读取 + 过期检查（一次查询）
-            row = self._conn.execute(
-                "SELECT value, expires_at FROM cache WHERE key = ?",
-                (encoded,),
-            ).fetchone()
-            if row is None:
-                self._misses += 1
-                return None
-            value, expires_at = row
-            if expires_at is not None and expires_at < now:
-                # 过期 → 删除
-                self._conn.execute("DELETE FROM cache WHERE key = ?", (encoded,))
-                self._misses += 1
-                return None
-            # 命中 → 更新 last_accessed_at（V0.29 真 LRU）
-            self._conn.execute(
-                "UPDATE cache SET last_accessed_at = ? WHERE key = ?",
-                (now, encoded),
-            )
-            self._hits += 1
-            return value
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT value, expires_at FROM cache WHERE key = ?",
+            (encoded,),
+        ).fetchone()
+        if row is None:
+            self._misses += 1
+            return None
+        value, expires_at = row
+        if expires_at is not None and expires_at < now:
+            conn.execute("DELETE FROM cache WHERE key = ?", (encoded,))
+            self._misses += 1
+            return None
+        conn.execute(
+            "UPDATE cache SET last_accessed_at = ? WHERE key = ?",
+            (now, encoded),
+        )
+        self._hits += 1
+        return value
 
     def set(self, key: tuple | str, value: str) -> None:
-        """设置 cache value（INSERT OR REPLACE 原子 upsert + LRU eviction）。"""
+        """V0.42：thread-local conn。"""
         encoded = encode_key(key)
         now = time.time()
         expires_at = now + self._ttl_seconds if self._ttl_seconds > 0 else None
-        with self._lock:
-            # INSERT OR REPLACE：原子 upsert（SQLite 内置）
-            self._conn.execute(
-                """
-                INSERT INTO cache (key, value, expires_at, last_accessed_at, created_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(key) DO UPDATE SET
-                    value=excluded.value,
-                    expires_at=excluded.expires_at,
-                    last_accessed_at=excluded.last_accessed_at
-                """,
-                (encoded, value, expires_at, now, now),
-            )
-            # LRU eviction（触发淘汰，但不阻塞读）
-            self._evict_if_needed()
+        conn = self._get_conn()
+        conn.execute(
+            """
+            INSERT INTO cache (key, value, expires_at, last_accessed_at, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value=excluded.value,
+                expires_at=excluded.expires_at,
+                last_accessed_at=excluded.last_accessed_at
+            """,
+            (encoded, value, expires_at, now, now),
+        )
+        self._evict_if_needed(conn)
 
     def size(self) -> int:
-        with self._lock:
-            return self._conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+        """V0.42：用 thread-local conn。"""
+        conn = self._get_conn()
+        return conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
 
     def clear(self) -> None:
         """清空 cache + 重置 stats。"""
-        with self._lock:
-            self._conn.execute("DELETE FROM cache")
+        conn = self._get_conn()
+        conn.execute("DELETE FROM cache")
         self._hits = 0
         self._misses = 0
 
@@ -691,12 +761,17 @@ class SQLiteBackend:
             "hit_rate": round(hit_rate, 4),
             "ttl_seconds": self._ttl_seconds,
             "persist_path": str(self._path),
-            "lock_backend": "sqlite",  # V0.40: SQLite 内置锁（跨 OS）
+            "lock_backend": "sqlite",
+            "conn_pool_size": len(self._conns),  # V0.42: 连接池大小
         }
 
     def close(self) -> None:
-        """V0.40：显式关闭连接（多 backend 切换 / 进程退出时）。"""
-        try:
-            self._conn.close()
-        except Exception as e:
-            logger.warning("V0.40 SQLiteBackend: 关闭连接时错误: %s", e)
+        """V0.42：关闭所有连接池中的 connection。"""
+        with self._conns_lock:
+            for conn in self._conns:
+                try:
+                    conn.close()
+                except Exception as e:
+                    logger.warning("V0.42 SQLiteBackend: 关闭连接错误: %s", e)
+            self._conns.clear()
+        logger.info("V0.42 SQLiteBackend: 所有连接已关闭")
