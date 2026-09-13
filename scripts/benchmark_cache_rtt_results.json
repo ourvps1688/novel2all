@@ -1,0 +1,92 @@
+{
+  "metadata": {
+    "timestamp": "2026-09-13T16:09:10.661621+00:00",
+    "num_ops_per_config": 5000,
+    "cache_max_size": 1000,
+    "workload": "read_heavy",
+    "rtt_configs": [
+      {
+        "name": "localhost_sim",
+        "rtt_ms": 0.05,
+        "jitter_pct": 20.0,
+        "description": "127.0.0.1 环回（典型本地 Redis）"
+      },
+      {
+        "name": "lan_sim",
+        "rtt_ms": 0.5,
+        "jitter_pct": 20.0,
+        "description": "千兆 LAN（同机房）"
+      },
+      {
+        "name": "wan_sim",
+        "rtt_ms": 5.0,
+        "jitter_pct": 30.0,
+        "description": "公网 WAN（跨城/跨国）"
+      }
+    ],
+    "note": "V0.48: fakeredis + RTT 注入（本环境无 Docker/WSL/Redis 二进制）。结果是真实 Redis 性能的上界估算。",
+    "elapsed_total_seconds": 37.81
+  },
+  "results": [
+    {
+      "backend": "fakeredis_baseline",
+      "workload": "read_heavy",
+      "rtt_ms": 0,
+      "num_ops": 5000,
+      "elapsed_ms": 211.13,
+      "throughput_ops_sec": 23682.6,
+      "latency_p50_ms": 0.0375,
+      "latency_p95_ms": 0.0547,
+      "latency_p99_ms": 0.0939,
+      "latency_mean_ms": 0.042,
+      "hit_rate": 0.927,
+      "final_size": 199,
+      "note": "V0.48 fakeredis in-process, 无 RTT 注入"
+    },
+    {
+      "backend": "localhost_sim",
+      "workload": "read_heavy",
+      "rtt_ms": 0.05,
+      "num_ops": 5000,
+      "elapsed_ms": 3119.44,
+      "throughput_ops_sec": 1602.9,
+      "latency_p50_ms": 0.6042,
+      "latency_p95_ms": 0.7487,
+      "latency_p99_ms": 0.8585,
+      "latency_mean_ms": 0.6233,
+      "hit_rate": 0.9367,
+      "final_size": 199,
+      "note": "fakeredis + sleep(0.050ms) ± 20% jitter"
+    },
+    {
+      "backend": "lan_sim",
+      "workload": "read_heavy",
+      "rtt_ms": 0.5,
+      "num_ops": 5000,
+      "elapsed_ms": 4360.99,
+      "throughput_ops_sec": 1146.5,
+      "latency_p50_ms": 0.9184,
+      "latency_p95_ms": 1.1844,
+      "latency_p99_ms": 1.3138,
+      "latency_mean_ms": 0.8713,
+      "hit_rate": 0.8985,
+      "final_size": 199,
+      "note": "fakeredis + sleep(0.500ms) ± 20% jitter"
+    },
+    {
+      "backend": "wan_sim",
+      "workload": "read_heavy",
+      "rtt_ms": 5.0,
+      "num_ops": 5000,
+      "elapsed_ms": 28162.33,
+      "throughput_ops_sec": 177.5,
+      "latency_p50_ms": 5.6247,
+      "latency_p95_ms": 7.0324,
+      "latency_p99_ms": 7.3226,
+      "latency_mean_ms": 5.6307,
+      "hit_rate": 0.9201,
+      "final_size": 197,
+      "note": "fakeredis + sleep(5.000ms) ± 30% jitter"
+    }
+  ]
+}
