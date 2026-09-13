@@ -1,4 +1,4 @@
-{# V0.31 流式编辑器升级 — Alpine.js 5 态状态机 + HTMX SSE + 取消按钮 + task_id 追踪 #}
+{# V0.32 流式编辑器升级 — Alpine.js 状态机 + 取消按钮 + 「继续写」按钮 + task_id 追踪 #}
 <div class="card"
      x-data="{
         status: 'idle',  // idle | running | cancelling | done | error | cancelled
@@ -6,7 +6,8 @@
         charCount: 0,
         errorMsg: '',
         taskId: '',
-        cancelledAt: 0,  // 取消时的字数
+        cancelledAt: 0,  // V0.31：取消时的字数
+        resumedFrom: 0,  // V0.32：当前章节已存在的 partial 字数（启动前 fetch 检测）
         startRun(taskId) {
             this.taskId = taskId;
             this.status = 'running';
@@ -34,6 +35,7 @@
             // V0.31：处理 'cancelled' SSE 事件
             this.status = 'cancelled';
             this.cancelledAt = data.partial_chars || this.charCount;
+            this.resumedFrom = this.cancelledAt;  // V0.32：继续写按钮用
         },
         async cancelRun() {
             // V0.31：调 /api/write/cancel/{task_id} 取消正在运行的 pipeline
@@ -50,9 +52,33 @@
                 console.error('Cancel error:', e);
             }
         },
+        resumeRun() {
+            // V0.32：点击「继续写」→ 重置状态 + 触发 form submit
+            // form 提交时携带 resumedFrom（HTMX 在 form 序列化时自动包含 input[name=resume_from_chars]）
+            this.status = 'idle';
+            this.content = '';
+            this.charCount = 0;
+        },
+        async onSubmit(event) {
+            // V0.32：如果 cancelled 状态，自动填 resume_from_chars = resumedFrom
+            const form = event.target;
+            const resumeInput = form.querySelector('input[name=resume_from_chars]');
+            if (resumeInput) {
+                resumeInput.value = (this.status === 'cancelled') ? this.resumedFrom : 0;
+            }
+            return true;
+        },
+        guardSubmit(event) {
+            // V0.31：运行中禁止再次提交；其他情况交给 onSubmit
+            if (this.status === 'running' || this.status === 'cancelling') {
+                event.preventDefault();
+                return false;
+            }
+            this.onSubmit(event);
+            return true;
+        },
         onSseEvent(detail) {
-            // V0.31：根据 SSE event 名分派
-            // htmx-sse 把所有事件统一为 htmx:sseMessage，detail.event 是 server 端的 event 名
+            // V0.32：根据 SSE event 名分派
             const evtName = detail.event;
             const data = detail.data || {};
             if (evtName === 'started') {
@@ -86,7 +112,9 @@
           hx-on::sse-before-message="startRun($event.detail.data.task_id || (window.__currentTaskId || ''))"
           hx-on::sse-message="appendChunk($event.detail.data)"
           hx-on::sse-after-message="endRun()"
-          @submit="if (status === 'running' || status === 'cancelling') { $event.preventDefault(); return false; }">
+          @submit="guardSubmit($event)">
+        {# V0.32：resume_from_chars 隐藏 input（JS 在 cancelled 状态时自动填）#}
+        <input type="hidden" name="resume_from_chars" value="0">
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
             <label>
                 <span style="display: block; font-size: 13px; color: var(--fg-muted);">章节号</span>
@@ -118,9 +146,11 @@
             <button type="submit"
                     :disabled="status === 'running' || status === 'cancelling'"
                     :style="(status === 'running' || status === 'cancelling') ? 'background: var(--fg-muted); cursor: wait;' : ''">
-                <span x-show="status === 'idle' || status === 'done' || status === 'error' || status === 'cancelled'">开始写（流式）</span>
+                <span x-show="status === 'idle' || status === 'done' || status === 'error'">开始写（流式）</span>
                 <span x-show="status === 'running'">⏳ 写作中...</span>
                 <span x-show="status === 'cancelling'">⚠ 取消中...</span>
+                {# V0.32：cancelled 状态显示「继续写」按钮（resume_from_chars 已自动填）#}
+                <span x-show="status === 'cancelled'">▶️ 继续写（从 <span x-text="cancelledAt"></span> 字接续）</span>
             </button>
             {# V0.31：取消按钮（仅 running 状态显示）#}
             <button type="button"
@@ -128,6 +158,13 @@
                     @click="cancelRun()"
                     style="background: #f59e0b; color: white;">
                 🛑 停止
+            </button>
+            {# V0.32：cancelled 状态的「重新开始」按钮（resume_from_chars=0 覆盖）#}
+            <button type="button"
+                    x-show="status === 'cancelled'"
+                    @click="resumedFrom = 0; $event.target.closest('form').requestSubmit()"
+                    style="background: #6b7280; color: white;">
+                🔄 重新开始
             </button>
         </div>
     </form>
@@ -139,9 +176,9 @@
             <span x-show="status === 'cancelling'">⚠ 正在保存已生成内容...</span>
             <span x-show="status === 'done'">✓ 已完成</span>
             <span x-show="status === 'cancelled'"
-                  x-text="'⊘ 已取消，已保存 ' + cancelledAt + ' 字（点击「开始写」覆盖重写）'"></span>
+                  x-text="'⊘ 已取消，已保存 ' + cancelledAt + ' 字（点击「继续写」接续，或「重新开始」覆盖）'"></span>
             <span x-show="status === 'error'" x-text="'✗ 错误: ' + errorMsg"></span>
-            <span x-show="status === 'idle'">💡 提示：V0.31 支持「停止」按钮中途取消（已生成内容会保存）</span>
+            <span x-show="status === 'idle'">💡 提示：V0.32 支持「停止」+「继续写」中途取消并智能接续</span>
         </div>
         <div>
             <strong>字数：</strong><span x-text="charCount" style="font-family: ui-monospace; color: var(--accent);"></span>

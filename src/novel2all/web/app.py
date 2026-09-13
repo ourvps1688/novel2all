@@ -351,6 +351,7 @@ def create_app() -> FastAPI:
         model: str | None = Form(None),
         min_chars: int = Form(2000),
         skip_pre_write: bool = Form(False),
+        resume_from_chars: int = Form(0),  # V0.32：0 = 正常开始，>0 = 接续模式
     ) -> StreamingResponse:
         """V0.30.1：带 model 参数的流式写作端点（V0.29.3 单例 + V0.30 WebUI 集成）。
 
@@ -359,6 +360,8 @@ def create_app() -> FastAPI:
         V0.31：在 'started' 事件里 yield task_id（uuid4 hex[:8]），
         注册到 app.state.active_pipelines，让 /api/write/cancel/{task_id} 能取消。
         Pipeline 抛 PipelineCancelledError 时 yield 'cancelled' 事件（partial content 信息）。
+
+        V0.32：接受 resume_from_chars 参数 → pipeline 接续 partial content 写。
         """
         # V0.30.1：用请求中的 model（不污染单例）
         from novel2all.cli.main import get_llm_for_model
@@ -389,6 +392,7 @@ def create_app() -> FastAPI:
                     "model": model or "default",
                     "min_chars": min_chars,
                     "skip_pre_write": skip_pre_write,
+                    "resume_from_chars": resume_from_chars,  # V0.32
                     "project_root": str(root),
                 },
             )
@@ -424,6 +428,7 @@ def create_app() -> FastAPI:
                         stream_callback=on_chunk,
                         min_chars=min_chars,
                         skip_pre_write_check=skip_pre_write,
+                        resume_from_chars=resume_from_chars,  # V0.32
                     )
                 finally:
                     await chunk_queue.put(None)
@@ -491,6 +496,7 @@ def create_app() -> FastAPI:
                         "task_id": task_id,
                         "output_path": str(result.output_path),
                         "content_chars": result.content_chars,
+                        "resumed_from_chars": result.resumed_from_chars,  # V0.32
                         "post_issue_count": len(result.post_write_issues),
                         "pre_issue_count": len(result.pre_write_issues),
                     },

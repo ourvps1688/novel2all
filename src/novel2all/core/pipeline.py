@@ -11,6 +11,13 @@ V0.31 取消/恢复：
 - 监听 asyncio.CancelledError（在 LLM 流式循环中），保存已生成的 partial content
 - 返回 WriteResult(cancelled=True)，不调 update_after_writing（章节未完成）
 - 恢复策略：下次写同一章节时检测 output_path 已存在 → 覆盖（用户决定从头重写）
+
+V0.32 智能恢复：
+- write_chapter 加 resume_from_chars: int = 0 参数
+- resume_from_chars > 0 + output_path 已存在 → 加载已有 partial content 作为 prompt 前缀
+- LLM 生成"续写"内容（prompt 明确指示不要再写前面部分）
+- 最终 content = partial + 续写，写回 output_path（覆盖）
+- 调用方（CLI / WebUI）：检测 output_path 已存在 + 已有 N 字 → 自动传 resume_from_chars=N
 """
 
 from __future__ import annotations
@@ -77,6 +84,7 @@ class WriteResult:
     """一次写作的完整结果。
 
     V0.31 新增 cancelled 字段：True 表示用户中途取消（不调 update_after_writing）。
+    V0.32 新增 resumed_from_chars：>0 表示接续模式（拼接 partial + 续写）。
     """
 
     chapter: int
@@ -85,6 +93,7 @@ class WriteResult:
     content_chars: int
     state: TrackingState
     cancelled: bool = False  # V0.31: 是否用户取消
+    resumed_from_chars: int = 0  # V0.32: 接续的 partial 字数
     post_write_issues: list[ConsistencyIssue] = field(default_factory=list)
     pre_write_issues: list[ConsistencyIssue] = field(default_factory=list)
 
@@ -130,6 +139,7 @@ class WritingPipeline:
         stream_callback: Callable[[str], None] | None = None,
         min_chars: int = 2000,
         skip_pre_write_check: bool = False,
+        resume_from_chars: int = 0,  # V0.32：0 = 正常开始，>0 = 接续模式
     ) -> WriteResult:
         """写第 N 章，完整流程。
 
@@ -141,6 +151,7 @@ class WritingPipeline:
             stream_callback: 流式回调（每次 LLM 输出 chunk 时触发）
             min_chars: 最低字数要求（用于 post-write check）
             skip_pre_write_check: 跳过 pre-write check（默认 False）
+            resume_from_chars: V0.32 接续模式 — 从 output_path[:N] 字继续写（>0 时启用）
 
         Returns:
             WriteResult
@@ -153,6 +164,26 @@ class WritingPipeline:
         if not outline_path.exists():
             raise OutlineNotFoundError(f"细纲文件不存在: {outline_path}。请先写细纲。")
         outline_text = outline_path.read_text(encoding="utf-8")
+
+        # V0.32：resume 模式加载 partial content（如果 output_path 已存在且 resume_from_chars > 0）
+        partial_content = ""
+        if resume_from_chars > 0:
+            output_path_for_resume = self.project.chapter_prose(chapter)
+            if output_path_for_resume.exists():
+                existing = output_path_for_resume.read_text(encoding="utf-8")
+                partial_content = existing[:resume_from_chars]
+                logger.info(
+                    "V0.32 resume: 第 %s 章从 %d 字继续（partial 已加载 %d 字）",
+                    chapter,
+                    resume_from_chars,
+                    len(partial_content),
+                )
+            else:
+                logger.warning(
+                    "V0.32 resume: 第 %s 章 resume_from_chars=%d 但 output_path 不存在，忽略接续",
+                    chapter,
+                    resume_from_chars,
+                )
 
         # 2. pre-write check（可跳过）
         pre_issues: list[ConsistencyIssue] = []
@@ -180,6 +211,8 @@ class WritingPipeline:
             memory_context=ctx,
             characters=characters,
             chapter=chapter,
+            partial_content=partial_content,  # V0.32
+            min_chars=min_chars,
         )
 
         # 5. 流式调用 LLM（V0.23+：自动应用 DeepSeek 双模型路由 + thinking 控制）
@@ -226,6 +259,10 @@ class WritingPipeline:
 
         content = "".join(content_chunks)
 
+        # V0.32：resume 模式拼接 partial + 续写内容
+        if partial_content:
+            content = partial_content + content
+
         # 6. 字数校验（低于阈值则警告但不阻断）
         if len(content) < min_chars:
             logger.warning(
@@ -235,7 +272,7 @@ class WritingPipeline:
                 min_chars,
             )
 
-        # 7. 写文件
+        # 7. 写文件（覆盖已有 partial）
         output_path = self.project.chapter_prose(chapter)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(content, encoding="utf-8")
@@ -252,6 +289,7 @@ class WritingPipeline:
             content_chars=len(content),
             state=state,
             cancelled=False,
+            resumed_from_chars=len(partial_content) if partial_content else 0,  # V0.32
             post_write_issues=post_issues,
             pre_write_issues=pre_issues,
         )
@@ -277,8 +315,10 @@ class WritingPipeline:
         memory_context: Any,
         characters: list[str],
         chapter: int,
+        partial_content: str = "",  # V0.32
+        min_chars: int = 2000,  # V0.32
     ) -> str:
-        """组装写作 prompt：细纲 + memory context + skill body。"""
+        """组装写作 prompt：细纲 + memory context + skill body + V0.32 partial（可选）。"""
         sections: list[str] = [
             f"# 当前任务：写第 {chapter} 章",
             "",
@@ -295,6 +335,22 @@ class WritingPipeline:
         if sys_sections:
             sections.append("## 历史记忆（请勿违反）")
             sections.extend(sys_sections)
+            sections.append("")
+
+        # V0.32：resume 模式 — 把 partial content 作为 prompt 前缀
+        # LLM 看到已写部分，会自然续写而不会重复
+        if partial_content:
+            remaining = max(min_chars - len(partial_content), 500)
+            sections.append(f"## 已写部分（前 {len(partial_content)} 字）")
+            sections.append(partial_content)
+            sections.append("")
+            sections.append(
+                f"## 任务\n\n"
+                f"继续完成本章剩余内容（**不要重复前面已写的 {len(partial_content)} 字**）。\n\n"
+                f"本章目标至少 {min_chars} 字，"
+                f"已写 {len(partial_content)} 字，"
+                f"还需写至少 {remaining} 字。"
+            )
             sections.append("")
 
         # skill 正文作为 prompt 的指令
