@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -224,6 +224,49 @@ def create_app() -> FastAPI:
         ]
         return templates.TemplateResponse(request, "roles_partial.html", {"roles": roles})
 
+    # V0.30.1：模型选择器 + 写章节表单（HTMX partial）
+    @app.get("/page/model-selector", response_class=HTMLResponse)
+    async def page_model_selector(request: Request) -> HTMLResponse:
+        """HTMX 用：渲染 model_selector.html（带当前模型 + 可选列表）。"""
+        from novel2all.core.provider_router import MODEL_CONFIG
+
+        provider: LLMProvider = request.app.state.provider
+        models = [
+            {
+                "name": name,
+                "anthropic_compat": bool(cfg.api_base and "anthropic" in cfg.api_base),
+                "api_base": cfg.api_base,
+                "api_key_env": cfg.api_key_env,
+            }
+            for name, cfg in MODEL_CONFIG.items()
+        ]
+        return templates.TemplateResponse(
+            request,
+            "model_selector.html",
+            {"models": models, "current_model": provider.config.default_model},
+        )
+
+    @app.get("/page/write-form", response_class=HTMLResponse)
+    async def page_write_form(request: Request) -> HTMLResponse:
+        """HTMX 用：渲染 write_form.html（带模型下拉 + 流式提交按钮）。"""
+        from novel2all.core.provider_router import MODEL_CONFIG
+
+        provider: LLMProvider = request.app.state.provider
+        models = [
+            {
+                "name": name,
+                "anthropic_compat": bool(cfg.api_base and "anthropic" in cfg.api_base),
+                "api_base": cfg.api_base,
+                "api_key_env": cfg.api_key_env,
+            }
+            for name, cfg in MODEL_CONFIG.items()
+        ]
+        return templates.TemplateResponse(
+            request,
+            "write_form.html",
+            {"models": models, "current_model": provider.config.default_model},
+        )
+
     @app.get("/api/cache/stats")
     async def cache_stats(request: Request) -> dict[str, Any]:
         """V0.29.3：返回 lifespan provider 的 cache 统计。
@@ -232,6 +275,212 @@ def create_app() -> FastAPI:
         """
         provider: LLMProvider = request.app.state.provider
         return provider.cache_stats()
+
+    # V0.30.1：模型选择器 API
+    @app.get("/api/models")
+    async def list_models() -> list[dict[str, Any]]:
+        """V0.30.1：列出 MODEL_CONFIG 中所有可用模型。
+
+        前端模型选择器用。每条含：
+        - name：模型名（litellm 格式，如 "minimax/MiniMax-M3"）
+        - anthropic_compat：是否走 anthropic Messages API 路径
+        - api_base：自定义 endpoint（None = 用 litellm 默认）
+        - api_key_env：环境变量名（None = 用 LLMConfig 默认）
+        """
+        from novel2all.core.provider_router import MODEL_CONFIG
+
+        models = []
+        for name, cfg in MODEL_CONFIG.items():
+            models.append(
+                {
+                    "name": name,
+                    "anthropic_compat": bool(cfg.api_base and "anthropic" in cfg.api_base),
+                    "api_base": cfg.api_base,
+                    "api_key_env": cfg.api_key_env,
+                }
+            )
+        return models
+
+    @app.get("/api/model/current")
+    async def get_current_model(request: Request) -> dict[str, str]:
+        """V0.30.1：返回当前 provider 的 default_model。"""
+        provider: LLMProvider = request.app.state.provider
+        return {"model": provider.config.default_model}
+
+    @app.post("/api/model/switch")
+    async def switch_model(request: Request, model: str = Form(...)) -> dict[str, str]:
+        """V0.30.1：切换 provider 的 default_model。
+
+        切换后：
+        - 后续 complete()/stream() 不传 model 参数时用新 model
+        - 已创建的 provider（lifespan 单例）保持
+        - cache stats 不受影响（LRU 保留）
+        """
+        from novel2all.core.provider_router import MODEL_CONFIG
+
+        provider: LLMProvider = request.app.state.provider
+        if model not in MODEL_CONFIG:
+            raise HTTPException(
+                status_code=400,
+                detail=f"未知模型: {model}。可选: {', '.join(MODEL_CONFIG.keys())}",
+            )
+        old_model = provider.config.default_model
+        provider.config.default_model = model
+        logger.info("V0.30.1: 模型切换 %s → %s", old_model, model)
+        return {"old_model": old_model, "new_model": model}
+
+    @app.post("/api/write/stream/model")
+    async def write_stream_with_model(
+        request: Request,
+        chapter: int = Form(...),
+        project_root: str = Form("."),
+        skill: str = Form("story-long-write"),
+        model: str | None = Form(None),
+        min_chars: int = Form(2000),
+        skip_pre_write: bool = Form(False),
+    ) -> StreamingResponse:
+        """V0.30.1：带 model 参数的流式写作端点（V0.29.3 单例 + V0.30 WebUI 集成）。
+
+        复用了原 /api/write/stream 的逻辑，但接受 Form 参数（HTMX 友好）。
+        """
+        # V0.30.1：用请求中的 model（不污染单例）
+        from novel2all.cli.main import get_llm_for_model
+
+        async def event_stream() -> AsyncIterator[str]:
+            llm: LLMProvider = get_llm_for_model(model)
+            root = Path(project_root).resolve()
+            project = ProjectStructure(root=root)
+            if not project.exists():
+                yield sse_event(
+                    "error",
+                    {"message": f"项目未初始化: {root}. 请先跑 novel2all setup."},
+                )
+                return
+
+            yield sse_event(
+                "started",
+                {
+                    "chapter": chapter,
+                    "skill": skill,
+                    "model": model or "default",  # V0.30.1: 显示选用的 model
+                    "min_chars": min_chars,
+                    "skip_pre_write": skip_pre_write,
+                    "project_root": str(root),
+                },
+            )
+
+            try:
+                manager = MemoryManager(project_root=root, llm=llm)
+                skills_dir = Path(__file__).parent.parent / "skills"
+                skill_registry = SkillRegistry(skills_dir)
+                skill_registry.discover()
+                pipeline = WritingPipeline(
+                    manager=manager,
+                    skill_registry=skill_registry,
+                    llm=llm,
+                    project=project,
+                )
+            except Exception as e:
+                yield sse_event("error", {"message": f"Pipeline 初始化失败: {e}"})
+                return
+
+            chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
+            collected: list[str] = []
+
+            def on_chunk(text: str) -> None:
+                collected.append(text)
+                chunk_queue.put_nowait(text)
+
+            async def run_pipeline() -> None:
+                try:
+                    await pipeline.write_chapter(
+                        chapter=chapter,
+                        outline_path=project.chapter_outline(chapter),
+                        skill_name=skill,
+                        stream_callback=on_chunk,
+                        min_chars=min_chars,
+                        skip_pre_write_check=skip_pre_write,
+                    )
+                finally:
+                    await chunk_queue.put(None)
+
+            try:
+                pipeline_task = asyncio.create_task(run_pipeline())
+                while True:
+                    chunk = await chunk_queue.get()
+                    if chunk is None:
+                        break
+                    yield sse_event("chunk", {"text": chunk})
+
+                result = await pipeline_task
+
+                if result.pre_write_issues:
+                    yield sse_event(
+                        "pre_write_check",
+                        {"issues": [issue.model_dump() for issue in result.pre_write_issues]},
+                    )
+
+                yield sse_event(
+                    "progress",
+                    {"phase": "save", "message": f"已写文件: {result.output_path}"},
+                )
+                yield sse_event(
+                    "progress",
+                    {"phase": "extract", "message": "提取角色/伏笔/时间线"},
+                )
+                yield sse_event(
+                    "progress",
+                    {"phase": "merge", "message": "合并到 tracking state"},
+                )
+
+                if result.post_write_issues:
+                    yield sse_event(
+                        "post_write_check",
+                        {"issues": [issue.model_dump() for issue in result.post_write_issues]},
+                    )
+
+                yield sse_event(
+                    "done",
+                    {
+                        "output_path": str(result.output_path),
+                        "content_chars": result.content_chars,
+                        "post_issue_count": len(result.post_write_issues),
+                        "pre_issue_count": len(result.pre_write_issues),
+                    },
+                )
+
+            except OutlineNotFoundError as e:
+                yield sse_event("error", {"message": str(e), "code": "outline_not_found"})
+            except BlockingIssuesError as e:
+                yield sse_event(
+                    "error",
+                    {
+                        "message": f"pre-write check 发现 {len(e.issues)} 个 critical 问题",
+                        "code": "blocking_issues",
+                        "issues": [issue.model_dump() for issue in e.issues],
+                    },
+                )
+            except Exception as e:
+                if pipeline_task.done() and pipeline_task.exception():
+                    exc = pipeline_task.exception()
+                    yield sse_event(
+                        "error",
+                        {"message": f"Pipeline 失败: {type(exc).__name__}: {exc}"},
+                    )
+                else:
+                    yield sse_event(
+                        "error",
+                        {"message": f"Pipeline 失败: {type(e).__name__}: {e}"},
+                    )
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @app.get("/api/tracking")
     async def get_tracking(project_root: str = ".") -> dict:

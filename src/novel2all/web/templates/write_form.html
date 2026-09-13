@@ -1,0 +1,40 @@
+{# V0.30.1 写章节表单 — HTMX 触发 SSE 流式端点 #}
+<div class="card">
+    <h2>✍️ 写章节</h2>
+    <form hx-post="/api/write/stream/model"
+          hx-target="#write-output"
+          hx-swap="innerHTML"
+          hx-ext="sse"
+          sse-swap="message"
+          hx-on::sse-message="document.getElementById('write-output').textContent += $event.detail.data">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
+            <label>
+                <span style="display: block; font-size: 13px; color: var(--fg-muted);">章节号</span>
+                <input type="number" name="chapter" min="1" value="1" required
+                       style="width: 100%;">
+            </label>
+            <label>
+                <span style="display: block; font-size: block; font-size: 13px; color: var(--fg-muted);">Skill</span>
+                <input type="text" name="skill" value="story-long-write"
+                       style="width: 100%;">
+            </label>
+            <label>
+                <span style="display: block; font-size: 13px; color: var(--fg-muted);">Model</span>
+                <select name="model" style="width: 100%;">
+                    <option value="">（用全局 default）</option>
+                    {% for m in models %}
+                    <option value="{{ m.name }}"
+                            {% if m.name == current_model %}selected{% endif %}>
+                        {{ m.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        <button type="submit">开始写（流式）</button>
+    </form>
+
+    <h3 style="margin-top: 16px; font-size: 14px;">输出（实时流）</h3>
+    <pre id="write-output"
+         style="background: #f5f5f5; padding: 12px; border-radius: var(--radius); min-height: 100px; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all;"></pre>
+</div>

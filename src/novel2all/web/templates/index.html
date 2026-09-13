@@ -13,6 +13,11 @@
     <p>加载中...</p>
 </div>
 
+{# V0.30.1 模型选择器（暴露 V0.27 minimax + V0.30 数据驱动）#}
+<div hx-get="/page/model-selector" hx-trigger="load" hx-swap="outerHTML" id="model-selector">
+    <div class="card"><h2>🤖 模型选择</h2><p>加载中...</p></div>
+</div>
+
 <div class="grid">
     <div class="card">
         <h2>📋 Skill 列表</h2>
@@ -26,6 +31,11 @@
             加载中...
         </div>
     </div>
+</div>
+
+{# V0.30.1 写章节表单（带模型选择 + SSE 流式提交）#}
+<div hx-get="/page/write-form" hx-trigger="load" hx-swap="outerHTML" id="write-form">
+    <div class="card"><h2>✍️ 写章节</h2><p>加载中...</p></div>
 </div>
 
 <div class="card">
