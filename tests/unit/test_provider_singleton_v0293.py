@@ -135,3 +135,82 @@ class TestCliSingletonV0293:
         assert p2._cache_hits == 0, "新对象的 stats 应从 0 开始"
 
         cli_main.reset_llm()  # 清理
+
+
+class TestCliModelOptionV0294:
+    """V0.29.4：CLI --model 参数支持。
+
+    get_llm_for_model(model):
+    - model=None：返回单例（用环境变量 NOVEL2ALL_MODEL）
+    - model=<name>：创建新 LLMProvider（不污染单例）
+
+    单例与传 model 的 provider 是不同对象，cache stats 独立。
+    """
+
+    def test_get_llm_for_model_none_returns_singleton(self) -> None:
+        """model=None 时返回单例（同 get_llm()）。"""
+        from novel2all.cli import main as cli_main
+
+        cli_main.reset_llm()
+        try:
+            p1 = cli_main.get_llm_for_model(None)
+            p2 = cli_main.get_llm()
+            assert p1 is p2, "model=None 时应返回同一单例"
+        finally:
+            cli_main.reset_llm()
+
+    def test_get_llm_for_model_explicit_creates_new_instance(self) -> None:
+        """传 model 时创建新 provider（不污染单例）。"""
+        from novel2all.cli import main as cli_main
+
+        cli_main.reset_llm()
+        try:
+            singleton = cli_main.get_llm()  # 单例（默认 model）
+            new_provider = cli_main.get_llm_for_model("minimax/MiniMax-M3")
+
+            assert singleton is not new_provider, "传 model 时应创建新 provider"
+            assert new_provider.config.default_model == "minimax/MiniMax-M3", (
+                f"新 provider 应使用 minimax，实际是 {new_provider.config.default_model}"
+            )
+            assert singleton.config.default_model != "minimax/MiniMax-M3", "单例不应被新 model 污染"
+        finally:
+            cli_main.reset_llm()
+
+    def test_get_llm_for_model_persists_singleton(self) -> None:
+        """传 model 后单例的 cache stats 仍独立。"""
+        from novel2all.cli import main as cli_main
+
+        cli_main.reset_llm()
+        try:
+            # 单例设置 cache_hits
+            singleton = cli_main.get_llm()
+            singleton._cache_hits = 10
+
+            # 传 model 创建新 provider
+            new_provider = cli_main.get_llm_for_model("deepseek/deepseek-v4-pro")
+
+            # 单例 cache_hits 不受影响
+            assert singleton._cache_hits == 10
+            # 新 provider cache_hits 从 0 开始
+            assert new_provider._cache_hits == 0
+        finally:
+            cli_main.reset_llm()
+
+    def test_get_llm_for_model_multiple_different_models(self) -> None:
+        """传不同 model 创建不同 provider。"""
+        from novel2all.cli import main as cli_main
+
+        cli_main.reset_llm()
+        try:
+            p_minimax = cli_main.get_llm_for_model("minimax/MiniMax-M3")
+            p_deepseek = cli_main.get_llm_for_model("deepseek/deepseek-v4-pro")
+            p_qwen = cli_main.get_llm_for_model("openai/qwen3.8-flash")
+
+            assert p_minimax.config.default_model == "minimax/MiniMax-M3"
+            assert p_deepseek.config.default_model == "deepseek/deepseek-v4-pro"
+            assert p_qwen.config.default_model == "openai/qwen3.8-flash"
+            # 三个不同对象
+            assert p_minimax is not p_deepseek
+            assert p_deepseek is not p_qwen
+        finally:
+            cli_main.reset_llm()

@@ -79,6 +79,28 @@ def get_llm() -> LLMProvider:
     return _llm_instance
 
 
+def get_llm_for_model(model: str | None) -> LLMProvider:
+    """V0.29.4：根据 --model 参数获取 LLMProvider。
+
+    - model=None：返回单例（用环境变量 NOVEL2ALL_MODEL）
+    - model=<name>：创建新 LLMProvider（不污染单例，让用户能临时切模型）
+
+    注意：传 model 时返回的不是单例，cache stats 与单例分离（避免混淆）。
+    """
+    import os
+
+    if model is None:
+        return get_llm()
+    return LLMProvider(
+        LLMConfig(
+            default_model=model,
+            api_key_anthropic=os.environ.get("ANTHROPIC_API_KEY"),
+            api_key_openai=os.environ.get("OPENAI_API_KEY"),
+            api_key_deepseek=os.environ.get("DEEPSEEK_API_KEY"),
+        )
+    )
+
+
 def reset_llm() -> None:
     """重置 LLMProvider 单例（V0.29.3 测试用）。"""
     global _llm_instance
@@ -257,6 +279,14 @@ def write_chapter(
     skill: str = typer.Option(
         "story-long-write", "--skill", "-s", help="使用的 skill（默认 story-long-write）"
     ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        "-m",
+        help="V0.29.4：指定模型（如 minimax/MiniMax-M3 / deepseek/deepseek-v4-pro）。"
+        "默认用环境变量 NOVEL2ALL_MODEL 或配置 default_model。"
+        "传 --model 会创建新 provider（不污染单例，cache stats 独立）。",
+    ),
     stream: bool = typer.Option(True, "--stream/--no-stream", help="流式输出到 console"),
     min_chars: int = typer.Option(2000, "--min-chars", help="最低字数（低于则警告）"),
     skip_pre_write: bool = typer.Option(
@@ -280,8 +310,8 @@ def write_chapter(
 
     outline_path = outline_file or project.chapter_outline(chapter)
 
-    # 装配 pipeline
-    llm = get_llm()
+    # V0.29.4：根据 --model 选 provider（None 时用单例）
+    llm = get_llm_for_model(model)
     manager = MemoryManager(project_root=root, llm=llm)
     skills_dir = Path(__file__).parent.parent / "skills"
     skill_registry = SkillRegistry(skills_dir)
@@ -297,6 +327,7 @@ def write_chapter(
     console.print(f"[bold]开始写第 {chapter} 章[/bold]")
     console.print(f"  细纲：{outline_path}")
     console.print(f"  skill：{skill}")
+    console.print(f"  model：{llm.config.default_model}")  # V0.29.4
     console.print(f"  项目：{root}")
     console.print()
 
