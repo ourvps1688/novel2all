@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from novel2all.core import LLMConfig, LLMProvider
@@ -26,6 +28,8 @@ from novel2all.core.pipeline import (
 from novel2all.core.project import ProjectStructure
 from novel2all.core.role import RoleRegistry
 from novel2all.core.skill import SkillRegistry
+
+logger = logging.getLogger(__name__)
 
 # === SSE 工具函数 ===
 
@@ -43,7 +47,47 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="novel2all Web UI", version="0.21.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """V0.29.3：app 启动时建全局 LLMProvider 单例，关闭时清理。
+
+        之前 V0.27 之前：每次请求都新建 LLMProvider，导致：
+        - cache stats（hits/misses）每次请求重置，命中率永远显示 0
+        - 重复初始化开销（load .env、读 MODEL_CONFIG）
+        - V0.30 WebUI 暴露 cache 命中率时无法跨请求累计
+
+        收益：cache 跨请求连续、stats 稳定、单进程多请求共享 provider
+        """
+        load_dotenv(".env", override=False)
+        app.state.provider = LLMProvider(LLMConfig())
+        logger.info(
+            "Web app started: LLMProvider initialized (model=%s, cache_enabled=%s)",
+            app.state.provider.config.default_model,
+            app.state.provider.config.cache_enabled,
+        )
+        try:
+            yield
+        finally:
+            # 清理：打印最终 cache stats（debug 用）
+            stats = app.state.provider.cache_stats()
+            logger.info(
+                "Web app shutting down: cache stats=%s",
+                stats,
+            )
+            del app.state.provider
+
+    app = FastAPI(
+        title="novel2all Web UI",
+        version="0.21.0",
+        lifespan=lifespan,
+    )
+
+    # V0.29.3：测试 fallback（TestClient 默认不触发 lifespan 上下文）
+    # 生产路径走 lifespan；测试路径直接初始化 provider
+    # 这样 `app = create_app(); client = TestClient(app)` 也能工作
+    if not hasattr(app.state, "provider"):
+        load_dotenv(".env", override=False)
+        app.state.provider = LLMProvider(LLMConfig())
 
     @app.get("/", response_class=HTMLResponse)
     async def index() -> str:
@@ -101,6 +145,15 @@ def create_app() -> FastAPI:
             }
             for r in registry.list()
         ]
+
+    @app.get("/api/cache/stats")
+    async def cache_stats(request: Request) -> dict[str, Any]:
+        """V0.29.3：返回 lifespan provider 的 cache 统计。
+
+        V0.30 WebUI 暴露此端点做实时命中率面板。
+        """
+        provider: LLMProvider = request.app.state.provider
+        return provider.cache_stats()
 
     @app.get("/api/tracking")
     async def get_tracking(project_root: str = ".") -> dict:
@@ -186,6 +239,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/write/stream")
     async def write_chapter_stream(
+        request: Request,  # V0.29.3：lifespan 单例 provider（FastAPI 自动注入）
         chapter: int = Query(..., description="章节号"),
         project_root: str = Query(".", description="项目根目录"),
         skill: str = Query("story-long-write", description="使用的 skill"),
@@ -194,6 +248,7 @@ def create_app() -> FastAPI:
     ) -> StreamingResponse:
         """SSE 流式写作端点。
 
+        V0.29.3：request 参数注入（用于获取 app.state.provider 单例）
         事件序列：
           - started: pipeline 启动
           - pre_write_check: pre-write check 结果（如有）
@@ -203,9 +258,11 @@ def create_app() -> FastAPI:
           - done: 完成（含 output_path, content_chars）
           - error: 出错
         """
-        load_dotenv(".env", override=False)  # 用项目 .env（不影响全局）
 
+        # V0.29.3：闭包捕获 request（FastAPI 不会自动注入到 inner async generator）
         async def event_stream() -> AsyncIterator[str]:
+            # V0.29.3：用 lifespan 管理的单例 provider（cache 跨请求连续）
+            llm: LLMProvider = request.app.state.provider
             root = Path(project_root).resolve()
             project = ProjectStructure(root=root)
             if not project.exists():
@@ -227,9 +284,8 @@ def create_app() -> FastAPI:
                 },
             )
 
-            # 构造 pipeline
+            # 构造 pipeline（用 lifespan 管理的单例 llm）
             try:
-                llm = LLMProvider(LLMConfig())
                 manager = MemoryManager(project_root=root, llm=llm)
                 skills_dir = Path(__file__).parent.parent / "skills"
                 skill_registry = SkillRegistry(skills_dir)

@@ -44,6 +44,9 @@ app = typer.Typer(
 
 console = Console()
 
+# V0.29.3：LLMProvider 单例（缓存 cache stats 跨 CLI 调用连续）
+_llm_instance: LLMProvider | None = None
+
 
 def get_project_root() -> Path:
     """获取当前项目根目录（默认 ./ 或环境变量）。"""
@@ -54,17 +57,32 @@ def get_project_root() -> Path:
 
 
 def get_llm() -> LLMProvider:
-    """从环境变量创建 LLM provider。"""
+    """获取 LLMProvider 单例（V0.29.3）。
+
+    之前每次调用都新建 LLMProvider，导致 cache stats 跨调用重置。
+    现在改为模块级单例：首次调用创建并缓存，后续直接返回。
+
+    测试用：reset_llm() 重置单例（强制下次创建新实例）。
+    """
     import os
 
-    return LLMProvider(
-        LLMConfig(
-            default_model=os.environ.get("NOVEL2ALL_MODEL", "claude-sonnet-4-20250514"),
-            api_key_anthropic=os.environ.get("ANTHROPIC_API_KEY"),
-            api_key_openai=os.environ.get("OPENAI_API_KEY"),
-            api_key_deepseek=os.environ.get("DEEPSEEK_API_KEY"),
+    global _llm_instance
+    if _llm_instance is None:
+        _llm_instance = LLMProvider(
+            LLMConfig(
+                default_model=os.environ.get("NOVEL2ALL_MODEL", "claude-sonnet-4-20250514"),
+                api_key_anthropic=os.environ.get("ANTHROPIC_API_KEY"),
+                api_key_openai=os.environ.get("OPENAI_API_KEY"),
+                api_key_deepseek=os.environ.get("DEEPSEEK_API_KEY"),
+            )
         )
-    )
+    return _llm_instance
+
+
+def reset_llm() -> None:
+    """重置 LLMProvider 单例（V0.29.3 测试用）。"""
+    global _llm_instance
+    _llm_instance = None
 
 
 @app.command()
