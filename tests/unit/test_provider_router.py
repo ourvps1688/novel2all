@@ -80,9 +80,15 @@ class TestTaskType:
 
 
 class TestDefaultRoutesV023:
-    def test_writing_uses_minimax(self) -> None:
-        """V0.27：WRITING 应用 minimax-M3（基于实测质量优势：剧情推进 + 角色独白 + 伏笔）。"""
-        assert DEFAULT_TASK_ROUTES[TaskType.WRITING] == "minimax/MiniMax-M3"
+    def test_writing_uses_deepseek_flash_v036(self) -> None:
+        """V0.36：WRITING 切回 deepseek-flash（V0.35 真实 benchmark 验证 flash 与 minimax 字数持平，便宜 2.5x）。
+
+        历史：
+        - V0.23：WRITING → deepseek-v4-pro（旗舰，V0.23 benchmark 假设）
+        - V0.27：WRITING → minimax-M3（V0.27 实测字数多 35%）
+        - V0.36：WRITING → deepseek-flash（V0.35 16 真实调用显示 flash 字数 2726 vs minimax 2713 持平）
+        """
+        assert DEFAULT_TASK_ROUTES[TaskType.WRITING] == "deepseek/deepseek-flash"
 
     def test_other_tasks_use_flash(self) -> None:
         """V0.27：CONSISTENCY/EXTRACTION/SUMMARIZATION/COVER 应用 deepseek-flash（结构化任务，DeepSeek flash 质量足够 + 便宜）。"""
@@ -121,8 +127,8 @@ class TestDefaultRoutesV023:
 
 class TestModelRouterSelect:
     def test_select_returns_default_model(self, router: ModelRouter) -> None:
-        """V0.27：WRITING 默认路由到 minimax（基于实测质量优势）。"""
-        assert router.select(TaskType.WRITING) == "minimax/MiniMax-M3"
+        """V0.36：WRITING 默认路由到 deepseek-flash（V0.35 真实 benchmark 验证）。"""
+        assert router.select(TaskType.WRITING) == "deepseek/deepseek-flash"
 
     def test_user_routes_override_defaults(self, config: LLMConfig) -> None:
         """用户提供的 task_routes 覆盖默认。"""
@@ -142,9 +148,15 @@ class TestModelRouterSelect:
 
 class TestModelRouterResolve:
     def test_resolve_returns_tuple(self, router: ModelRouter) -> None:
-        """V0.27：resolve 返回 (minimax, v4-pro) — minimax 故障时回退到 v4-pro。"""
+        """V0.36：resolve 返回 (flash, v4-pro) — flash 故障时回退到 v4-pro。
+
+        历史：
+        - V0.23: WRITING → v4-pro（旗舰假设）
+        - V0.27: WRITING → minimax（V0.27 实测字数优势）
+        - V0.36: WRITING → flash（V0.35 benchmark 验证字数持平，便宜 2.5x）
+        """
         primary, fallback = router.resolve(TaskType.WRITING)
-        assert primary == "minimax/MiniMax-M3"
+        assert primary == "deepseek/deepseek-flash"
         assert fallback == "deepseek/deepseek-v4-pro"
 
     def test_resolve_flash_task(self, router: ModelRouter) -> None:
@@ -249,15 +261,15 @@ class TestCostEstimateV023:
         cost = router.cost_estimate(TaskType.EXTRACTION, 5000, 1000, model="minimax/MiniMax-M3")
         assert cost == pytest.approx(0.0294, abs=1e-6)
 
-    def test_minimax_writing_offpeak(self, router: ModelRouter) -> None:
-        """V0.27：WRITING × minimax off-peak 价格估算。"""
-        # minimax-M3: input_miss=4.2, output=8.4（无 peak/offpeak 区分）
+    def test_flash_writing_offpeak_v036(self, router: ModelRouter) -> None:
+        """V0.36：WRITING × deepseek-flash off-peak 价格估算（V0.35 验证 flash 是新默认）。"""
+        # deepseek-flash: input_miss=1.0, output=4.0
         # 5K input + 3K output
-        # input: 5000 × 4.2 / 1M = 0.021
-        # output: 3000 × 8.4 / 1M = 0.0252
-        # total: 0.0462
+        # input: 5000 × 1.0 / 1M = 0.005
+        # output: 3000 × 4.0 / 1M = 0.012
+        # total: 0.017
         cost = router.cost_estimate(TaskType.WRITING, 5000, 3000)
-        assert cost == pytest.approx(0.0462, abs=1e-6)
+        assert cost == pytest.approx(0.017, abs=1e-6)
 
     def test_cache_hit_drastically_reduces_cost(self, router: ModelRouter) -> None:
         """cache hit 价格应明显低于 cache miss。"""
@@ -266,10 +278,15 @@ class TestCostEstimateV023:
         # cache hit 应便宜至少 20%
         assert cost_cache < cost_no_cache * 0.8
 
-    def test_cache_hit_minimax_specific(self, router: ModelRouter) -> None:
-        """V0.27：minimax cache hit 价格：5K × 0.84/M + 3K × 8.4/M = 0.0294。"""
+    def test_cache_hit_flash_specific_v036(self, router: ModelRouter) -> None:
+        """V0.36：flash cache hit 价格：5K × 0.02/M + 3K × 4.0/M = 0.0121。"""
+        # V0.36: WRITING 路由到 flash，所以 WRITING 的 cache hit 测试 flash 定价
         cost = router.cost_estimate(TaskType.WRITING, 5000, 3000, cache_hit=True)
-        assert cost == pytest.approx(0.0294, abs=1e-6)
+        # flash cache hit: input=0.02/M, output=4.0/M
+        # 5000 × 0.02 / 1M = 0.0001
+        # 3000 × 4.0 / 1M = 0.012
+        # total: 0.0121
+        assert cost == pytest.approx(0.0121, abs=1e-6)
 
     def test_unknown_model_returns_zero(self, router: ModelRouter) -> None:
         """未知模型（不在价格表里）返回 0.0。"""
@@ -396,10 +413,10 @@ class TestRouterConfig:
 
 class TestBuildRouterFromConfig:
     def test_no_router_config_uses_defaults(self, config: LLMConfig) -> None:
-        """None RouterConfig → 用默认路由（V0.27 DeepSeek 4 task + minimax WRITING）。"""
+        """None RouterConfig → 用默认路由（V0.36：所有 5 个 task 走 deepseek-flash）。"""
         router = build_router_from_config(config, None)
-        # V0.27: WRITING 默认 minimax（基于实测质量优势）
-        assert router.select(TaskType.WRITING) == "minimax/MiniMax-M3"
+        # V0.36: WRITING 默认 deepseek-flash（V0.35 benchmark 验证）
+        assert router.select(TaskType.WRITING) == "deepseek/deepseek-flash"
         assert router.select(TaskType.EXTRACTION) == "deepseek/deepseek-flash"
 
     def test_with_router_config_overrides(self, config: LLMConfig) -> None:
@@ -407,8 +424,8 @@ class TestBuildRouterFromConfig:
         rc = RouterConfig(task_routes={"extraction": "openai/gpt-4o"})
         router = build_router_from_config(config, rc)
         assert router.select(TaskType.EXTRACTION) == "openai/gpt-4o"
-        # WRITING 未覆盖，默认 V0.27 路由到 minimax
-        assert router.select(TaskType.WRITING) == "minimax/MiniMax-M3"
+        # WRITING 未覆盖，默认 V0.36 路由到 deepseek-flash
+        assert router.select(TaskType.WRITING) == "deepseek/deepseek-flash"
 
     def test_string_keys_mapped_to_enum(self, config: LLMConfig) -> None:
         """RouterConfig.task_routes 用 str key（来自 JSON），build 时转 TaskType。"""
@@ -428,10 +445,10 @@ class TestLLMProviderResolveModel:
         assert result == "openai/gpt-4o"
 
     def test_task_uses_default_route(self, config: LLMConfig) -> None:
-        """V0.27：task=WRITING 默认路由到 minimax。"""
+        """V0.36：task=WRITING 默认路由到 deepseek-flash（V0.35 benchmark 验证）。"""
         provider = LLMProvider(config)
         result = provider._resolve_model(task=TaskType.WRITING)
-        assert result == "minimax/MiniMax-M3"
+        assert result == "deepseek/deepseek-flash"
 
     def test_default_when_no_task_no_model(self, config: LLMConfig) -> None:
         """无 task / 无 model= → config.default_model。"""

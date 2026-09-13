@@ -172,8 +172,14 @@ class TestVerifierTaskRouting:
 class TestTaskAffectsRouting:
     """验证 task= 参数影响真实路由（不只传过去）。"""
 
-    def test_writing_task_picks_minimax_v027(self) -> None:
-        """V0.27：task=WRITING → 路由到 minimax/MiniMax-M3（基于实测质量优势）。"""
+    def test_writing_task_picks_flash_v036(self) -> None:
+        """V0.36：task=WRITING → 路由到 deepseek/deepseek-flash（V0.35 benchmark 验证 flash 与 minimax 字数持平，便宜 2.5x）。
+
+        历史：
+        - V0.23: task=WRITING → deepseek-v4-pro
+        - V0.27: task=WRITING → minimax-M3
+        - V0.36: task=WRITING → deepseek-flash（V0.35 16 真实调用验证）
+        """
         from novel2all.core.provider_router import ModelRouter
 
         config = LLMConfig()
@@ -181,7 +187,7 @@ class TestTaskAffectsRouting:
         provider = LLMProvider(config)
 
         model = provider._resolve_model(task=TaskType.WRITING)
-        assert model == "minimax/MiniMax-M3"
+        assert model == "deepseek/deepseek-flash"
         assert router.select(TaskType.WRITING) == model
 
     def test_extraction_task_picks_flash(self) -> None:
@@ -208,8 +214,8 @@ class TestTaskAffectsRouting:
         model = provider._resolve_model(task=TaskType.SUMMARIZATION)
         assert model == "deepseek/deepseek-flash"
 
-    def test_thinking_control_applied_for_minimax_v027(self) -> None:
-        """V0.27：task=WRITING → 模型 minimax → 自动禁用 thinking。"""
+    def test_thinking_control_applied_for_flash_v036(self) -> None:
+        """V0.36：task=WRITING → 模型 deepseek-flash → 自动禁用 thinking（V0.23 设计的 thinking 控制）。"""
         config = LLMConfig()
         provider = LLMProvider(config)
 
@@ -280,17 +286,18 @@ class TestPipelineTaskRouting:
 
 
 class TestAllTasksRouteCorrectly:
-    """验证 5 个 TaskType 都能正确解析到对应模型（V0.26 路由策略）。
+    """验证 5 个 TaskType 都能正确解析到对应模型（V0.36 路由策略）。
 
-    V0.26 关键变化：minimax-M3 **未接入默认路由**（与 instructor 路径不兼容，
-    端到端测试报 404 page not found）。所有 5 个 task 仍走 DeepSeek 双模型。
+    V0.36 关键变化：WRITING 从 minimax-M3 切回 deepseek-flash
+    （V0.35 真实 benchmark 验证字数持平，便宜 2.5 倍）。
+    所有 5 个 task 现在统一走 deepseek-flash（fallback 仍为 v4-pro）。
     """
 
     @pytest.mark.parametrize(
         "task,expected_model",
         [
-            # V0.27: WRITING 切到 minimax（基于实测质量优势）
-            (TaskType.WRITING, "minimax/MiniMax-M3"),
+            # V0.36: WRITING 切回 deepseek-flash（V0.35 benchmark 验证）
+            (TaskType.WRITING, "deepseek/deepseek-flash"),
             (TaskType.CONSISTENCY, "deepseek/deepseek-flash"),
             (TaskType.EXTRACTION, "deepseek/deepseek-flash"),
             (TaskType.SUMMARIZATION, "deepseek/deepseek-flash"),
@@ -298,7 +305,7 @@ class TestAllTasksRouteCorrectly:
         ],
     )
     def test_task_to_model_mapping(self, task: TaskType, expected_model: str) -> None:
-        """所有 5 个 TaskType 都映射到 V0.23 路由策略对应的模型。"""
+        """所有 5 个 TaskType 都映射到 V0.36 路由策略对应的模型。"""
         config = LLMConfig()
         provider = LLMProvider(config)
 
@@ -325,10 +332,14 @@ class TestMinimaxIntegrationV027:
     """
 
     def test_minimax_in_writing_route(self) -> None:
-        """V0.27：WRITING 默认路由到 minimax（实测质量优势）。"""
+        """V0.36：WRITING 默认路由到 deepseek-flash（V0.35 benchmark 验证 flash 与 minimax 字数持平，便宜 2.5x）。
+
+        注意：minimax 仍然注册在 MODEL_CONFIG（可被显式 model="minimax/MiniMax-M3" 调用），
+        但不再是默认 WRITING 路由。V0.36 fallback 是 v4-pro（高质但慢）。
+        """
         config = LLMConfig()
         router = ModelRouter(config)
-        assert router.select(TaskType.WRITING) == "minimax/MiniMax-M3"
+        assert router.select(TaskType.WRITING) == "deepseek/deepseek-flash"
 
     def test_minimax_NOT_in_other_task_routes(self) -> None:
         """V0.27：其他 4 个 task 不路由到 minimax（保持 deepseek-flash）。"""

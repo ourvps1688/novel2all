@@ -657,6 +657,25 @@ def _anthropic_api_key_for(self, model_name: str) -> str | None:
 - **其他任务**：保持 deepseek-flash（V0.23 推荐被验证）
 - **qwen3.8-flash** 可作为冗余 fallback（性能接近 deepseek-flash，**0.7x 价格**）
 
+### 16.4 V0.36 实施状态
+
+V0.36 已应用 V0.35 建议（commit `f1e8b9d` 待提交）：
+
+- ✅ `DEFAULT_TASK_ROUTES[WRITING]` 从 `minimax/MiniMax-M3` 切到 `deepseek/deepseek-flash`
+- ✅ `DEFAULT_TASK_FALLBACKS[WRITING]` 保持 `deepseek/deepseek-v4-pro`（高质但慢）
+- ✅ `minimax/MiniMax-M3` 仍注册在 `MODEL_CONFIG`（用户可显式 `model="minimax/MiniMax-M3"` 调用）
+- ✅ 5 个 task 统一走 `deepseek-flash`（简化路由 + 性能一致）
+- ✅ 新增 `tests/unit/test_routing_v0360.py`（13 个测试，含 1 个回归保护测试）
+
+**成本节省**：50 章小说 WRITING 成本从 ¥2.31（minimax）→ ¥0.85（flash），**节省 ¥1.46（63%）**
+
+### 16.5 仍未验证
+
+- 长上下文（>8K tokens）性能
+- 多轮对话的 context 保持能力
+- 50 章全本长跑（成本 + 稳定性）
+- 千问 qwen3.8-flash 通过 DashScope openai 兼容模式（需要 `OPENAI_API_KEY=DASHSCOPE_API_KEY`）
+
 ### 16.4 仍未验证
 
 - 长上下文（>8K tokens）性能

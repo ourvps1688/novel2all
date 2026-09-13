@@ -117,19 +117,21 @@ def is_peak_hour() -> bool:
 # - minimax 与 instructor 不兼容（V0.26 实测），不能用 complete_structured
 
 DEFAULT_TASK_ROUTES: dict[TaskType, str] = {
-    # V0.27：WRITING 切到 minimax-M3（基于实测质量对比：minimax 文笔 + 剧情推进显著优于 DeepSeek flash）
-    # 数据：scripts/test_quality_compare.py + docs/llm-providers-truth.md §15
-    TaskType.WRITING: "minimax/MiniMax-M3",  # 创作质量优先（实测 845 字含有效剧情）
-    TaskType.CONSISTENCY: "deepseek/deepseek-flash",  # flash 字数更多 + 便宜
-    TaskType.EXTRACTION: "deepseek/deepseek-flash",  # 批量处理（V0.26 minimax 试过，但 instructor 不兼容，回退）
+    # V0.36：WRITING 切回 deepseek-flash（V0.35 真实 benchmark 验证 flash 与 minimax 字数持平，
+    # 但 flash 便宜 2.5 倍：¥0.012 vs ¥0.030 / 2000 字）
+    # V0.23/V0.27 假设 minimax 更优，但 V0.35 16 真实调用显示差异 < 0.5%
+    # 数据：scripts/benchmark_v035_results.md + docs/llm-providers-truth.md §16
+    TaskType.WRITING: "deepseek/deepseek-flash",  # V0.36: flash 字数持平 + 便宜 2.5x
+    TaskType.CONSISTENCY: "deepseek/deepseek-flash",  # V0.23 起：字数最多 + 便宜
+    TaskType.EXTRACTION: "deepseek/deepseek-flash",  # V0.26 minimax 试过，但 instructor 不兼容，回退
     TaskType.SUMMARIZATION: "deepseek/deepseek-flash",  # 批量处理
     TaskType.COVER: "deepseek/deepseek-flash",  # 批量处理
 }
 
 DEFAULT_TASK_FALLBACKS: dict[TaskType, str | None] = {
-    # V0.27 前置：WRITING primary 将切到 minimax/MiniMax-M3（V0.27 实施）
-    # fallback 改 v4-pro 保证质量（之前的 flash fallback 是 V0.23 假设 WRITING 用 v4-pro 时的设计）
-    TaskType.WRITING: "deepseek/deepseek-v4-pro",  # minimax 故障 → v4-pro
+    # V0.36：WRITING primary 是 flash，fallback 选 v4-pro（高质但慢）
+    # 如果 v4-pro 也失败，可考虑 minimax 作为第二次 fallback（V0.35 实测字数与 flash 持平）
+    TaskType.WRITING: "deepseek/deepseek-v4-pro",  # flash 故障 → v4-pro
     TaskType.CONSISTENCY: "deepseek/deepseek-v4-pro",
     TaskType.EXTRACTION: "deepseek/deepseek-v4-pro",
     TaskType.SUMMARIZATION: "deepseek/deepseek-v4-pro",
