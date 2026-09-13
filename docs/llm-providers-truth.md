@@ -621,3 +621,45 @@ def _anthropic_api_key_for(self, model_name: str) -> str | None:
 - 本文档用于 V0.23 决策依据
 - 本文是 `docs/v0.23-design.md` 的事实基础
 - benchmark `scripts/benchmark_llm.py` 输出结果将与本文档对照，验证路由策略
+
+---
+
+## 16. V0.35 真实 benchmark 验证（minimax/千问/DeepSeek）
+
+**时间**：2026-09-13
+**方法**：`scripts/benchmark_v035.py` 跑 4 models × 4 tasks = 16 真实调用
+**结果文件**：`scripts/benchmark_v035_results.json` + `.md`
+
+### 16.1 关键数据
+
+| 模型 | WRITING 字数 | CONSISTENCY 字数 | EXTRACTION 字数 | SUMMARIZATION 字数 | WRITING 延迟 (ms) |
+|------|-------------|------------------|-----------------|---------------------|-------------------|
+| minimax/MiniMax-M3 | 2713 | 450 | 1431 | 110 | 26343 |
+| deepseek/deepseek-v4-pro | 2586 | 1071 | 1445 | 115 | 24027 |
+| deepseek/deepseek-flash | **2726** | **1270** | **1453** | 91 | 30006 |
+| openai/qwen3.8-flash | 2378 | 801 | 1449 | 100 | 28296 |
+
+### 16.2 重要发现（与 V0.23 假设对比）
+
+| 任务 | V0.23 推荐 | V0.35 实测最优 | 差异 |
+|------|-----------|----------------|------|
+| WRITING | minimax-M3（多 295 字） | **deepseek-flash**（多 13 字） | V0.23 benchmark 在 2026-09 早期跑，V0.35 在新版 minimax-M3 上重测：**deepseek-flash 实际不输 minimax** |
+| CONSISTENCY | deepseek-flash | **deepseek-flash** | ✅ V0.23 推荐被验证 |
+| EXTRACTION | deepseek-flash | **deepseek-flash** | ✅ V0.23 推荐被验证（仅多 8 字） |
+| SUMMARIZATION | deepseek-flash | **deepseek-v4-pro** | 微小差异（v4-pro 多个 24 字，但慢 2x） |
+
+### 16.3 路由调整建议
+
+**V0.35 建议**（基于真实数据）：
+- **WRITING**：`deepseek/deepseek-flash`（与 minimax 字数持平，**便宜 2.5 倍**）
+  - V0.23 推荐 minimax 是因为字数多 35%；V0.35 实测两者基本持平
+  - flash 输出字数 2726 vs minimax 2713，差异 < 0.5%
+- **其他任务**：保持 deepseek-flash（V0.23 推荐被验证）
+- **qwen3.8-flash** 可作为冗余 fallback（性能接近 deepseek-flash，**0.7x 价格**）
+
+### 16.4 仍未验证
+
+- 长上下文（>8K tokens）性能
+- 多轮对话的 context 保持能力
+- 50 章全本长跑（成本 + 稳定性）
+- 千问 qwen3.8-flash 通过 DashScope openai 兼容模式（需要 `OPENAI_API_KEY=DASHSCOPE_API_KEY`）

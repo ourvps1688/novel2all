@@ -1,0 +1,155 @@
+{
+  "timestamp": "2026-09-13T13:46:54.467388",
+  "models": [
+    "minimax/MiniMax-M3",
+    "deepseek/deepseek-v4-pro",
+    "deepseek/deepseek-flash",
+    "openai/qwen3.8-flash"
+  ],
+  "results": [
+    {
+      "model": "minimax/MiniMax-M3",
+      "task": "writing",
+      "latency_ms": 26342.9,
+      "output_chars": 2713,
+      "output_preview": "# 第五章 黑云压城\n\n苍茫镇外，黑云压城。\n\n天幕如倒悬的墨池，沉甸甸地压在废墟之上。林雷独跪于断壁残垣间，指尖攥着那枚染血的玉佩。\n\n玉佩上的血渍已干，化作暗褐色的痕迹，像一道永远无法愈合的伤口。\n\n\"爹……娘……\"\n\n他低低唤了一声，嗓音沙哑得不像自己。三日前的那场浩劫如同一柄钝刀，一刀刀割进他的骨髓——爹娘的笑颜、故园的炊烟、邻家孩童的嬉闹，全数化为齑粉，融进脚下这片焦黑的废墟。\n\n风卷起",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "minimax/MiniMax-M3",
+      "task": "consistency",
+      "latency_ms": 8174.3,
+      "output_chars": 450,
+      "output_preview": "根据已知设定，章节摘要中存在以下潜在冲突：\n\n1. **玉佩归属冲突**：摘要称玉佩是“母亲遗物”，但设定明确玉佩是“林家传承300年的信物，只有家主血脉可激活”。若玉佩为母亲个人遗物，则与“林家传承信物”的家族属性不一致；若母亲是家主血脉，则需额外说明，但现有设定未支持这一点。\n\n2. **黑袍使者追踪时间与地点冲突**：设定称黑袍使者来自北方“暗影殿”，已追踪林家50年。摘要中黑袍使者在“苍茫",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "minimax/MiniMax-M3",
+      "task": "extraction",
+      "latency_ms": 3388.3,
+      "output_chars": 1431,
+      "output_preview": "```json\n{\n  \"characters\": [\n    {\n      \"name\": \"林雷\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emotional_state\": \"警惕、紧张、决然\"\n    },\n    {\n      \"name\": \"白发老人\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emotional_",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "minimax/MiniMax-M3",
+      "task": "summarization",
+      "latency_ms": 1240.7,
+      "output_chars": 110,
+      "output_preview": "林雷在苍茫镇废墟前握着染血玉佩，白发老人现身，称是其父故人，告知他血脉觉醒，苍茫镇安宁将破。暗影殿黑袍人突现，老人令林雷快跑并留下防御阵法阻敌。与此同时，千里之外青云宗的苏寒心生不安，预感苍茫镇出事，立刻启程飞往苍茫镇。",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "writing",
+      "latency_ms": 24027.0,
+      "output_chars": 2586,
+      "output_preview": "# 第五章 黑云压城\n\n苍茫镇外，黑云如墨，沉甸甸地压在废墟上空。\n\n三日之前，这里还是一处清幽小镇，青瓦白墙，溪水绕村。如今，残垣断壁间犹自腾着青烟，焦糊的气息被风卷起，与天边翻涌的乌云搅在一处，化作一片令人窒息的灰暗。\n\n林雷独跪在废墟前。\n\n他手中紧攥着一枚玉佩。玉佩本该莹润如脂，此刻却被鲜血染成了暗红色，边缘还残留着一丝碎裂的痕迹——那是父亲临终之际，用尽最后一丝力气塞进他掌中之物。\n\n\"",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "consistency",
+      "latency_ms": 4801.1,
+      "output_chars": 1071,
+      "output_preview": "# 一致性检查结果\n\n## 冲突 1：玉佩归属与传承性质矛盾\n\n- **已知设定**：玉佩是林家传承 300 年的信物，只有家主血脉可激活。\n- **章节摘要**：玉佩其实是林雷母亲的遗物。\n- **冲突分析**：如果玉佩是传承 300 年的林家信物，它应是家族世代相传之物，而非某一位成员（母亲）的个人遗物。两者可以兼容的前提是：母亲本身是林家家主血脉、玉佩由她保管并最终传给林雷。但摘要的措辞“其",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "extraction",
+      "latency_ms": 2596.1,
+      "output_chars": 1445,
+      "output_preview": "```json\n{\n  \"characters\": [\n    {\n      \"name\": \"林雷\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emotional_state\": \"警惕、紧张、决绝\"\n    },\n    {\n      \"name\": \"白发老人\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emotional_",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-v4-pro",
+      "task": "summarization",
+      "latency_ms": 1131.6,
+      "output_chars": 115,
+      "output_preview": "林雷在苍茫镇废墟前紧握染血玉佩，这是林家三百年信物。一位神秘老人现身，称是林父故人，告知他血脉觉醒，苍茫镇将乱。暗影殿黑袍使者突现，追踪林家五十年。老人布阵阻挡，林雷逃走。千里之外，青云宗苏寒心生不安，疑苍茫镇出事，即刻飞身赶往。",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-flash",
+      "task": "writing",
+      "latency_ms": 30005.8,
+      "output_chars": 2726,
+      "output_preview": "# 第五章 黑云压城\n\n苍茫镇外，天色如墨。\n\n黑云自天际倾压而下，几欲将整个镇子吞没。断壁残垣间，焦烟未散，被风一吹，便化作呜咽之声，在空旷的废墟之上盘旋不去。\n\n林雷独站在倒塌的祠堂前，衣袍染血，面色苍白。他的手中，紧紧攥着一枚玉佩——那是林家世代相传之物，玉质温润，此刻却被鲜血浸透，殷红刺目。\n\n\"爷爷……\"\n\n他低声呢喃，声音干涩得像被风沙打磨过的枯木。方才那场浩劫之中，妖兽破门而入，族人",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-flash",
+      "task": "consistency",
+      "latency_ms": 5208.8,
+      "output_chars": 1270,
+      "output_preview": "# 一致性检查结果\n\n## 冲突一：玉佩归属与性质（严重冲突）\n\n- **章节摘要**：玉佩是**母亲遗物**（暗示为个人/母系物品）。\n- **已知设定**：玉佩是**林家传承300年的信物，只有家主血脉可激活**（家族传承物，与家主血脉绑定）。\n\n**冲突点**：\n1. “母亲遗物”与“林家传承信物”是否指向同一块玉佩？若同一块，则“母亲遗物”的说法与“家族传承300年”存在张力——除非母亲本",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-flash",
+      "task": "extraction",
+      "latency_ms": 3254.2,
+      "output_chars": 1453,
+      "output_preview": "```json\n{\n  \"characters\": [\n    {\n      \"name\": \"林雷\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emotional_state\": \"警惕、紧张、决然\"\n    },\n    {\n      \"name\": \"白发老人\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emotional_",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "deepseek/deepseek-flash",
+      "task": "summarization",
+      "latency_ms": 1353.3,
+      "output_chars": 91,
+      "output_preview": "林雷在苍茫镇废墟前手握林家传承玉佩，一位神秘老人告知他血脉已觉醒，苍茫镇安宁将破。暗影殿黑袍使者突现，老人设阵阻挡，林雷逃走。千里之外，青云宗苏寒心生不安，怀疑苍茫镇出事，即刻赶往。",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "openai/qwen3.8-flash",
+      "task": "writing",
+      "latency_ms": 28295.5,
+      "output_chars": 2378,
+      "output_preview": "# 第五章 黑云压城\n\n天色如墨。\n\n苍茫镇外的荒野上，风卷残云，枯草伏地如拜。数十间茅屋的残骸还在冒着青烟，空气里弥漫着焦木与血腥混杂的气息。\n\n林雷独自立在废墟之前，衣袍上沾着尚未干涸的血迹，发丝散乱，眸中却有一团压抑的暗火。\n\n他的右手紧紧攥着一枚玉佩。\n\n玉佩通体莹白，本是林家代代相传的祖物，如今却染上了一层触目惊心的殷红——那是他父亲的血。父亲护他逃离时，胸口中了一掌，鲜血喷涌而出，恰恰",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "openai/qwen3.8-flash",
+      "task": "consistency",
+      "latency_ms": 3244.3,
+      "output_chars": 801,
+      "output_preview": "# 一致性检查结果\n\n## 发现的冲突\n\n### 1. 玉佩归属冲突（严重）\n- **章节摘要**：玉佩是**母亲遗物**\n- **已知设定**：玉佩是**林家传承 300 年的信物**，只有家主血脉可激活\n- **冲突分析**：两者可以兼容（母亲可能来自林家血脉），但摘要未说明母亲与林家的关系。若母亲是外姓人，则“母亲遗物”与“林家传承信物”存在直接矛盾；若母亲是林家人，则需澄清。当前表述容易被",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "openai/qwen3.8-flash",
+      "task": "extraction",
+      "latency_ms": 3047.8,
+      "output_chars": 1449,
+      "output_preview": "```json\n{\n  \"characters\": [\n    {\n      \"name\": \"林雷\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emotional_state\": \"警惕、紧张、决绝\"\n    },\n    {\n      \"name\": \"白发老人（父亲故人）\",\n      \"location\": \"苍茫镇外的废墟\",\n      \"emot",
+      "success": true,
+      "error": ""
+    },
+    {
+      "model": "openai/qwen3.8-flash",
+      "task": "summarization",
+      "latency_ms": 1216.7,
+      "output_chars": 100,
+      "output_preview": "林雷在苍茫镇废墟前握紧染血玉佩，遇见自称父亲故人的神秘老人，得知血脉觉醒将打破安宁。暗影殿黑袍人突袭，林雷在老人掩护下逃离。与此同时，千里之外的青云宗苏寒心生不安，怀疑苍茫镇出事，立即动身飞往苍茫镇。",
+      "success": true,
+      "error": ""
+    }
+  ]
+}
