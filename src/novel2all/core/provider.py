@@ -292,13 +292,42 @@ class LLMProvider:
 
         # V0.27 前置：anthropic 兼容模型（如 minimax-M3）不支持 instructor Pydantic schema 验证
         # 必须显式报错（V0.27 实现 transparent 分流后，WRITING 走 complete() 而非 complete_structured）
-        from novel2all.core.provider_router import get_model_config as _get_cfg_for_struct
+        from novel2all.core.provider_router import (
+            MODEL_CONFIG,
+        )
+        from novel2all.core.provider_router import (
+            get_model_config as _get_cfg_for_struct,
+        )
 
         _cfg = _get_cfg_for_struct(model_name)
         if _cfg.api_base and "anthropic" in _cfg.api_base:
+            # V0.29.5：动态列出可用替代模型（数据驱动，不写死）
+            alternatives = [
+                name
+                for name, cfg in MODEL_CONFIG.items()
+                if not (cfg.api_base and "anthropic" in cfg.api_base)
+            ]
+            alternatives_str = (
+                chr(10).join(f"  - {m}" for m in alternatives) if alternatives else "  (无)"
+            )
             raise NotImplementedError(
-                f"complete_structured() 不支持 {model_name}（Anthropic Messages API 不兼容 instructor Pydantic 验证）。"
-                "请改用 complete() 返回文本，或换用 litellm 支持的模型（如 deepseek/千问）。"
+                f"complete_structured() 不支持 {model_name}（V0.27 transparent 分流走 httpx 调 /v1/messages，"
+                f"Anthropic Messages API 不兼容 instructor Pydantic 验证）。"
+                + chr(10)
+                + chr(10)
+                + "可用的支持结构化输出的模型（从 MODEL_CONFIG 自动筛选）："
+                + chr(10)
+                + alternatives_str
+                + chr(10)
+                + chr(10)
+                + "两种解决方案："
+                + chr(10)
+                + "  1. 切到上述支持的模型：provider.complete_structured(model='deepseek/deepseek-flash', ...)"
+                + chr(10)
+                + f"  2. 改用 complete() 返回文本 + 自己解析 JSON：provider.complete(model='{model_name}', ...) + json.loads(content)"
+                + chr(10)
+                + chr(10)
+                + "参考：docs/llm-providers-truth.md §15（V0.27 transparent 分流）"
             )
 
         try:
