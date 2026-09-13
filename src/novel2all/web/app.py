@@ -327,6 +327,8 @@ def create_app() -> FastAPI:
                 src_backend = "json"
             elif src.endswith((".db", ".sqlite")):
                 src_backend = "sqlite"
+            elif src.startswith("redis://"):
+                src_backend = "redis"
             else:
                 raise HTTPException(
                     status_code=400,
@@ -337,6 +339,8 @@ def create_app() -> FastAPI:
                 dst_backend = "json"
             elif dst.endswith((".db", ".sqlite")):
                 dst_backend = "sqlite"
+            elif dst.startswith("redis://"):
+                dst_backend = "redis"
             else:
                 raise HTTPException(
                     status_code=400,

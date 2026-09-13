@@ -34,6 +34,7 @@ dependencies = [
     "httpx>=0.28.0",
     "anyio>=4.7.0",
     "python-multipart>=0.0.32",  # V0.30.1: FastAPI Form() 依赖
+    "redis>=5.0.0",  # V0.45: 分布式 cache backend
     # 文件 / 配置
     "platformdirs>=4.3.0",
     "python-dotenv>=1.0.1",
@@ -54,6 +55,7 @@ dev = [
     "build>=1.2.0",      # CI: uv run python -m build
     "twine>=6.0.0",      # CI: uv run twine check dist/*
     "pyyaml>=6.0.3",
+    "fakeredis>=2.20.0",  # V0.45: 分布式 cache 测试（无需真实 Redis）
 ]
 
 [project.scripts]

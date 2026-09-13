@@ -805,3 +805,193 @@ class SQLiteBackend:
                     logger.warning("V0.42 SQLiteBackend: 关闭连接错误: %s", e)
             self._conns.clear()
         logger.info("V0.42 SQLiteBackend: 所有连接已关闭")
+
+
+# === RedisBackend：V0.45 新增（分布式 cache）===
+
+
+class RedisBackend:
+    """V0.45：Redis cache backend — 分布式 / 跨机器 / 跨进程。
+
+    优势（vs SQLite/Memory/JSON）：
+    - **分布式**：多机器 / 多容器共享 cache（web 集群 + CLI 跨机器）
+    - **生产级**：Redis 内置 LRU / 持久化 / 高可用（sentinel/cluster）
+    - **跨进程安全**：Redis 内置单线程命令队列（自动串行化）
+    - **内置 TTL**：Redis EXPIRE（无需应用层检查）
+    - **原子操作**：SETNX / SETEX / MSET 等
+
+    劣势：
+    - 需要 Redis 服务（额外基础设施）
+    - 性能比内存 / SQLite 慢（网络 round-trip）
+    - 单 Redis 节点容量有限（建议 100K-1M keys）
+
+    Key 格式：
+        {namespace}:{encoded_key}        # e.g., "novel2all:model:hash_0:user_hash_0:0.7"
+
+    LRU 策略（由 Redis 配置决定）：
+        - maxmemory-policy: allkeys-lru  # 整体 LRU
+        - maxmemory-policy: volatile-lru  # 仅 TTL keys
+
+    进程/线程安全（V0.45）：
+    - redis-py 客户端自带连接池（ConnectionPool）
+    - 单线程 asyncio 兼容：redis.asyncio.Redis
+    - 多线程：每个线程自动从池获取连接
+    """
+
+    FILE_VERSION = 3  # V0.45 升级版本
+
+    def __init__(
+        self,
+        url: str = "redis://localhost:6379/0",
+        max_size: int = 256,
+        ttl_seconds: int = 0,
+        namespace: str = "novel2all",
+    ) -> None:
+        """V0.45：初始化 Redis backend。
+
+        Args:
+            url: Redis 连接 URL（默认 redis://localhost:6379/0）
+            max_size: LRU 上限（建议 Redis maxmemory 配置对齐）
+            ttl_seconds: TTL（0 = 永不过期，但 Redis 仍可配 maxmemory-policy）
+            namespace: key 前缀（避免多应用共享 Redis 时冲突）
+        """
+        try:
+            import redis
+        except ImportError as e:
+            raise ImportError(
+                "V0.45 RedisBackend 需要 redis 包。请运行：pip install 'redis>=5.0.0'"
+            ) from e
+
+        self._url = url
+        self._max_size = max_size
+        self._ttl_seconds = ttl_seconds
+        self._namespace = namespace
+        self._hits = 0
+        self._misses = 0
+
+        # 创建连接池（redis-py 自动管理线程安全）
+        self._client = redis.Redis.from_url(
+            url,
+            decode_responses=False,  # 存 bytes（value 是 str.encode()）
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            health_check_interval=30,
+        )
+        # 启动时检查连接
+        try:
+            self._client.ping()
+            logger.info("V0.45 RedisBackend: 连接成功 %s", url)
+        except Exception as e:
+            logger.error("V0.45 RedisBackend: Redis 连接失败 %s: %s", url, e)
+            raise
+
+    def _key(self, key: tuple | str) -> str:
+        """V0.45：生成 Redis key（带 namespace 前缀）。"""
+        encoded = encode_key(key)
+        return f"{self._namespace}:{encoded}"
+
+    def get(self, key: tuple | str) -> str | None:
+        """V0.45：获取 cache value（Redis GET）。"""
+        try:
+            value = self._client.get(self._key(key))
+        except Exception as e:
+            logger.warning("V0.45 RedisBackend: GET 失败: %s", e)
+            self._misses += 1
+            return None
+
+        if value is None:
+            self._misses += 1
+            return None
+        # V0.45：返回 bytes → str
+        self._hits += 1
+        if isinstance(value, bytes):
+            return value.decode("utf-8")
+        return value
+
+    def set(self, key: tuple | str, value: str) -> None:
+        """V0.45：设置 cache value（Redis SET + EXPIRE）。"""
+        redis_key = self._key(key)
+        try:
+            if self._ttl_seconds > 0:
+                # V0.45：用 set(name, value, ex=ttl) 替代 deprecated setex()
+                self._client.set(redis_key, value.encode("utf-8"), ex=self._ttl_seconds)
+            else:
+                self._client.set(redis_key, value.encode("utf-8"))
+        except Exception as e:
+            logger.warning("V0.45 RedisBackend: SET 失败: %s", e)
+
+    def size(self) -> int:
+        """V0.45：当前 cache 条目数（Redis DBSIZE）。"""
+        try:
+            return self._client.dbsize()
+        except Exception:
+            return 0
+
+    def clear(self) -> None:
+        """V0.45：清空 cache（仅清本 namespace 的 keys，避免误删其他应用）。"""
+        pattern = f"{self._namespace}:*"
+        try:
+            # SCAN 比 KEYS 更安全（不阻塞 Redis）
+            cursor = 0
+            while True:
+                cursor, keys = self._client.scan(cursor=cursor, match=pattern, count=100)
+                if keys:
+                    self._client.delete(*keys)
+                if cursor == 0:
+                    break
+        except Exception as e:
+            logger.warning("V0.45 RedisBackend: clear 失败: %s", e)
+        self._hits = 0
+        self._misses = 0
+
+    def keys(self) -> list[str]:
+        """V0.45：返回所有 encoded keys（带 namespace 前缀）。"""
+        pattern = f"{self._namespace}:*"
+        result: list[str] = []
+        try:
+            cursor = 0
+            while True:
+                cursor, keys = self._client.scan(cursor=cursor, match=pattern, count=100)
+                # 去掉 namespace 前缀，返回纯 encoded key
+                prefix = f"{self._namespace}:"
+                for k in keys:
+                    if isinstance(k, bytes):
+                        k = k.decode("utf-8")
+                    if k.startswith(prefix):
+                        result.append(k[len(prefix) :])
+                if cursor == 0:
+                    break
+        except Exception as e:
+            logger.warning("V0.45 RedisBackend: keys 失败: %s", e)
+        return result
+
+    def stats(self) -> dict[str, Any]:
+        total = self._hits + self._misses
+        hit_rate = self._hits / total if total > 0 else 0.0
+        try:
+            redis_info = self._client.info(section="memory")
+            used_memory = redis_info.get("used_memory", 0)
+        except Exception:
+            used_memory = 0
+        return {
+            "enabled": True,
+            "backend": "redis",
+            "size": self.size(),
+            "max_size": self._max_size,
+            "hits": self._hits,
+            "misses": self._misses,
+            "hit_rate": round(hit_rate, 4),
+            "ttl_seconds": self._ttl_seconds,
+            "persist_path": self._url,
+            "lock_backend": "redis",  # V0.45: Redis 内置单线程队列
+            "namespace": self._namespace,
+            "used_memory_bytes": used_memory,
+        }
+
+    def close(self) -> None:
+        """V0.45：关闭 Redis 连接池。"""
+        try:
+            self._client.close()
+            logger.info("V0.45 RedisBackend: 连接池已关闭")
+        except Exception as e:
+            logger.warning("V0.45 RedisBackend: 关闭错误: %s", e)

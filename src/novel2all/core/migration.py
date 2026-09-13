@@ -29,6 +29,7 @@ from typing import Literal
 from novel2all.core.cache import (
     JSONFileBackend,
     MemoryLRUBackend,
+    RedisBackend,
     SQLiteBackend,
 )
 
@@ -69,8 +70,8 @@ def _open_backend(
     path: str | None,
     max_size: int = 1024,
     ttl_seconds: int = 0,
-) -> MemoryLRUBackend | JSONFileBackend | SQLiteBackend:
-    """V0.43：根据类型创建后端实例（用于迁移 + 验证）。"""
+) -> MemoryLRUBackend | JSONFileBackend | SQLiteBackend | RedisBackend:
+    """V0.45：根据类型创建后端实例（用于迁移 + 验证）。"""
     if backend_type == "memory":
         return MemoryLRUBackend(max_size=max_size, ttl_seconds=ttl_seconds)
     if backend_type == "json":
@@ -81,6 +82,13 @@ def _open_backend(
         if not path:
             raise ValueError("sqlite backend 需要 path")
         return SQLiteBackend(path=Path(path), max_size=max_size, ttl_seconds=ttl_seconds)
+    if backend_type == "redis":
+        # V0.45：Redis backend（path 作为 redis URL）
+        from novel2all.core.cache import RedisBackend
+
+        if not path:
+            path = "redis://localhost:6379/0"  # 默认
+        return RedisBackend(url=path, max_size=max_size, ttl_seconds=ttl_seconds)
     raise ValueError(f"未知 backend 类型: {backend_type}")
 
 

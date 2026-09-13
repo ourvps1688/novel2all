@@ -405,6 +405,8 @@ def cache_migrate(
             src_backend = "json"
         elif src.endswith((".db", ".sqlite")):
             src_backend = "sqlite"
+        elif src.startswith("redis://"):
+            src_backend = "redis"
         else:
             console.print(f"[red]无法自动检测 src backend（{src}），请显式指定 --src-backend[/red]")
             raise typer.Exit(1)
@@ -413,6 +415,8 @@ def cache_migrate(
             dst_backend = "json"
         elif dst.endswith((".db", ".sqlite")):
             dst_backend = "sqlite"
+        elif dst.startswith("redis://"):
+            dst_backend = "redis"
         else:
             console.print(f"[red]无法自动检测 dst backend（{dst}），请显式指定 --dst-backend[/red]")
             raise typer.Exit(1)

@@ -79,9 +79,13 @@ class LLMConfig(BaseModel):
     cache_max_size: int = 256  # LRU 上限（防内存爆炸）
     # V0.33：cache 后端选择 + TTL + 持久化
     # V0.40：新增 "sqlite" backend（OS-agnostic + 跨进程安全 + 跨 OS 共享）
-    cache_backend: str = "memory"  # "memory" | "json" | "sqlite"
+    # V0.45：新增 "redis" backend（分布式 / 跨机器）
+    cache_backend: str = "memory"  # "memory" | "json" | "sqlite" | "redis"
     cache_ttl_seconds: int = 0  # 0 = 永不过期；>0 = N 秒后过期
     cache_persist_path: str | None = None  # json/sqlite backend 的文件路径
+    # V0.45：Redis backend 配置
+    cache_redis_url: str = "redis://localhost:6379/0"  # Redis 连接 URL
+    cache_redis_namespace: str = "novel2all"  # Redis key 前缀
     # V0.29.1：anthropic_compat 重试配置（用于 _call_anthropic_compat / _stream_anthropic_compat）
     # tenacity 指数退避：min_wait × 2^attempt，clamp 到 [min_wait, max_wait]
     anthropic_max_retries: int = 3  # 失败重试次数（除首次外）
@@ -112,11 +116,13 @@ class LLMProvider:
         self._configure_env()
         # V0.33：cache 后端抽象（MemoryLRUBackend / JSONFileBackend）
         # V0.40：新增 SQLiteBackend（OS-agnostic + 跨进程安全）
+        # V0.45：新增 RedisBackend（分布式 / 跨机器）
         # 默认是进程内 OrderedDict 实现（行为与 V0.29 一致）；
-        # 通过 LLMConfig.cache_backend / cache_persist_path 可切换到 JSON / SQLite 持久化。
+        # 通过 LLMConfig.cache_backend / cache_persist_path 可切换到 JSON / SQLite / Redis 持久化。
         from novel2all.core.cache import (
             JSONFileBackend,
             MemoryLRUBackend,
+            RedisBackend,
             SQLiteBackend,
         )
 
@@ -140,6 +146,14 @@ class LLMProvider:
                 path=Path(persist_path),
                 max_size=self.config.cache_max_size,
                 ttl_seconds=self.config.cache_ttl_seconds,
+            )
+        elif self.config.cache_backend == "redis":
+            # V0.45：Redis 分布式 cache（跨机器 / 跨进程）
+            self._cache = RedisBackend(
+                url=self.config.cache_redis_url,
+                max_size=self.config.cache_max_size,
+                ttl_seconds=self.config.cache_ttl_seconds,
+                namespace=self.config.cache_redis_namespace,
             )
         else:
             # "memory"（默认）
