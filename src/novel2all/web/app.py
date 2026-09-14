@@ -126,7 +126,40 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="novel2all Web UI",
+        description="""novel2all 是 AI 驱动的小说创作平台。
+
+## 核心特性
+- **多 LLM 协同**：DeepSeek / Anthropic / OpenAI / minimax 等 12+ provider
+- **质量保障**：4-agent 并行审查（critical / major / minor + quality）
+- **数据驱动**：prompt prefix cache 节省 ~27% LLM 成本，自适应路由
+- **多用户协作**：Session + ProjectMembership 权限管理
+- **实时反馈**：8 阶段 SSE 进度条，字数/字秒/ETA 实时显示
+- **章节导出**：Markdown / TXT / EPUB 3.0
+
+## 认证
+除  外大部分端点需要 Session cookie（HttpOnly + SameSite=Strict）。
+登录后自动获得 7 天有效 cookie。
+
+## 主要端点分组
+-  - 认证
+-  - 写作
+-  - 章节管理
+-  - Cache 管理
+-  - 项目授权（B5）
+-  - 登录页
+-  - 本 OpenAPI 文档
+        """,
+        version="1.0.0",
+        contact={"name": "novel2all", "url": "https://github.com/ourvps1688/novel2all"},
+        license_info={"name": "MIT"},
         lifespan=lifespan,
+        openapi_tags=[
+            {"name": "auth", "description": "认证（登录/注销/用户管理）"},
+            {"name": "writing", "description": "写作（SSE 流式 + cancel）"},
+            {"name": "chapters", "description": "章节管理（导出/审查/回滚）"},
+            {"name": "cache", "description": "Cache 管理（4 backend）"},
+            {"name": "projects", "description": "项目授权（B5 多用户）"},
+        ],
     )
     # V0.30.6 B5 收尾：注入 AuthMiddleware 到 FastAPI（处理每个请求的 session cookie）
     try:
