@@ -18,7 +18,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -781,6 +781,109 @@ def create_app() -> FastAPI:
             "char_count": len(text_content),
             "first_line": text_content.split("\n", 1)[0].strip()[:120],
         }
+
+    # V0.30.6 B6：章节导出端点
+    @app.get("/api/chapter/{chapter}/export")
+    async def export_chapter(
+        chapter: int,
+        format: str = Query("md", description="导出格式: md | txt | epub"),
+        project_root: str = Query(".", description="项目根目录"),
+    ) -> Response:
+        """V0.30.6 B6：导出单章节为指定格式。
+
+        支持格式：
+        - md：Markdown（直接透传 + 标准 frontmatter）
+        - txt：纯文本（剥离 markdown 语法）
+        - epub：EPUB 3.0（单章节 + 元数据）
+
+        Returns:
+            Response: 带 Content-Disposition 头的文件流
+        """
+        from novel2all.core.exporter import (
+            Chapter,
+            export_chapter_file,
+            get_exporter,
+        )
+
+        root = Path(project_root).resolve()
+        project = ProjectStructure(root=root)
+        if not project.exists():
+            raise HTTPException(status_code=404, detail="Project not initialized")
+
+        prose_path = project.chapter_prose(chapter)
+        if not prose_path.exists():
+            raise HTTPException(status_code=404, detail=f"Chapter {chapter} not found")
+
+        try:
+            ch = Chapter.from_md_file(prose_path)
+            exporter = get_exporter(format)
+            content_bytes = exporter.export_chapter(ch)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            logger.exception("V0.30.6 B6 export_chapter failed")
+            raise HTTPException(status_code=500, detail=f"Export failed: {e}") from e
+
+        return Response(
+            content=content_bytes,
+            media_type=exporter.mime_type(),
+            headers={
+                # V0.30.6 B6: ASCII-safe filename（HTTP header 必须 latin-1）
+                "Content-Disposition": (
+                    f'attachment; filename="chapter_{chapter:03d}.{exporter.file_extension()}"'
+                ),
+            },
+        )
+
+    # V0.30.6 B6：批量导出端点（整本书）
+    @app.get("/api/export")
+    async def export_project(
+        format: str = Query("epub", description="导出格式: md | txt | epub"),
+        project_root: str = Query(".", description="项目根目录"),
+        title: str = Query("", description="书名（EPUB 用）"),
+        author: str = Query("", description="作者（EPUB 用）"),
+    ) -> Response:
+        """V0.30.6 B6：导出整本书为指定格式（自动发现所有 chapter）。
+
+        支持格式：
+        - md：单文件 Markdown（多章节拼接）
+        - txt：纯文本（多章节拼接）
+        - epub：EPUB 3.0（含导航 + 元数据 + 完整结构）
+        """
+        from novel2all.core.exporter import BookMetadata, export_project as do_export
+
+        root = Path(project_root).resolve()
+        try:
+            metadata = BookMetadata(
+                title=title or "未命名作品",
+                author=author or "未知作者",
+            )
+            content_bytes = do_export(root, format, metadata)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except Exception as e:
+            logger.exception("V0.30.6 B6 export_project failed")
+            raise HTTPException(status_code=500, detail=f"Export failed: {e}") from e
+
+        from novel2all.core.exporter import get_exporter
+
+        exporter = get_exporter(format)
+        # V0.30.6 B6: HTTP header latin-1 only, so strip non-ASCII
+        import re as _re
+        safe_title = (title or "未命名作品").replace("/", "_").replace("\\", "_")
+        safe_title_ascii = _re.sub(r"[^\\w\\-]", "_", safe_title) or "novel"
+        return Response(
+            content=content_bytes,
+            media_type=exporter.mime_type(),
+            headers={
+                # V0.30.6 B6: ASCII-safe filename
+                "Content-Disposition": (
+                    f'attachment; filename="{safe_title_ascii}.{exporter.file_extension()}"'
+                ),
+            },
+        )
 
     # V0.34：手动保存编辑后的章节
     @app.post("/api/chapter/{chapter}/save")
