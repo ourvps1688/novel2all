@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
             from novel2all.core.audit import AuditStore
 
             app.state.audit_store = AuditStore()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("V1.0 GA: AuditStore init failed (audit disabled): %s", e)
             app.state.audit_store = None
 
