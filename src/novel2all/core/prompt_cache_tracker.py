@@ -42,8 +42,8 @@ class PromptCacheTracker:
     """
 
     # === 核心计数器 ===
-    prefix_hits: int = 0       # sys_hash 复用次数（prefix cache 命中机会）
-    prefix_misses: int = 0       # 首次出现 sys_hash（无 prefix 复用）
+    prefix_hits: int = 0  # sys_hash 复用次数（prefix cache 命中机会）
+    prefix_misses: int = 0  # 首次出现 sys_hash（无 prefix 复用）
 
     # === 节省估算（V0.30.6 C1.1）===
     # 假设：

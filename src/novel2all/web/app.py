@@ -332,9 +332,7 @@ def create_app() -> FastAPI:
         """
         provider: LLMProvider = request.app.state.provider
         stats = provider.prompt_cache_stats()
-        return templates.TemplateResponse(
-            request, "prompt_cache_panel.html", {"stats": stats}
-        )
+        return templates.TemplateResponse(request, "prompt_cache_panel.html", {"stats": stats})
 
     # V0.43：Cache 迁移端点（POST 表单）
     @app.post("/api/cache/migrate")

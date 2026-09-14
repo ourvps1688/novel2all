@@ -9,6 +9,7 @@ from novel2all.core.prompt_cache_tracker import PromptCacheTracker
 
 # === Test 1: PromptCacheTracker 基础功能 ===
 
+
 class TestPromptCacheTrackerBasics:
     """V0.30.6 C1：PromptCacheTracker 单元测试（无 LLMProvider 依赖）。"""
 
@@ -118,6 +119,7 @@ class TestPromptCacheTrackerBasics:
 
 # === Test 2: LLMProvider 集成 ===
 
+
 class TestLLMProviderPromptCacheIntegration:
     """V0.30.6 C1：LLMProvider 自动跟踪 prompt prefix cache。"""
 
@@ -174,6 +176,7 @@ class TestLLMProviderPromptCacheIntegration:
 
 
 # === Test 3: Web API 端点 ===
+
 
 class TestPromptCacheStatsEndpoint:
     """V0.30.6 C1：/api/cache/prompt-stats + /api/cache/prompt-stats/reset 端点。"""
@@ -232,6 +235,7 @@ class TestPromptCacheStatsEndpoint:
 
 # === Test 4: 成本计算准确性 ===
 
+
 class TestCostSavingsCalculation:
     """V0.30.6 C1：cost_saved_cny 数学正确性。"""
 
@@ -241,7 +245,11 @@ class TestCostSavingsCalculation:
         (1.00 - 0.02) × 5000 / 1M = 0.0049 CNY/call
         """
         t = PromptCacheTracker()
-        saved = (t.cache_miss_price_cny_per_m - t.cache_hit_price_cny_per_m) * t.avg_input_tokens_per_call / 1_000_000
+        saved = (
+            (t.cache_miss_price_cny_per_m - t.cache_hit_price_cny_per_m)
+            * t.avg_input_tokens_per_call
+            / 1_000_000
+        )
         assert saved == pytest.approx(0.0049)
 
     def test_high_hit_rate_savings(self) -> None:
@@ -262,8 +270,6 @@ class TestCostSavingsCalculation:
         # 900 × 0.0049 = 4.41
         assert t.cost_saved_cny == pytest.approx(4.41, abs=0.01)
 
-
-
     def test_prompt_cache_panel_endpoint(self) -> None:
         """V0.30.6 C1：GET /page/prompt-cache-panel 返回 HTML 面板。"""
         from fastapi.testclient import TestClient
@@ -277,7 +283,7 @@ class TestCostSavingsCalculation:
             html = response.text
             # 验证关键 UI 元素存在
             assert "Prompt Prefix Cache" in html
-            assert "data-testid=\"prompt-cache-panel\"" in html
+            assert 'data-testid="prompt-cache-panel"' in html
             assert "¥" in html  # 成本金额
             assert "Prefix Hits" in html
             assert "Prefix Misses" in html
