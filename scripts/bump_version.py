@@ -18,7 +18,11 @@ import subprocess
 from pathlib import Path
 
 PYPROJECT_PATH = Path("pyproject.toml")
-VERSION_RE = re.compile(r'version\s*=\s*["\']([^"\']+)["\']')
+# V1.0.1：精确匹配 `[project]` 段下的 version（避免误匹配 `target-version`）
+VERSION_RE = re.compile(
+    r'^\[project\].*?^version\s*=\s*["\']([^"\']+)["\']',
+    re.MULTILINE | re.DOTALL,
+)
 
 
 def get_current_version() -> str:
@@ -55,9 +59,16 @@ def bump(version: str, component: str) -> str:
 
 
 def write_version(new_version: str) -> None:
-    """V1.0 GA：写回 pyproject.toml。"""
+    """V1.0 GA：写回 pyproject.toml（仅修改 [project] 段下 version）。"""
     text = PYPROJECT_PATH.read_text(encoding="utf-8")
-    new_text = VERSION_RE.sub(f'version = "{new_version}"', text)
+    # V1.0.1：仅替换 [project] 段下的 version（避免误改 target-version）
+    new_text = re.sub(
+        r"(\[project\][^\[]*?version\s*=\s*)[\"'][^\"']+[\"']",
+        rf'\1"{new_version}"',
+        text,
+        count=1,
+        flags=re.DOTALL,
+    )
     PYPROJECT_PATH.write_text(new_text, encoding="utf-8")
 
 
