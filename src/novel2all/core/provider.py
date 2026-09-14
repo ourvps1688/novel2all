@@ -162,6 +162,12 @@ class LLMProvider:
                 ttl_seconds=self.config.cache_ttl_seconds,
             )
 
+        # V0.30.6 C1：Prompt prefix cache 跟踪器（独立于 response cache）
+        # 跟踪 sys_hash 复用次数，量化 prompt prefix cache 节省的 ¥
+        from novel2all.core.prompt_cache_tracker import PromptCacheTracker
+
+        self._prompt_tracker = PromptCacheTracker()
+
     def _configure_env(self) -> None:
         """从 config 同步设置环境变量（LiteLLM 需要）。"""
         _strip_proxy_env()  # 沙箱/CI 环境必须
@@ -203,6 +209,7 @@ class LLMProvider:
 
         # V0.33：cache lookup（通过 CacheBackend.get，命中则直接返回 + 自动 LRU 更新）
         cache_key = self._make_cache_key(model_name, system, prompt, temperature)
+        # V0.30.6 C1：sys_hash 记录已在 _make_cache_key() 内部完成
         if self.config.cache_enabled:
             cached = self._cache.get(cache_key)
             if cached is not None:
@@ -275,9 +282,15 @@ class LLMProvider:
         key = (model, sha256(system), sha256(user), temperature)
         - hash 用 sha256 截前 16 字符（足够唯一 + 省内存）
         - None system 用空字符串
+
+        V0.30.6 C1：同时记录到 _prompt_tracker，统计 sys_hash 复用。
+        这样无论调用方是否实际查 cache（cache_enabled=False），
+        都能跟踪 prompt prefix 复用次数。
         """
         sys_h = hashlib.sha256((system or "").encode("utf-8")).hexdigest()[:16]
         usr_h = hashlib.sha256(user.encode("utf-8")).hexdigest()[:16]
+        # V0.30.6 C1：prompt prefix cache tracking（与 response cache 解耦）
+        self._prompt_tracker.record(sys_h)
         return (model, sys_h, usr_h, temperature)
 
     def _cache_store(self, key: tuple[str, str, str, float], content: str) -> None:
@@ -292,11 +305,26 @@ class LLMProvider:
 
         V0.33 扩展：增加 backend / ttl_seconds / persist_path 字段，
         让 /api/cache/stats 面板能展示后端类型。
+        V0.30.6 C1：增加 prompt_prefix 子字典，量化 prefix cache 节省的 ¥。
         """
         stats = self._cache.stats()
         # V0.33：补充 cache_enabled（后端 stats 假设 enabled=True）
         stats["enabled"] = self.config.cache_enabled
+        # V0.30.6 C1：增加 prompt prefix cache 统计
+        stats["prompt_prefix"] = self._prompt_tracker.to_dict()
         return stats
+
+    def prompt_cache_stats(self) -> dict[str, Any]:
+        """V0.30.6 C1：返回 prompt prefix cache 专用统计。
+
+        与 cache_stats()["prompt_prefix"] 字段等价，但更直接。
+        供 /api/cache/prompt-stats 端点和 Web UI 调用。
+        """
+        return self._prompt_tracker.to_dict()
+
+    def reset_prompt_cache_stats(self) -> None:
+        """V0.30.6 C1：重置 prompt prefix cache 统计（用于测试或手动 reset）。"""
+        self._prompt_tracker.reset()
 
     @property
     def _cache_hits(self) -> int:
@@ -451,6 +479,7 @@ class LLMProvider:
         """
         model_name = self._resolve_model(task=task, explicit_model=model)
 
+        # V0.30.6 C1：sys_hash 记录已在 _make_cache_key() 内部完成
         # V0.33：cache 命中 → 返回 cached stream（通过 CacheBackend.get）
         cache_key = self._make_cache_key(model_name, system, prompt, temperature)
         if self.config.cache_enabled:

@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "version": "V0.30.6 C1",
+    "started_at": "2026-09-14T11:55:10.145716",
+    "elapsed_ms": 0.17,
+    "config": {
+      "num_chapters": 100,
+      "num_unique_system_prompts": 5,
+      "avg_prompt_tokens": 5000,
+      "avg_output_tokens": 3000
+    },
+    "pricing": {
+      "input_miss_cny_per_m": 1.0,
+      "input_hit_cny_per_m": 0.02,
+      "output_cny_per_m": 4.0
+    }
+  },
+  "results": {
+    "prefix_hits": 95,
+    "prefix_misses": 5,
+    "total": 100,
+    "hit_rate": 0.95,
+    "unique_sys_prompts": 5
+  },
+  "cost_analysis": {
+    "total_input_tokens": 500000,
+    "total_output_tokens": 300000,
+    "cost_no_cache_cny": 1.7,
+    "cost_with_cache_cny": 1.2345,
+    "actual_savings_cny": 0.4655,
+    "savings_pct": 27.38
+  }
+}

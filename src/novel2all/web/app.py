@@ -294,9 +294,47 @@ def create_app() -> FastAPI:
         """V0.29.3：返回 lifespan provider 的 cache 统计。
 
         V0.30 WebUI 暴露此端点做实时命中率面板。
+        V0.30.6 C1：额外包含 prompt_prefix 子字典（量化 prefix cache 节省）。
         """
         provider: LLMProvider = request.app.state.provider
         return provider.cache_stats()
+
+    # V0.30.6 C1：Prompt prefix cache 专用端点
+    @app.get("/api/cache/prompt-stats")
+    async def prompt_cache_stats(request: Request) -> dict[str, Any]:
+        """V0.30.6 C1：返回 prompt prefix cache 统计。
+
+        与 /api/cache/stats["prompt_prefix"] 等价，但更直接。
+        用于 Web UI "prompt prefix 节省 ¥" 卡片 + benchmark 验证脚本。
+
+        Returns:
+            dict 含 prefix_hits/misses/total/hit_rate/unique_sys_prompts/
+            cost_saved_cny/potential_savings_cny + model 参数
+        """
+        provider: LLMProvider = request.app.state.provider
+        return provider.prompt_cache_stats()
+
+    @app.post("/api/cache/prompt-stats/reset")
+    async def reset_prompt_cache_stats(request: Request) -> dict[str, Any]:
+        """V0.30.6 C1：重置 prompt prefix cache 统计（手动 reset）。"""
+        provider: LLMProvider = request.app.state.provider
+        provider.reset_prompt_cache_stats()
+        return {"reset": True, "stats": provider.prompt_cache_stats()}
+
+    # V0.30.6 C1：HTMX partial — prompt cache panel
+    @app.get("/page/prompt-cache-panel", response_class=HTMLResponse)
+    async def page_prompt_cache_panel(request: Request) -> HTMLResponse:
+        """V0.30.6 C1：HTMX 渲染 prompt prefix cache 面板（每 30s 刷新）。
+
+        实时显示 prefix hit rate + cost saved，激励用户：
+        - 复用 system prompt（多章节共用同一角色卡）
+        - 避免频繁更换写作风格
+        """
+        provider: LLMProvider = request.app.state.provider
+        stats = provider.prompt_cache_stats()
+        return templates.TemplateResponse(
+            request, "prompt_cache_panel.html", {"stats": stats}
+        )
 
     # V0.43：Cache 迁移端点（POST 表单）
     @app.post("/api/cache/migrate")

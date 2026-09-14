@@ -27,6 +27,7 @@ from unittest.mock import patch
 import pytest
 
 from novel2all.core.cache import MemoryLRUBackend
+from novel2all.core.prompt_cache_tracker import PromptCacheTracker
 from novel2all.core.provider import LLMConfig, LLMProvider
 from novel2all.core.provider_router import (
     DEFAULT_TASK_FALLBACKS,
@@ -669,6 +670,7 @@ class TestPromptCacheV024:
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
         provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        provider._prompt_tracker = PromptCacheTracker()
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         # 拦截 litellm.acompletion
@@ -716,6 +718,7 @@ class TestPromptCacheV024:
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
         provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        provider._prompt_tracker = PromptCacheTracker()
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -753,6 +756,7 @@ class TestPromptCacheV024:
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
         provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        provider._prompt_tracker = PromptCacheTracker()
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -786,6 +790,7 @@ class TestPromptCacheV024:
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
         provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        provider._prompt_tracker = PromptCacheTracker()
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -815,6 +820,7 @@ class TestPromptCacheV024:
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
         provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        provider._prompt_tracker = PromptCacheTracker()
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -844,6 +850,7 @@ class TestPromptCacheV024:
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
         provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        provider._prompt_tracker = PromptCacheTracker()
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         from types import SimpleNamespace
@@ -881,6 +888,7 @@ class TestPromptCacheV024:
         _cache._hits = 5
         _cache._misses = 3
         provider._cache = _cache
+        provider._prompt_tracker = PromptCacheTracker()
         provider._resolve_model = lambda *, task, explicit_model: "mock/model"
 
         provider.cache_clear()
@@ -896,6 +904,7 @@ class TestPromptCacheV024:
         provider = LLMProvider.__new__(LLMProvider)
         provider.config = config
         provider._cache = MemoryLRUBackend(max_size=config.cache_max_size, ttl_seconds=0)
+        provider._prompt_tracker = PromptCacheTracker()
 
         key1 = provider._make_cache_key("model", "system", "user", 0.7)
         key2 = provider._make_cache_key("model", "system", "user", 0.7)
