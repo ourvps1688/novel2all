@@ -212,10 +212,16 @@ jobs:
           "
 
   # ===== V0.52 Cache 性能回归检测 =====
+  # V0.52.1：GitHub Actions 共享 runner 抖动 ±50%（即使同环境）。
+  # benchmark 设为 advisory（continue-on-error）而非 blocking：
+  # - 仍跑 benchmark + 输出报告
+  # - 失败不阻断 PR
+  # - 维护者通过 artifact review 决定是否真有回归
   cache-benchmark:
-    name: Cache benchmark regression
+    name: Cache benchmark regression (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v7
@@ -226,7 +232,8 @@ jobs:
       - run: uv sync --all-extras --dev
       - name: Run cache benchmark + regression check
         # V0.52：跑简化的 cache benchmark + 对比 baseline
-        # 失败 → CI 失败（throughput 下降 >25%）
+        # 退出码：0 = pass / 1 = 检测到回归
+        # CI 仍产出 artifact 用于人工 review
         run: uv run python scripts/benchmark_cache_ci.py
       - name: Upload benchmark results
         if: always()
@@ -235,6 +242,13 @@ jobs:
           name: cache-benchmark-results
           path: scripts/cache_benchmark_ci_results.json
           retention-days: 30
+      - name: Print summary if regression detected
+        if: failure()
+        run: |
+          echo "⚠️  Cache benchmark detected regression(s)"
+          echo "    See artifact: cache-benchmark-results"
+          echo "    Note: GitHub Actions shared runners have ±50% noise."
+          echo "    Check if regression is consistent across multiple runs."
 
   # ===== Build sdist + wheel =====
   build:
