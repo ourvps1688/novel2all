@@ -34,6 +34,10 @@ htmlcov/
 .novel2all/memory.db
 .novel2all/ci-status.json
 .novel2all/ci-alerts.json
+.novel2all/audit.db  # V1.0.1：runtime data，不入仓
+.novel2all/sessions.db  # V1.0.1：runtime data，不入仓
+.novel2all/adaptive_routing.db  # V1.0.1：runtime data，不入仓
+.novel2all/traces.jsonl  # V1.0.1：runtime tracing 数据
 .ci_watch.pid
 .ci_watch.log
 
@@ -72,6 +76,12 @@ _*.py
 
 # 用户项目
 # 用户用 novel2all 创建的小说项目目录由用户自己管理 .gitignore
+
+# V1.0.1：忽略 8-9 char lowercase alphanumeric 或带下划线的临时文件（如 "blat" artifacts）
+# 这些是测试/工具脚本意外产生的占位文件（仅含 "blat" 等短内容）
+# 不误伤合法文件（如 "000m5fp4.md" 8 字符但带扩展名）
+/[a-z0-9]{8}
+/[a-z0-9_]{8,9}
 
 # 注意：之前用 [a-z0-9]{8,12} 类规则想忽略 git 自身的"blat"占位文件，
 # 但这类规则会误伤合法文件（如 pipeline.py 的"pipeline"8 字符 + .py）。
