@@ -9,6 +9,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import threading
+import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -18,7 +21,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -62,6 +65,212 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+# === V1.0.1 B1：dev mode detection ===
+def _is_dev_mode() -> bool:
+    """V1.0.1 B1：判断是否处于 dev 模式（HTTP，非 HTTPS）。
+
+    返回 True 时，session cookie 的 ``secure`` 标志必须为 False
+    （否则浏览器会拒收 cookie，导致 session 丢失）。
+
+    优先级：
+      1. ``NOVEL2ALL_DEBUG`` 环境变量（项目专属）
+      2. ``DEBUG`` 环境变量（通用约定）
+
+    任何能解析为真值的值（"1", "true", "yes", "on"）都视为 dev mode。
+    默认行为：``True``（即无环境变量时按 dev 处理，避免 HTTP 下 cookie 失效）。
+
+    注意：空字符串 / 未设置 → True（dev mode）。要显式启用 prod，
+    必须设置 ``NOVEL2ALL_DEBUG=false`` 或 ``DEBUG=false``。
+    """
+    raw = os.environ.get("NOVEL2ALL_DEBUG")
+    if raw is None:
+        raw = os.environ.get("DEBUG")
+    if raw is None:
+        return True  # 默认 dev mode（避免本地 HTTP cookie 失效）
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+# === V1.0.1 B8：Idempotency store（thread-safe + TTL + in-flight claim） ===
+class InMemoryIdempotencyStore:
+    """V1.0.1 B8：内存版 idempotency store（threading.Lock + TTL + in-flight claim）。
+
+    用于 /api/chapter/{n}/review 等昂贵端点，防止客户端双击 + 并发同 key
+    触发重复 LLM 调用。
+
+    设计要点：
+      - 锁内做读写（threading.Lock，非 RLock 因为逻辑简单）。
+      - 写入时惰性清理过期条目（每写入一次清理一次，简单实用）。
+      - 默认 TTL 5 分钟（per spec）；过期后重新调用 LLM。
+      - key 维度由 caller 决定（spec 要求 per-chapter + per-endpoint）。
+      - **in-flight sentinel**（QA B8 PoC 修复）：``claim()`` 原子地尝试占位，
+        后续请求看到 sentinel 时会 ``await wait_for_result()`` 轮询等第一个
+        完成，然后拿到结果作为 replay 一起返回 200。这样：
+          * LLM 不会被并发请求重复调用（fix race condition）
+          * 后到的请求仍拿到结果（不会 409 拒绝）
+          * 极端情况下 in-flight 永不 complete → 30s 超时后返回 409
+      - **跨 event loop 友好**：用 poll 模式而非 ``asyncio.Event``。
+        不同 TestClient 各自有独立 event loop；asyncio.Event 绑一个 loop 后
+        不能跨 loop 使用（"is bound to a different event loop" error），
+        poll 模式则没有这个问题（store 自身有 threading.Lock 保护并发）。
+
+    用法：
+        store = InMemoryIdempotencyStore(ttl_seconds=300)
+        cache_key = (user_id, chapter, idempotency_key)
+        claimed, existing = store.claim(cache_key)
+        if not claimed:
+            if isinstance(existing, dict) and existing.get("_in_flight"):
+                result = await store.wait_for_result(cache_key, timeout=30.0)
+                if result is None:
+                    raise HTTPException(409, "...")
+                existing = result
+            replay = dict(existing)
+            replay["_idempotent_replay"] = True
+            return replay
+        # 占位成功 → 跑 LLM
+        result = await expensive_llm_call(...)
+        store.complete(cache_key, result)
+    """
+
+    def __init__(self, ttl_seconds: int = 300) -> None:
+        self.ttl_seconds = ttl_seconds
+        # value 可能是：
+        #   - tuple[float, Any]    — 旧格式（直接 set() 写入）
+        #   - dict[str, Any]       — sentinel ({"_in_flight": True, "_created_at": float})
+        self._store: dict[tuple[Any, ...], Any] = {}
+        self._lock = threading.Lock()
+
+    def _now(self) -> float:
+        return time.time()
+
+    def _is_expired(self, created_at: float, now: float | None = None) -> bool:
+        if self.ttl_seconds <= 0:
+            return True
+        if now is None:
+            now = self._now()
+        return now - created_at >= self.ttl_seconds
+
+    def _extract_created_at(self, entry: Any) -> float | None:
+        """V1.0.1 B8：从 entry 提取 created_at（兼容旧/新两种格式）。"""
+        if isinstance(entry, tuple) and len(entry) == 2:
+            ts, _ = entry
+            return float(ts) if isinstance(ts, (int, float)) else None
+        if isinstance(entry, dict):
+            ts = entry.get("_created_at")
+            return float(ts) if isinstance(ts, (int, float)) else None
+        return None
+
+    def _purge_expired(self) -> None:
+        """V1.0.1 B8：清理过期条目（callers 持有 lock）。"""
+        now = self._now()
+        expired = [
+            k
+            for k in list(self._store)
+            if self._is_expired(self._extract_created_at(self._store[k]) or 0.0, now)
+        ]
+        for k in expired:
+            self._store.pop(k, None)
+
+    def get(self, key: tuple[Any, ...]) -> Any | None:
+        """V1.0.1 B8：取缓存结果。命中且未过期返回原值；过期或未命中返回 None。
+
+        in-flight sentinel 被视为"未命中"（返回 None），caller 应改用
+        ``claim()`` 来观察 sentinel + 等待完成。
+        """
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            created = self._extract_created_at(entry)
+            if created is not None and self._is_expired(created):
+                self._store.pop(key, None)
+                return None
+            # in-flight sentinel → 视为未命中
+            if isinstance(entry, dict) and entry.get("_in_flight"):
+                return None
+            # 旧格式 (ts, value)
+            if isinstance(entry, tuple) and len(entry) == 2:
+                return entry[1]
+            # 新格式（直接存 result）
+            return entry
+
+    def set(self, key: tuple[Any, ...], value: Any) -> None:
+        """V1.0.1 B8：写缓存（绕过 claim 流程，直接存结果）。
+
+        惰性清理过期条目以限制内存增长。保留向后兼容：旧测试用 ``.set()`` + ``.get()``
+        仍按原语义工作。
+        """
+        with self._lock:
+            self._purge_expired()
+            self._store[key] = (self._now(), value)
+
+    def claim(self, key: tuple[Any, ...]) -> tuple[bool, Any]:
+        """V1.0.1 B8：原子地尝试占位。
+
+        Returns:
+            (claimed, existing):
+              - (True, None) — 占位成功，你是第一个（应跑 LLM 然后 ``complete()``）
+              - (False, sentinel_dict) — 已有 in-flight；caller 应 poll
+                ``get()`` 等候结果（见 ``wait_for_result()``）。
+              - (False, result) — 已有 cached result；直接返回作为 replay。
+        """
+        with self._lock:
+            existing = self._store.get(key)
+            if existing is not None:
+                created = self._extract_created_at(existing)
+                if created is not None and self._is_expired(created):
+                    self._store.pop(key, None)
+                    existing = None
+            if existing is not None:
+                # in-flight sentinel → 整体返回（caller 检测 _in_flight）
+                if isinstance(existing, dict) and existing.get("_in_flight"):
+                    return False, existing
+                # cached result — 兼容旧 tuple 格式 (ts, value)
+                if isinstance(existing, tuple) and len(existing) == 2:
+                    return False, existing[1]
+                return False, existing
+            # 占位（sentinel；不绑 asyncio.Event 因为跨 event loop 不可用）
+            sentinel: dict[str, Any] = {
+                "_in_flight": True,
+                "_created_at": self._now(),
+            }
+            self._store[key] = sentinel
+            self._purge_expired()
+            return True, None
+
+    def complete(self, key: tuple[Any, ...], result: Any) -> None:
+        """V1.0.1 B8：占位完成后存 result（覆盖 sentinel）。
+
+        唤醒"在等待"同一 key 的协程是 caller 的责任：用
+        ``wait_for_result()`` 轮询即可（见 review 端点实现）。
+        """
+        with self._lock:
+            # 总是覆盖（让后续请求拿到 result）
+            self._store[key] = (self._now(), result)
+
+    async def wait_for_result(
+        self, key: tuple[Any, ...], timeout: float = 30.0, poll_interval: float = 0.02
+    ) -> Any | None:
+        """V1.0.1 B8：异步轮询等待 in-flight 结果。
+
+        跨 event loop 友好的等待（不用 asyncio.Event，因为不同 TestClient
+        用各自 event loop）。每 ``poll_interval`` 秒检查 store 是否有 result。
+        Returns:
+            result（命中） / None（超时或 key 不存在）。
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = self.get(key)
+            if result is not None:
+                return result
+            await asyncio.sleep(poll_interval)
+        return None
+
+    def clear(self) -> None:
+        """V1.0.1 B8：清空（仅测试使用）。"""
+        with self._lock:
+            self._store.clear()
+
+
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -98,6 +307,10 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.warning("V1.0 GA: AuditStore init failed (audit disabled): %s", e)
             app.state.audit_store = None
+
+        # V1.0.1 B8：review 端点 idempotency store（防双击重复 LLM 调用）。
+        # 单进程内有效；multi-worker 部署下需换成 Redis 共享（后续 V1.0.2+）。
+        app.state.idempotency_store = InMemoryIdempotencyStore(ttl_seconds=300)
 
         # V0.30.6 C3 收尾：初始化 LLMProvider 内 AdaptiveRouter（数据驱动选模型）
         try:
@@ -169,6 +382,76 @@ def create_app() -> FastAPI:
             {"name": "projects", "description": "项目授权（B5 多用户）"},
         ],
     )
+
+    # === V1.0.1 B2：全局 500 exception handler（防 stack trace 泄露） ===
+
+    @app.exception_handler(Exception)
+    async def _global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        """V1.0.1 B2：未捕获异常 → 返回 500 + 简短 message，不泄露 stack trace。
+
+        实现要点：
+          - 用 ``tracer.span("http.request.error")`` 包装整个处理流程，
+            通过手动设置 ``span.status = "error"`` + ``span.attributes["error"]``
+            标记错误（不重新 raise，否则会被 Starlette 的 ServerErrorMiddleware
+            当作"test 时 raise"或 prod 时 500 response 处理）。
+          - 返回 ``{"detail": "Internal server error", "request_id": "..."}``，
+            request_id 便于运维按 ID 在 traces.jsonl 中定位完整堆栈。
+          - 仅记录 logger.exception（不向 client 输出 stack trace）。
+          - HTTPException 已经被 FastAPI 框架自身处理，这里仅捕获其他 Exception。
+        """
+        from novel2all.core.tracing import get_tracer
+
+        tracer = get_tracer()
+        request_id = uuid.uuid4().hex[:16]
+        with tracer.span(
+            "http.request.error",
+            request_id=request_id,
+            path=request.url.path,
+            method=request.method,
+            exception_type=type(exc).__name__,
+        ) as span:
+            span.status = "error"
+            span.attributes["error"] = str(exc)
+            logger.exception(
+                "V1.0.1 B2 unhandled exception: request_id=%s path=%s exc=%s",
+                request_id,
+                request.url.path,
+                exc,
+            )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error",
+                "request_id": request_id,
+            },
+        )
+
+    # === V1.0.1 B3：/metrics 端点 IP 白名单 ===
+    @app.middleware("http")
+    async def _metrics_ip_filter(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """V1.0.1 B3：限制 ``/metrics`` 端点仅 trusted IP 访问。
+
+        默认白名单：``127.0.0.1``, ``::1``（localhost scrape）。
+        通过 ``METRICS_ALLOWED_IPS`` 环境变量覆盖（逗号分隔）。
+        注意：这是简单的 IP 字符串比较；如需 CIDR，可扩展为 ``ipaddress``
+        模块匹配（per B5 同款思路）。
+        """
+        if request.url.path == "/metrics":
+            allowed_raw = os.environ.get("METRICS_ALLOWED_IPS", "127.0.0.1,::1")
+            allowed = {ip.strip() for ip in allowed_raw.split(",") if ip.strip()}
+            client_ip = request.client.host if request.client else ""
+            if client_ip not in allowed:
+                logger.warning("V1.0.1 B3: /metrics access denied from %s", client_ip)
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": (
+                            f"metrics endpoint only available from {', '.join(sorted(allowed))}"
+                        ),
+                    },
+                )
+        return await call_next(request)
+
     # V0.30.6 B5 收尾：注入 AuthMiddleware 到 FastAPI（处理每个请求的 session cookie）
     try:
         from starlette.middleware.base import BaseHTTPMiddleware
@@ -292,12 +575,18 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         """V0.30.6 B5 收尾：登录（username + password → set cookie）。
 
+        V1.0.1 B1：cookie 增加 ``secure=not is_dev_mode`` 标志。
+        V1.0.1 B7：用户名枚举防护——
+          1. 用户不存在时也执行一次 PBKDF2 hash（与"用户存在但密码错"路径
+             的耗时对齐），消除时序侧信道。
+          2. audit log ``login_failed`` 不记 username（仅记 IP）——避免日志中
+             泄露哪些 username 被尝试过、被用于枚举。
+
         Returns:
             {user: {...}, message: "Login successful"}
-        Set-Cookie: n2a_session=<id>; HttpOnly; SameSite=Strict; Max-Age=604800
+        Set-Cookie: n2a_session=<id>; HttpOnly; SameSite=Strict; Secure;
+                    Max-Age=604800
         """
-        from starlette.responses import JSONResponse
-
         client_ip = await get_client_ip(request)
         limiter = request.app.state.rate_limiter
 
@@ -309,22 +598,36 @@ def create_app() -> FastAPI:
             )
 
         auth_store = request.app.state.auth_store
+        # V1.0.1 B7：先看用户是否存在（不暴露给 client），用户不存在时跑一遍
+        # dummy hash 抹平时序差异。
+        existing_user = auth_store.get_user_by_username(username)
         user = auth_store.authenticate(username, password)
+
         if user is None:
+            # V1.0.1 B7：用户不存在或密码错时跑一次 dummy PBKDF2，使两条
+            # 路径耗时大致相等。dummy hash 使用固定随机 salt（每次启动都
+            # 不同），与 verify_password 走相同的算法路径。
+            if existing_user is None:
+                # 用户不存在：仍执行一次完整 PBKDF2（与 verify_password
+                # 路径一致）
+                from novel2all.core.auth import hash_password
+
+                _ = hash_password(password)
             locked = limiter.record_fail(client_ip)
             detail = "Invalid credentials"
             if locked:
                 detail = "Too many failed attempts. Account temporarily locked."
             # V1.0 GA Day 11-15：audit 记录登录失败
+            # V1.0.1 B7：不记 username（防止日志被用作枚举探测 + PII 防护）
             audit_store = request.app.state.audit_store
-        if audit_store is not None:
-            audit_store.record(
-                "login_failed",
-                username=username,
-                ip=client_ip,
-                success=False,
-                detail=detail,
-            )
+            if audit_store is not None:
+                audit_store.record(
+                    "login_failed",
+                    username=None,  # B7: 不记 username
+                    ip=client_ip,
+                    success=False,
+                    detail=detail,
+                )
             raise HTTPException(status_code=401, detail=detail)
 
         # 登录成功：创建 session + 重置 rate limit
@@ -354,13 +657,17 @@ def create_app() -> FastAPI:
                 "message": "Login successful",
             }
         )
-        # V0.30.6 B5：HttpOnly + SameSite=Strict cookie（per 用户偏好）
+        # V1.0.1 B1：HttpOnly + SameSite=Strict + Secure cookie。
+        # Secure 标志在 dev 模式下（HTTP）必须为 False，否则浏览器拒收。
+        # 生产（HTTPS）通过 NOVEL2ALL_DEBUG=false 或 DEBUG=false 启用。
+        is_dev_mode = _is_dev_mode()
         response.set_cookie(
             key="n2a_session",
             value=sess.id,
             max_age=7 * 24 * 3600,
             httponly=True,
             samesite="strict",
+            secure=not is_dev_mode,
             path="/",
         )
         return response
@@ -428,10 +735,50 @@ def create_app() -> FastAPI:
         user_id: int = Form(...),
         role: str = Form("viewer"),
     ) -> dict[str, Any]:
-        """V0.30.6 B5 收尾：admin 给用户授权项目访问（owner/editor/viewer）。"""
-        await admin_required(request)
-        admin = get_request_user(request)
+        """V0.30.6 B5 收尾：admin 给用户授权项目访问（owner/editor/viewer）。
+
+        V1.0.1 B6：增加路径校验 + 项目存在性 check + 双层 admin guard：
+          1. ``current_user_required`` 必须是已登录用户。
+          2. ``admin_required`` 必须是 admin（否则 403）。
+          3. URL 路径不得含 ``..`` 或绝对路径前缀 → 400。
+          4. admin 自身必须已对该项目有 owner/editor 权限 → 403（admin 不能凭空
+             grant 一个 admin 自己都没访问权的项目；这避免了恶意 admin 把
+             任意路径授权出去）。**注意**：spec 中"admin 跳过"指跳过
+             *非 admin 路径*（即 admin 总可以授权），但项目级仍要求 admin 自己
+             已 ``grant_project_access`` 过该 project（"必须先有 owner"）。
+        """
+        # === V1.0.1 B6：路径校验（防越权） ===
+        # 拒绝含 `..` 的相对路径穿越，以及绝对路径绕过（绝对路径会被 Path.resolve
+        # 直接接受，但 spec 要求拒绝）。
+        if ".." in project_root.split("/") or ".." in project_root.split("\\"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid project_root: '..' path traversal not allowed",
+            )
+        if Path(project_root).is_absolute() or project_root.startswith(("/", "\\")):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid project_root: absolute paths not allowed. "
+                    "Use a relative path (resolved against the caller)."
+                ),
+            )
+
+        # === V1.0.1 B6：admin guard + caller 项目授权检查 ===
+        admin = await admin_required(request)
         abs_path = str(Path(project_root).resolve())
+
+        # admin 自身必须已对该项目有 owner/editor 权限（防任意路径授权）
+        admin_role = request.app.state.auth_store.get_project_role(admin.id, abs_path)
+        if admin_role not in {"owner", "editor"}:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"Admin does not have owner/editor access to {abs_path}. "
+                    "Grant yourself access first."
+                ),
+            )
+
         try:
             m = request.app.state.auth_store.grant_project_access(
                 user_id,
@@ -471,6 +818,11 @@ def create_app() -> FastAPI:
     if not hasattr(app.state, "provider"):
         load_dotenv(".env", override=False)
         app.state.provider = LLMProvider(LLMConfig())
+
+    # V1.0.1 B8：测试 fallback 也初始化 idempotency_store（让 TestClient 测试
+    # 访问 review 端点时不会因 app.state 缺失而 crash）。
+    if not hasattr(app.state, "idempotency_store"):
+        app.state.idempotency_store = InMemoryIdempotencyStore(ttl_seconds=300)
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request) -> HTMLResponse:
@@ -1297,11 +1649,63 @@ def create_app() -> FastAPI:
     ) -> dict[str, Any]:
         """V0.30.6 B1：4-agent 并行审查章节（critical/major/minor + quality）。
 
+        V1.0.1 B8：``Idempotency-Key`` header 支持（防双击 + 防并发重复 LLM）。
+        - 客户端在请求头中传 UUID4 作 idempotency key。
+        - 后端用 ``InMemoryIdempotencyStore.claim()`` 原子占位，避免并发同
+          key 触发多次 LLM 调用。
+        - 同 key 同 chapter + TTL 内：直接返回缓存（不调 LLM）。
+        - 并发同 key：第一个抢到 claim 的跑 LLM，其他请求 await asyncio.Event
+          等结果（共享同一 LLM 结果，全部 200 返回）。
+        - TTL 过期或 in-flight 超时（30s）→ 重新调用 LLM 或返回 409。
+        - 不同 chapter → 不同 cache slot。
+
         Returns:
             dict 含 critical_issues / major_issues / minor_issues / quality_score /
             total_* / overall_verdict / elapsed_seconds / content_chars / chapter_number
+            （含 ``_idempotent_replay: true`` 字段当返回缓存命中时）
         """
         from novel2all.core.memory.multi_reviewer import MultiAgentReviewer
+
+        # === V1.0.1 B8：idempotency check (claim-based, race-safe) ===
+        idempotency_key = request.headers.get("Idempotency-Key")
+        user = get_request_user(request)
+        user_id = user.id if user is not None else 0
+
+        cache_key: tuple[int, int, str] | None = None
+        claimed: bool = False
+        if idempotency_key:
+            # key 维度：(user_id, chapter, idempotency_key) — per spec。
+            # 同 chapter 不同 user 的请求互不干扰。
+            cache_key = (user_id, chapter, idempotency_key)
+            idempotency_store = request.app.state.idempotency_store
+            claimed, existing = idempotency_store.claim(cache_key)
+            if not claimed:
+                # 已有 in-flight 或 cached result
+                if isinstance(existing, dict) and existing.get("_in_flight"):
+                    # In-flight：轮询等第一个请求完成（跨 event loop 友好）
+                    result = await idempotency_store.wait_for_result(cache_key, timeout=30.0)
+                    if result is None:
+                        logger.warning(
+                            "V1.0.1 B8: idempotency in-flight timeout user=%s chapter=%s key=%s",
+                            user_id,
+                            chapter,
+                            idempotency_key[:8],
+                        )
+                        raise HTTPException(
+                            status_code=409,
+                            detail="Idempotency-Key request still in progress (timeout)",
+                        ) from None
+                    existing = result
+                # 此时 existing 一定是 cached result
+                logger.info(
+                    "V1.0.1 B8: review idempotent replay user=%s chapter=%s key=%s",
+                    user_id,
+                    chapter,
+                    idempotency_key[:8],
+                )
+                replay = dict(existing)
+                replay["_idempotent_replay"] = True
+                return replay
 
         root = Path(project_root).resolve()
         project = ProjectStructure(root=root)
@@ -1339,7 +1743,12 @@ def create_app() -> FastAPI:
         provider: LLMProvider = request.app.state.provider
         reviewer = MultiAgentReviewer(llm=provider)
         report = await reviewer.review(state=state, content=content, chapter_number=chapter)
-        return report.to_dict()
+        result = report.to_dict()
+
+        # === V1.0.1 B8：complete（覆盖 sentinel + 唤醒 waiter）===
+        if cache_key is not None and claimed:
+            idempotency_store.complete(cache_key, result)
+        return result
 
     # V0.30.6 B6：批量导出端点（整本书）
     @app.get("/api/export")

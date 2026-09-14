@@ -45,6 +45,10 @@ RUN pip install -e .
 # 数据目录（持久化 cache + auth.db + sessions.db）
 RUN mkdir -p /app/.novel2all /app/正文
 
+# V1.0.1 B4：以非 root 用户运行（最小权限原则 + CIS Docker Benchmark）
+RUN useradd -m -u 1001 novel && chown -R novel:novel /app
+USER novel
+
 # 暴露端口
 EXPOSE 8000
 
