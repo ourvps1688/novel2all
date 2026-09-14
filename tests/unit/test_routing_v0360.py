@@ -23,6 +23,19 @@ from novel2all.core.provider_router import (
     TaskType,
 )
 
+
+# === V0.23.1：offpeak fixture（强制 is_peak_hour = False） ===
+@pytest.fixture
+def offpeak(monkeypatch: pytest.MonkeyPatch) -> None:
+    """强制 is_peak_hour() 返回 False（off-peak）。
+
+    背景：DeepSeek 高峰时段是北京 9-12、14-18 工作日，CI 在任何时区跑都不可控。
+    价格测试假设 offpeak 价格（input 1.0/M, output 4.0/M），但运行在 peak 时段会
+    返回 2x 数字。fixture mock 让测试确定性。
+    """
+    monkeypatch.setattr("novel2all.core.provider_router.is_peak_hour", lambda: False)
+
+
 # === 1. DEFAULT_TASK_ROUTES 配置验证 ===
 
 
@@ -107,7 +120,7 @@ class TestV036CostEstimate:
     def router(self) -> ModelRouter:
         return ModelRouter(LLMConfig())
 
-    def test_writing_cost_uses_flash_pricing(self, router: ModelRouter) -> None:
+    def test_writing_cost_uses_flash_pricing(self, router: ModelRouter, offpeak) -> None:
         """V0.36：WRITING 成本 = flash 价格（input=1.0/M, output=4.0/M）。"""
         # 5K input + 3K output
         # input: 5000 × 1.0 / 1M = 0.005
@@ -116,7 +129,7 @@ class TestV036CostEstimate:
         cost = router.cost_estimate(TaskType.WRITING, 5000, 3000)
         assert cost == pytest.approx(0.017, abs=1e-6)
 
-    def test_writing_cost_50_chapters(self, router: ModelRouter) -> None:
+    def test_writing_cost_50_chapters(self, router: ModelRouter, offpeak) -> None:
         """V0.36：50 章小说 WRITING 总成本估算（V0.27 vs V0.36 对比）。
 
         V0.27 (minimax): 50 × 0.0462 = ¥2.31

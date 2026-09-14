@@ -54,6 +54,17 @@ def router(config: LLMConfig) -> ModelRouter:
     return ModelRouter(config)
 
 
+@pytest.fixture
+def offpeak(monkeypatch: pytest.MonkeyPatch) -> None:
+    """V0.23.1：强制 is_peak_hour() 返回 False（off-peak）。
+
+    背景：DeepSeek 高峰时段是北京 9-12、14-18 工作日，CI 在任何时区跑都不可控。
+    价格测试假设 offpeak 价格（input 1.0/M, output 4.0/M），但运行在 peak 时段会
+    返回 2x 数字。fixture mock 掉 is_peak_hour 让测试确定性。
+    """
+    monkeypatch.setattr("novel2all.core.provider_router.is_peak_hour", lambda: False)
+
+
 # === TaskType enum 测试 ===
 
 
@@ -242,7 +253,7 @@ class TestModelPricingV023:
 
 
 class TestCostEstimateV023:
-    def test_flash_extraction_offpeak(self, router: ModelRouter) -> None:
+    def test_flash_extraction_offpeak(self, router: ModelRouter, offpeak) -> None:
         """V0.26：SUMMARIZATION（flash 任务）× flash off-peak 价格估算。"""
         # 5K input + 1K output, no cache hit
         # input: 5000 × 1.00 / 1M = 0.005
@@ -261,7 +272,7 @@ class TestCostEstimateV023:
         cost = router.cost_estimate(TaskType.EXTRACTION, 5000, 1000, model="minimax/MiniMax-M3")
         assert cost == pytest.approx(0.0294, abs=1e-6)
 
-    def test_flash_writing_offpeak_v036(self, router: ModelRouter) -> None:
+    def test_flash_writing_offpeak_v036(self, router: ModelRouter, offpeak) -> None:
         """V0.36：WRITING × deepseek-flash off-peak 价格估算（V0.35 验证 flash 是新默认）。"""
         # deepseek-flash: input_miss=1.0, output=4.0
         # 5K input + 3K output
@@ -278,7 +289,7 @@ class TestCostEstimateV023:
         # cache hit 应便宜至少 20%
         assert cost_cache < cost_no_cache * 0.8
 
-    def test_cache_hit_flash_specific_v036(self, router: ModelRouter) -> None:
+    def test_cache_hit_flash_specific_v036(self, router: ModelRouter, offpeak) -> None:
         """V0.36：flash cache hit 价格：5K × 0.02/M + 3K × 4.0/M = 0.0121。"""
         # V0.36: WRITING 路由到 flash，所以 WRITING 的 cache hit 测试 flash 定价
         cost = router.cost_estimate(TaskType.WRITING, 5000, 3000, cache_hit=True)
