@@ -1,0 +1,4 @@
+untracked: 11
+modified: 0
+ignored:  18544
+untracked sample (first 10): ['?? scripts/_cleanup_result.log', '?? scripts/_del_pytest_cache.ps1', '?? scripts/_patch_runner.ps1', '?? scripts/_pytest_after.log', '?? scripts/_quality_result.md', '?? scripts/_run_quality.sh', '?? scripts/_scan_untracked.log', '?? scripts/_scan_untracked2.log', '?? scripts/_scan_untracked3.log', '?? scripts/_verify_after.log']

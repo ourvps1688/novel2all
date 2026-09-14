@@ -41,7 +41,6 @@ from typing import Any
 from novel2all.core import LLMConfig, LLMProvider
 from novel2all.core.provider_router import TaskType
 
-
 # === 配置 ===
 
 MODELS_TO_TEST = [
@@ -324,7 +323,7 @@ def main() -> int:
     print("V0.35 真实 benchmark：minimax/千问/DeepSeek 对比")
     print("=" * 60)
     print(f"模型：{MODELS_TO_TEST}")
-    print(f"任务：WRITING / CONSISTENCY / EXTRACTION / SUMMARIZATION")
+    print("任务：WRITING / CONSISTENCY / EXTRACTION / SUMMARIZATION")
 
     results = asyncio.run(run_full_benchmark())
 
@@ -351,7 +350,7 @@ def main() -> int:
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md)
 
-    print(f"\n✅ 结果已保存：")
+    print("\n✅ 结果已保存：")
     print(f"  - {json_path}")
     print(f"  - {md_path}")
 

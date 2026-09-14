@@ -1,0 +1,188 @@
+untracked: 1608
+modified: 0
+ignored (gitignored): 22317
+
+=== UNTRACKED (first 60) ===
+  021ithqz
+  02v7r3jp
+  03f10zkd
+  04znx7cc
+  05a3jm40
+  05rkmyy0
+  07l7_igm
+  08jvy7wx
+  0aisro8x
+  0bh_ebaw
+  0bnrzuia
+  0dfot48r
+  0drwgypo
+  0ds3zwuy
+  0el5s35p
+  0eok_0rw
+  0eruirj6
+  0fjqa6vc
+  0gecmwnq
+  0gegwnao
+  0h37ik52
+  0hi46bti
+  0hpbobce
+  0it8wxkf
+  0jcblck_
+  0jo5_cs3
+  0l0jl117
+  0l0wtuqn
+  0mz_8n2_
+  0npwiwmf
+  0nvtuiaj
+  0obccpa6
+  0ohzb29x
+  0owlgnok
+  0p42zfur
+  0q7oplya
+  0qs48vpu
+  0qzcopat
+  0rhg9qjj
+  0rq780ca
+  0rswkhem
+  0t_6fp8c
+  0th1qarx
+  0vwx9s4i
+  0w9hdgii
+  0wod3myo
+  0wzjkv7z
+  0y0ewpov
+  0y3lcs2p
+  0yw_xvyt
+  0znqc96z
+  10iz7ntj
+  11osl9s_
+  12zcloeo
+  1480819g
+  14jy67m7
+  1645vhau
+  19_ldjl_
+  1a8r3ywm
+  1ctx4zd_
+
+=== IGNORED (first 60) ===
+  .api-info.log
+  .api-test.log
+  .commit.log
+  .env
+  .github-info.log
+  .github-info.py
+  .mypy_cache/.gitignore
+  .mypy_cache/3.12/cache.0.db
+  .mypy_cache/3.12/cache.1.db
+  .mypy_cache/3.12/cache.10.db
+  .mypy_cache/3.12/cache.11.db
+  .mypy_cache/3.12/cache.12.db
+  .mypy_cache/3.12/cache.13.db
+  .mypy_cache/3.12/cache.14.db
+  .mypy_cache/3.12/cache.15.db
+  .mypy_cache/3.12/cache.2.db
+  .mypy_cache/3.12/cache.3.db
+  .mypy_cache/3.12/cache.4.db
+  .mypy_cache/3.12/cache.5.db
+  .mypy_cache/3.12/cache.6.db
+  .mypy_cache/3.12/cache.7.db
+  .mypy_cache/3.12/cache.8.db
+  .mypy_cache/3.12/cache.9.db
+  .mypy_cache/CACHEDIR.TAG
+  .outbound.log
+  .perms.log
+  .push-result.log
+  .push-verbose.log
+  .push.py
+  .ruff_cache/.gitignore
+  .ruff_cache/0.16.6/10069717759724268033
+  .ruff_cache/0.16.6/101057510228287235
+  .ruff_cache/0.16.6/10178021213890428003
+  .ruff_cache/0.16.6/10329586064715153101
+  .ruff_cache/0.16.6/10367394746519940453
+  .ruff_cache/0.16.6/10372547672437073157
+  .ruff_cache/0.16.6/10427556240361852652
+  .ruff_cache/0.16.6/10480963331084851690
+  .ruff_cache/0.16.6/10870059136263163261
+  .ruff_cache/0.16.6/10950483331326690057
+  .ruff_cache/0.16.6/1098450939248109463
+  .ruff_cache/0.16.6/11010714317289377613
+  .ruff_cache/0.16.6/11146422749433469140
+  .ruff_cache/0.16.6/11184242687161028950
+  .ruff_cache/0.16.6/11288610255693005196
+  .ruff_cache/0.16.6/11480001171699943771
+  .ruff_cache/0.16.6/1169296928135512849
+  .ruff_cache/0.16.6/11758787473326357269
+  .ruff_cache/0.16.6/12139950671876883244
+  .ruff_cache/0.16.6/12731016972446064361
+  .ruff_cache/0.16.6/12814892972315078220
+  .ruff_cache/0.16.6/12937367621609533251
+  .ruff_cache/0.16.6/13349821200324362503
+  .ruff_cache/0.16.6/13357897345179763996
+  .ruff_cache/0.16.6/13419585490999608704
+  .ruff_cache/0.16.6/13442231059872349175
+  .ruff_cache/0.16.6/13499805510596617764
+  .ruff_cache/0.16.6/1369661456802757491
+  .ruff_cache/0.16.6/14795328865094659740
+  .ruff_cache/0.16.6/14867843028197251721
+
+=== MODIFIED (all) ===
+=== UNTRACKED FILE STATS ===
+count: 1609
+sizes (bytes): min=4, median=4, max=5686, total=22318
+with extension: 6
+no extension (8-char random): 1600
+extensions: {'(none)': 1600, 'ps1': 2, 'md': 1, 'sh': 1, 'log': 1, 'py': 1}
+
+=== SAMPLE CONTENTS (first 100 bytes of 3 random files) ===
+--- 021ithqz (size=4) ---
+TEXT: blat
+--- 02v7r3jp (size=4) ---
+TEXT: blat
+--- 03f10zkd (size=4) ---
+TEXT: blat
+
+=== IGNORED TOP-LEVEL ===
+   22063  .venv/
+     142  .ruff_cache/
+      34  src/
+      22  tests/
+      18  .mypy_cache/
+      13  scripts/
+       1  .api-info.log/
+       1  .api-test.log/
+       1  .commit.log/
+       1  .env/
+       1  .github-info.log/
+       1  .github-info.py/
+       1  .outbound.log/
+       1  .perms.log/
+       1  .push-result.log/
+       1  .push-verbose.log/
+       1  .push.py/
+       1  .ssh-test.log/
+       1  .token-check.log/
+       1  .token-check.py/
+       1  _b.txt/
+       1  _d.txt/
+       1  _e.txt/
+       1  _e2.txt/
+       1  _ef.txt/
+       1  _gd.txt/
+       1  _lint_log.txt/
+       1  _r.txt/
+       1  _rf.txt/
+       1  _rf2.txt/
+       1  _test_log.txt/
+
+=== SUSPECT LOG FILES AT ROOT (top 20) ===
+  .api-info.log  size=44
+  .api-test.log  size=77
+  .commit.log  size=3975
+  .github-info.log  size=5334
+  .outbound.log  size=30
+  .perms.log  size=279
+  .push-result.log  size=1086
+  .push-verbose.log  size=418
+  .ssh-test.log  size=408
+  .token-check.log  size=73

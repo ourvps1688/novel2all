@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 # === Helpers ===
 
+
 def get_request_user(request: Request) -> User | None:
     """V0.30.6 B5 收尾：从 request.state 取当前用户（可能 None）。"""
     return getattr(request.state, "user", None)
@@ -31,6 +32,7 @@ def get_request_session_id(request: Request) -> str | None:
 
 
 # === FastAPI dependencies ===
+
 
 async def current_user_optional(request: Request) -> User | None:
     """V0.30.6 B5 收尾：注入当前用户（可选，未登录返回 None）。

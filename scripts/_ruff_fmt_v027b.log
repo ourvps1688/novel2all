@@ -1,0 +1,27 @@
+unformatted: File would be reformatted
+    --> tests\unit\test_provider_router.py:1049:14
+     |
+1048 |
+     -         with patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"), patch(
+     -             "httpx.AsyncClient.post", new_callable=AsyncMock
+     -         ) as mock_post:
+1049 +         with (
+1050 +             patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"),
+1051 +             patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+1052 +         ):
+1053 |             mock_resp = MagicMock()
+--------------------------------------------------------------------------------
+1146 |         # 同时 patch 两个
+     -         with patch.object(
+     -             LLMProvider, "_call_anthropic_compat", new_callable=AsyncMock
+     -         ) as mock_call, patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm:
+1147 +         with (
+1148 +             patch.object(
+1149 +                 LLMProvider, "_call_anthropic_compat", new_callable=AsyncMock
+1150 +             ) as mock_call,
+1151 +             patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm,
+1152 +         ):
+1153 |             mock_litellm.return_value = SimpleNamespace(
+     |
+
+1 file would be reformatted, 58 files already formatted

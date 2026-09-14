@@ -1,0 +1,6 @@
+STDOUT: [main e5abf77] feat(v0.30.3): 流式编辑器升级 - HTMX SSE + Alpine.js 状态机 + 错误处理
+ 4 files changed, 509 insertions(+), 11 deletions(-)
+ create mode 100644 src/novel2all/web/static/htmx-sse.js
+ create mode 100644 tests/unit/test_stream_editor_v0303.py
+
+STDERR: 

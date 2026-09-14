@@ -1,0 +1,87 @@
+=== src/ (34 ignored) ===
+       233  src/novel2all/__pycache__/__init__.cpython-312.pyc
+       233  src/novel2all/__pycache__/__init__.cpython-313.pyc
+       190  src/novel2all/cli/__pycache__/__init__.cpython-312.pyc
+       190  src/novel2all/cli/__pycache__/__init__.cpython-313.pyc
+     17480  src/novel2all/cli/__pycache__/main.cpython-312.pyc
+     15578  src/novel2all/cli/__pycache__/main.cpython-313.pyc
+       637  src/novel2all/core/__pycache__/__init__.cpython-312.pyc
+       637  src/novel2all/core/__pycache__/__init__.cpython-313.pyc
+     11306  src/novel2all/core/__pycache__/pipeline.cpython-312.pyc
+      5110  src/novel2all/core/__pycache__/project.cpython-312.pyc
+     18478  src/novel2all/core/__pycache__/provider.cpython-312.pyc
+      6942  src/novel2all/core/__pycache__/provider.cpython-313.pyc
+     12639  src/novel2all/core/__pycache__/provider_router.cpython-312.pyc
+      4437  src/novel2all/core/__pycache__/role.cpython-312.pyc
+      4590  src/novel2all/core/__pycache__/role.cpython-313.pyc
+      4338  src/novel2all/core/__pycache__/skill.cpython-312.pyc
+      4526  src/novel2all/core/__pycache__/skill.cpython-313.pyc
+      1631  src/novel2all/core/memory/__pycache__/__init__.cpython-312.pyc
+      1138  src/novel2all/core/memory/__pycache__/__init__.cpython-313.pyc
+     19402  src/novel2all/core/memory/__pycache__/extractor.cpython-312.pyc
+      9761  src/novel2all/core/memory/__pycache__/extractor.cpython-313.pyc
+     18978  src/novel2all/core/memory/__pycache__/graph.cpython-312.pyc
+     22845  src/novel2all/core/memory/__pycache__/manager.cpython-312.pyc
+      9727  src/novel2all/core/memory/__pycache__/manager.cpython-313.pyc
+     21521  src/novel2all/core/memory/__pycache__/retriever.cpython-312.pyc
+     14470  src/novel2all/core/memory/__pycache__/summarizer.cpython-312.pyc
+      8928  src/novel2all/core/memory/__pycache__/tracker.cpython-312.pyc
+      8884  src/novel2all/core/memory/__pycache__/tracker.cpython-313.pyc
+      9232  src/novel2all/core/memory/__pycache__/types.cpython-312.pyc
+      5781  src/novel2all/core/memory/__pycache__/types.cpython-313.pyc
+     10392  src/novel2all/core/memory/__pycache__/verifier.cpython-312.pyc
+      6814  src/novel2all/core/memory/__pycache__/verifier.cpython-313.pyc
+       185  src/novel2all/web/__pycache__/__init__.cpython-312.pyc
+     46300  src/novel2all/web/__pycache__/app.cpython-312.pyc
+
+=== tests/ (22 ignored) ===
+       172  tests/__pycache__/__init__.cpython-312.pyc
+       168  tests/unit/__pycache__/__init__.cpython-312.pyc
+     27948  tests/unit/__pycache__/test_ci_status.cpython-312-pytest-9.1.1.pyc
+     12271  tests/unit/__pycache__/test_extractor.cpython-312-pytest-9.1.1.pyc
+     46434  tests/unit/__pycache__/test_extractor_graph.cpython-312-pytest-9.1.1.pyc
+     68098  tests/unit/__pycache__/test_graph.cpython-312-pytest-9.1.1.pyc
+     43060  tests/unit/__pycache__/test_manager_graph.cpython-312-pytest-9.1.1.pyc
+     13657  tests/unit/__pycache__/test_memory.cpython-312-pytest-9.1.1.pyc
+     27187  tests/unit/__pycache__/test_memory_integration.cpython-312-pytest-9.1.1.pyc
+     35577  tests/unit/__pycache__/test_pipeline.cpython-312-pytest-9.1.1.pyc
+     11858  tests/unit/__pycache__/test_project.cpython-312-pytest-9.1.1.pyc
+    135727  tests/unit/__pycache__/test_provider_router.cpython-312-pytest-9.1.1.pyc
+     36828  tests/unit/__pycache__/test_retriever.cpython-312-pytest-9.1.1.pyc
+      7992  tests/unit/__pycache__/test_role.cpython-312-pytest-9.1.1.pyc
+     11800  tests/unit/__pycache__/test_skill.cpython-312-pytest-9.1.1.pyc
+     40587  tests/unit/__pycache__/test_summarizer.cpython-312-pytest-9.1.1.pyc
+     40854  tests/unit/__pycache__/test_task_routing_integration.cpython-312-pytest-9.1.1.pyc
+     21282  tests/unit/__pycache__/test_tracker.cpython-312-pytest-9.1.1.pyc
+      7789  tests/unit/__pycache__/test_verifier.cpython-312-pytest-9.1.1.pyc
+     39226  tests/unit/__pycache__/test_verifier_severity.cpython-312-pytest-9.1.1.pyc
+     14756  tests/unit/__pycache__/test_web_api.cpython-312-pytest-9.1.1.pyc
+     30227  tests/unit/__pycache__/test_web_sse.cpython-312-pytest-9.1.1.pyc
+
+=== scripts/ (13 ignored) ===
+     12683  scripts/__pycache__/ci_status.cpython-312.pyc
+       396  scripts/_check.py
+       882  scripts/_check_cache.py
+       651  scripts/_direct_run.py
+       913  scripts/_find_path.py
+        27  scripts/_hello.py
+       250  scripts/_list_shim.py
+     18019  scripts/_p0_apply.py
+      5297  scripts/_p0_patch.py
+     17981  scripts/_p0_v2_apply.py
+       491  scripts/_run_compare.py
+      3080  scripts/_run_test.py
+         9  scripts/_scan_untracked.py
+
+=== TOP-LEVEL UNDERSCORE FILES ===
+      1030  _b.txt
+      4122  _d.txt
+      2897  _e.txt
+      3446  _e2.txt
+      5630  _ef.txt
+      4043  _gd.txt
+       176  _lint_log.txt
+       805  _r.txt
+      8180  _rf.txt
+      5682  _rf2.txt
+       176  _test_log.txt

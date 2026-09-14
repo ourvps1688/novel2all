@@ -655,11 +655,13 @@ class LLMProvider:
         """V0.30.6 C3：记录一次 LLM 调用到 AdaptiveRouter（用于下次 select）。"""
         try:
             from novel2all.core.provider_router import TaskType
+
             if not isinstance(task, TaskType):
                 return  # 仅 TaskType 才记录
             if hasattr(self, "_adaptive_router") and self._adaptive_router is not None:
                 self._adaptive_router.record_run(
-                    task, model,
+                    task,
+                    model,
                     success=success,
                     latency_ms=latency_ms,
                     quality_score=quality_score,

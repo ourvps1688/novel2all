@@ -1,0 +1,16 @@
+tests\unit\test_task_routing_integration.py ........................     [ 83%]
+tests\unit\test_tracker.py ..........                                    [ 87%]
+tests\unit\test_verifier.py ....                                         [ 88%]
+tests\unit\test_verifier_severity.py .....................               [ 94%]
+tests\unit\test_web_api.py .......                                       [ 96%]
+tests\unit\test_web_sse.py ...........                                   [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\starlette\testclient.py:53
+  D:\OHMYSTORY\novel2all\.venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 324 passed, 7 skipped, 1 warning in 11.64s ==================
+
+EXIT= 0

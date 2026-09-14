@@ -1,0 +1,43 @@
+F401 [*] `unittest.mock.patch` imported but unused
+    --> tests\unit\test_provider_router.py:1307:35
+     |
+1305 |         """_anthropic_api_key_for 现在纯配置驱动，不再有 hardcoded if/else。"""
+1306 |         import os
+1307 |         from unittest.mock import patch
+     |                                   ^^^^^
+1308 |
+1309 |         from novel2all.core.provider import LLMProvider
+     |
+help: Remove unused import: `unittest.mock.patch`
+     |
+1306 |         import os
+     -         from unittest.mock import patch
+1307 |
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> tests\unit\test_provider_router.py:1328:13
+     |
+1326 |               # 3. 未来加 anthropic_compat provider：只需在 MODEL_CONFIG 加条目，
+1327 |               #    函数本身无需改（这是 V0.28 的核心改进）
+1328 | /             from novel2all.core.provider_router import MODEL_CONFIG
+1329 | |
+1330 | |             # 临时注入一个假 anthropic_compat provider
+1331 | |             from novel2all.core.provider_router import ModelConfig
+     | |__________________________________________________________________^
+1332 |
+1333 |               MODEL_CONFIG["my-provider/my-model"] = ModelConfig(
+     |
+help: Organize imports
+     |
+1327 |             #    函数本身无需改（这是 V0.28 的核心改进）
+     -             from novel2all.core.provider_router import MODEL_CONFIG
+     -
+1328 |             # 临时注入一个假 anthropic_compat provider
+     -             from novel2all.core.provider_router import ModelConfig
+1329 +             from novel2all.core.provider_router import MODEL_CONFIG, ModelConfig
+1330 |
+     |
+
+Found 2 errors.
+[*] 2 fixable with the `--fix` option.

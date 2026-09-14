@@ -10,6 +10,7 @@ from novel2all.core.provider_router import TaskType
 
 # === Test 1: 初始化 ===
 
+
 class TestAdaptiveRouterInit:
     """V0.30.6 C3 收尾：init_adaptive_router + 字段。"""
 
@@ -42,6 +43,7 @@ class TestAdaptiveRouterInit:
 
 # === Test 2: record_adaptive_run ===
 
+
 class TestRecordAdaptiveRun:
     """V0.30.6 C3 收尾：record_adaptive_run 集成方法。"""
 
@@ -50,8 +52,11 @@ class TestRecordAdaptiveRun:
         provider = LLMProvider(LLMConfig(cache_enabled=False))
         provider.init_adaptive_router(db_path=tmp_path / "router.db")
         provider._record_adaptive_run(
-            TaskType.WRITING, "deepseek/deepseek-flash",
-            success=True, latency_ms=3000, quality_score=8.0,
+            TaskType.WRITING,
+            "deepseek/deepseek-flash",
+            success=True,
+            latency_ms=3000,
+            quality_score=8.0,
         )
         stats = provider._adaptive_router.get_stats(TaskType.WRITING, "deepseek/deepseek-flash")
         assert stats is not None
@@ -62,8 +67,10 @@ class TestRecordAdaptiveRun:
         provider = LLMProvider(LLMConfig(cache_enabled=False))
         provider.init_adaptive_router(db_path=tmp_path / "router.db")
         provider._record_adaptive_run(
-            "writing", "deepseek/deepseek-flash",  # 字符串 task
-            success=True, latency_ms=3000,
+            "writing",
+            "deepseek/deepseek-flash",  # 字符串 task
+            success=True,
+            latency_ms=3000,
         )
         # 不应 crash，也不应记录
         stats = provider._adaptive_router.get_stats(TaskType.WRITING, "deepseek/deepseek-flash")
@@ -74,14 +81,17 @@ class TestRecordAdaptiveRun:
         provider = LLMProvider(LLMConfig(cache_enabled=False))
         # 不调用 init_adaptive_router
         provider._record_adaptive_run(
-            TaskType.WRITING, "m1",
-            success=True, latency_ms=1000,
+            TaskType.WRITING,
+            "m1",
+            success=True,
+            latency_ms=1000,
         )
         # 不应 crash，无记录（_adaptive_router=None）
         assert provider._adaptive_router is None
 
 
 # === Test 3: _resolve_model 集成 ===
+
 
 class TestResolveModelWithAdaptive:
     """V0.30.6 C3 收尾：_resolve_model 优先用 AdaptiveRouter。"""
@@ -94,9 +104,7 @@ class TestResolveModelWithAdaptive:
         # V0.23 默认：WRITING → deepseek/deepseek-flash
         assert "deepseek" in model
 
-    def test_resolve_with_router_cold_start_uses_default(
-        self, tmp_path: Path
-    ) -> None:
+    def test_resolve_with_router_cold_start_uses_default(self, tmp_path: Path) -> None:
         """V0.30.6 C3 收尾：启用 AdaptiveRouter 但无数据 → cold-start default。"""
         provider = LLMProvider(
             LLMConfig(cache_enabled=False, default_model="deepseek/deepseek-flash")
@@ -115,14 +123,20 @@ class TestResolveModelWithAdaptive:
         # m1: 快 + 高质量
         for _ in range(10):
             provider._record_adaptive_run(
-                TaskType.WRITING, "m1",
-                success=True, latency_ms=2000, quality_score=9.0,
+                TaskType.WRITING,
+                "m1",
+                success=True,
+                latency_ms=2000,
+                quality_score=9.0,
             )
         # m2: 慢 + 低质量
         for _ in range(10):
             provider._record_adaptive_run(
-                TaskType.WRITING, "m2",
-                success=True, latency_ms=10000, quality_score=5.0,
+                TaskType.WRITING,
+                "m2",
+                success=True,
+                latency_ms=10000,
+                quality_score=5.0,
             )
 
         model = provider._resolve_model(task=TaskType.WRITING)
@@ -134,7 +148,11 @@ class TestResolveModelWithAdaptive:
         provider.init_adaptive_router(db_path=tmp_path / "router.db", min_samples=5)
         for _ in range(10):
             provider._record_adaptive_run(
-                TaskType.WRITING, "m1", success=True, latency_ms=1000, quality_score=9.0,
+                TaskType.WRITING,
+                "m1",
+                success=True,
+                latency_ms=1000,
+                quality_score=9.0,
             )
 
         # 显式 model 应胜出
@@ -151,18 +169,34 @@ class TestResolveModelWithAdaptive:
         # WRITING: m1 优
         for _ in range(10):
             provider._record_adaptive_run(
-                TaskType.WRITING, "m1", success=True, latency_ms=1000, quality_score=9.0,
+                TaskType.WRITING,
+                "m1",
+                success=True,
+                latency_ms=1000,
+                quality_score=9.0,
             )
             provider._record_adaptive_run(
-                TaskType.WRITING, "m2", success=True, latency_ms=5000, quality_score=6.0,
+                TaskType.WRITING,
+                "m2",
+                success=True,
+                latency_ms=5000,
+                quality_score=6.0,
             )
         # SUMMARIZATION: m2 优
         for _ in range(10):
             provider._record_adaptive_run(
-                TaskType.SUMMARIZATION, "m2", success=True, latency_ms=2000, quality_score=9.0,
+                TaskType.SUMMARIZATION,
+                "m2",
+                success=True,
+                latency_ms=2000,
+                quality_score=9.0,
             )
             provider._record_adaptive_run(
-                TaskType.SUMMARIZATION, "m1", success=True, latency_ms=4000, quality_score=5.0,
+                TaskType.SUMMARIZATION,
+                "m1",
+                success=True,
+                latency_ms=4000,
+                quality_score=5.0,
             )
 
         assert provider._resolve_model(task=TaskType.WRITING) == "m1"
@@ -179,9 +213,7 @@ class TestResolveModelWithAdaptive:
 
     def test_resolve_no_task_uses_default(self, tmp_path: Path) -> None:
         """V0.30.6 C3 收尾：task=None → config.default_model。"""
-        provider = LLMProvider(
-            LLMConfig(cache_enabled=False, default_model="my_default")
-        )
+        provider = LLMProvider(LLMConfig(cache_enabled=False, default_model="my_default"))
         provider.init_adaptive_router(db_path=tmp_path / "router.db")
         model = provider._resolve_model()  # task=None
         assert model == "my_default"

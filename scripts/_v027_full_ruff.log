@@ -1,0 +1,130 @@
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+    --> tests\unit\test_provider_router.py:1043:9
+     |
+1041 |           provider = LLMProvider(LLMConfig())
+1042 |
+1043 | /         with patch.object(
+1044 | |             LLMProvider, "_anthropic_api_key_for", return_value="test-key"
+1045 | |         ):
+1046 | |             # 直接 patch httpx.AsyncClient.post
+1047 | |             with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+     | |______________________________________________________________________________________^
+1048 |                   mock_resp = MagicMock()
+1049 |                   mock_resp.json.return_value = {
+     |
+help: Combine `with` statements
+
+F401 [*] `unittest.mock.MagicMock` imported but unused
+    --> tests\unit\test_provider_router.py:1104:46
+     |
+1102 |         """complete() 调 minimax 时走 _call_anthropic_compat，不调 litellm。"""
+1103 |         import os
+1104 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                              ^^^^^^^^^
+1105 |
+1106 |         from novel2all.core.provider import LLMProvider
+     |
+help: Remove unused import: `unittest.mock.MagicMock`
+     |
+1103 |         import os
+     -         from unittest.mock import AsyncMock, MagicMock, patch
+1104 +         from unittest.mock import AsyncMock, patch
+1105 |
+     |
+
+F401 [*] `unittest.mock.MagicMock` imported but unused
+    --> tests\unit\test_provider_router.py:1135:46
+     |
+1133 |         """complete() 调 DeepSeek（非 anthropic_compat）时仍走 litellm。"""
+1134 |         from types import SimpleNamespace
+1135 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                              ^^^^^^^^^
+1136 |
+1137 |         from novel2all.core.provider import LLMProvider
+     |
+help: Remove unused import: `unittest.mock.MagicMock`
+     |
+1134 |         from types import SimpleNamespace
+     -         from unittest.mock import AsyncMock, MagicMock, patch
+1135 +         from unittest.mock import AsyncMock, patch
+1136 |
+     |
+
+SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+    --> tests\unit\test_provider_router.py:1142:9
+     |
+1141 |           # 同时 patch 两个
+1142 | /         with patch.object(
+1143 | |             LLMProvider, "_call_anthropic_compat", new_callable=AsyncMock
+1144 | |         ) as mock_call:
+1145 | |             with patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm:
+     | |______________________________________________________________________________________^
+1146 |                   mock_litellm.return_value = SimpleNamespace(
+1147 |                       choices=[SimpleNamespace(message=SimpleNamespace(content="DS_RESPONSE"))]
+     |
+help: Combine `with` statements
+     |
+1143 |             LLMProvider, "_call_anthropic_compat", new_callable=AsyncMock
+     -         ) as mock_call:
+     -             with patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm:
+     -                 mock_litellm.return_value = SimpleNamespace(
+     -                     choices=[SimpleNamespace(message=SimpleNamespace(content="DS_RESPONSE"))]
+     -                 )
+1144 +         ) as mock_call, patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm:
+1145 +             mock_litellm.return_value = SimpleNamespace(
+1146 +                 choices=[SimpleNamespace(message=SimpleNamespace(content="DS_RESPONSE"))]
+1147 +             )
+1148 |
+     -                 result = await provider.complete(prompt="hi", model="deepseek/deepseek-flash")
+1149 +             result = await provider.complete(prompt="hi", model="deepseek/deepseek-flash")
+1150 |
+     -                 # 1. litellm 被调
+     -                 mock_litellm.assert_called_once()
+     -                 # 2. anthropic_compat 没被调
+     -                 mock_call.assert_not_called()
+     -                 # 3. 返回 litellm 内容
+     -                 assert result == "DS_RESPONSE"
+1151 +             # 1. litellm 被调
+1152 +             mock_litellm.assert_called_once()
+1153 +             # 2. anthropic_compat 没被调
+1154 +             mock_call.assert_not_called()
+1155 +             # 3. 返回 litellm 内容
+1156 +             assert result == "DS_RESPONSE"
+1157 |
+     |
+
+RUF012 Mutable default value for class attribute
+    --> tests\unit\test_provider_router.py:1211:37
+     |
+1209 |             """async with httpx.AsyncClient(...) as client: 的 client 上下文"""
+1210 |
+1211 |             captured_kwargs: dict = {}
+     |                                     ^^
+1212 |
+1213 |             def __init__(self, *args, **kwargs):
+     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests\unit\test_task_routing_integration.py:363:9
+    |
+361 |           绕过 litellm，直接 httpx POST /v1/messages。
+362 |           """
+363 | /         import os
+364 | |         import asyncio
+365 | |         from unittest.mock import AsyncMock, patch
+    | |__________________________________________________^
+366 |
+367 |           # 确保有 API key（mock httpx 不真发请求，但 _anthropic_api_key_for 需读到 key）
+    |
+help: Organize imports
+    |
+362 |         """
+363 +         import asyncio
+364 |         import os
+    -         import asyncio
+365 |         from unittest.mock import AsyncMock, patch
+    |
+
+Found 6 errors.
+[*] 4 fixable with the `--fix` option.

@@ -1,0 +1,7 @@
+STDOUT: [main 91827e0] feat(v0.30.1): 模型选择器 - 暴露 V0.27 minimax + V0.28 数据驱动
+ 6 files changed, 505 insertions(+), 1 deletion(-)
+ create mode 100644 src/novel2all/web/templates/model_selector.html
+ create mode 100644 src/novel2all/web/templates/write_form.html
+ create mode 100644 tests/unit/test_model_selector_v0301.py
+
+STDERR: 

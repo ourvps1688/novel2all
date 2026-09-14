@@ -1,0 +1,26 @@
+A. __pycache__/        :  3588 files,     42749841 bytes
+B. .ruff_cache/        :   142 files,        39214 bytes
+C. .mypy_cache/        :    18 files,     95367397 bytes
+D. 1600 blat random    :  1600 files,         6400 bytes
+E. top hidden logs     :    14 files,        23312 bytes
+F. top underscore txt  :    11 files,        36187 bytes
+G. scripts/_ debug     :    12 files,        47996 bytes
+
+blat 名字样本（前 10 + 后 5）：
+  021ithqz
+  02v7r3jp
+  03f10zkd
+  04znx7cc
+  05a3jm40
+  05rkmyy0
+  07l7_igm
+  08jvy7wx
+  0aisro8x
+  0bh_ebaw
+ ...
+  zuu4vc2z
+  zxt2uss3
+  zxve1s5p
+  zyy0c5ff
+  zzk4erju
+blat mtime 范围: 2026-09-12 15:54:14.982074 - 2026-09-12 23:18:29.905799

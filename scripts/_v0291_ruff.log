@@ -1,0 +1,245 @@
+I001 [*] Import block is un-sorted or un-formatted
+    --> tests\unit\test_provider_router.py:1454:9
+     |
+1453 |           """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1454 | /         import httpx
+1455 | |         from unittest.mock import AsyncMock, MagicMock, patch
+     | |_____________________________________________________________^
+1456 |           """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1457 |           import httpx
+     |
+help: Organize imports
+     |
+1453 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+     -         import httpx
+1454 |         from unittest.mock import AsyncMock, MagicMock, patch
+1455 +
+1456 +         import httpx
+1457 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+     |
+
+F811 [*] Redefinition of unused `httpx` from line 1451
+    --> tests\unit\test_provider_router.py:1454:16
+     |
+1449 |     @pytest.mark.asyncio
+1450 |     async def test_retry_on_transient_error_then_success(self) -> None:
+1451 |         import httpx
+     |                ----- previous definition of `httpx` here
+1452 |
+1453 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1454 |         import httpx
+     |                ^^^^^ `httpx` redefined here
+1455 |         from unittest.mock import AsyncMock, MagicMock, patch
+1456 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+     |
+help: Remove definition: `httpx`
+     |
+1453 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+     -         import httpx
+1454 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> tests\unit\test_provider_router.py:1457:9
+     |
+1455 |           from unittest.mock import AsyncMock, MagicMock, patch
+1456 |           """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1457 | /         import httpx
+1458 | |         from unittest.mock import AsyncMock, MagicMock, patch
+1459 | |
+1460 | |         from novel2all.core.provider import LLMProvider
+     | |_______________________________________________________^
+1461 |
+1462 |           config = LLMConfig(
+     |
+help: Organize imports
+     |
+1456 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+     -         import httpx
+1457 |         from unittest.mock import AsyncMock, MagicMock, patch
+1458 |
+1459 +         import httpx
+1460 +
+1461 |         from novel2all.core.provider import LLMProvider
+     |
+
+F811 [*] Redefinition of unused `httpx` from line 1454
+    --> tests\unit\test_provider_router.py:1457:16
+     |
+1453 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1454 |         import httpx
+     |                ----- previous definition of `httpx` here
+1455 |         from unittest.mock import AsyncMock, MagicMock, patch
+1456 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1457 |         import httpx
+     |                ^^^^^ `httpx` redefined here
+1458 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |
+help: Remove definition: `httpx`
+     |
+1456 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+     -         import httpx
+1457 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |
+
+F811 [*] Redefinition of unused `AsyncMock` from line 1455
+    --> tests\unit\test_provider_router.py:1458:35
+     |
+1453 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1454 |         import httpx
+1455 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                   --------- previous definition of `AsyncMock` here
+1456 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1457 |         import httpx
+1458 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                   ^^^^^^^^^ `AsyncMock` redefined here
+1459 |
+1460 |         from novel2all.core.provider import LLMProvider
+     |
+help: Remove definition: `AsyncMock`
+     |
+1457 |         import httpx
+     -         from unittest.mock import AsyncMock, MagicMock, patch
+1458 |
+     |
+
+F811 [*] Redefinition of unused `MagicMock` from line 1455
+    --> tests\unit\test_provider_router.py:1458:46
+     |
+1453 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1454 |         import httpx
+1455 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                              --------- previous definition of `MagicMock` here
+1456 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1457 |         import httpx
+1458 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                              ^^^^^^^^^ `MagicMock` redefined here
+1459 |
+1460 |         from novel2all.core.provider import LLMProvider
+     |
+help: Remove definition: `MagicMock`
+     |
+1457 |         import httpx
+     -         from unittest.mock import AsyncMock, MagicMock, patch
+1458 |
+     |
+
+F811 [*] Redefinition of unused `patch` from line 1455
+    --> tests\unit\test_provider_router.py:1458:57
+     |
+1453 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1454 |         import httpx
+1455 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                                         ----- previous definition of `patch` here
+1456 |         """第一次 TransportError 失败，第二次成功——应返回 success content。"""
+1457 |         import httpx
+1458 |         from unittest.mock import AsyncMock, MagicMock, patch
+     |                                                         ^^^^^ `patch` redefined here
+1459 |
+1460 |         from novel2all.core.provider import LLMProvider
+     |
+help: Remove definition: `patch`
+     |
+1457 |         import httpx
+     -         from unittest.mock import AsyncMock, MagicMock, patch
+1458 |
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> tests\unit\test_provider_router.py:1509:9
+     |
+1507 |       async def test_retry_exhausted_raises_last_exception(self) -> None:
+1508 |           """max_retries=3 共 4 次都失败 → 抛最后一次的异常（不是 RetryError）。"""
+1509 | /         import httpx
+1510 | |         from unittest.mock import AsyncMock, patch
+1511 | |
+1512 | |         from novel2all.core.provider import LLMProvider
+     | |_______________________________________________________^
+1513 |
+1514 |           config = LLMConfig(
+     |
+help: Organize imports
+     |
+1508 |         """max_retries=3 共 4 次都失败 → 抛最后一次的异常（不是 RetryError）。"""
+     -         import httpx
+1509 |         from unittest.mock import AsyncMock, patch
+1510 |
+1511 +         import httpx
+1512 +
+1513 |         from novel2all.core.provider import LLMProvider
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> tests\unit\test_provider_router.py:1554:9
+     |
+1552 |       async def test_no_retry_on_4xx_client_error(self) -> None:
+1553 |           """4xx 客户端错误（如 400 bad request）不应重试。"""
+1554 | /         import httpx
+1555 | |         from unittest.mock import AsyncMock, MagicMock, patch
+1556 | |
+1557 | |         from novel2all.core.provider import LLMProvider
+     | |_______________________________________________________^
+1558 |
+1559 |           config = LLMConfig(
+     |
+help: Organize imports
+     |
+1553 |         """4xx 客户端错误（如 400 bad request）不应重试。"""
+     -         import httpx
+1554 |         from unittest.mock import AsyncMock, MagicMock, patch
+1555 |
+1556 +         import httpx
+1557 +
+1558 |         from novel2all.core.provider import LLMProvider
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> tests\unit\test_provider_router.py:1606:9
+     |
+1604 |       async def test_retry_on_429_rate_limit(self) -> None:
+1605 |           """429 限流应重试。"""
+1606 | /         import httpx
+1607 | |         from unittest.mock import AsyncMock, MagicMock, patch
+1608 | |
+1609 | |         from novel2all.core.provider import LLMProvider
+     | |_______________________________________________________^
+1610 |
+1611 |           config = LLMConfig(
+     |
+help: Organize imports
+     |
+1605 |         """429 限流应重试。"""
+     -         import httpx
+1606 |         from unittest.mock import AsyncMock, MagicMock, patch
+1607 |
+1608 +         import httpx
+1609 +
+1610 |         from novel2all.core.provider import LLMProvider
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> tests\unit\test_provider_router.py:1662:9
+     |
+1660 |       async def test_no_retry_when_max_retries_is_zero(self) -> None:
+1661 |           """max_retries=0 → 只首次，不重试。"""
+1662 | /         import httpx
+1663 | |         from unittest.mock import AsyncMock, patch
+1664 | |
+1665 | |         from novel2all.core.provider import LLMProvider
+     | |_______________________________________________________^
+1666 |
+1667 |           config = LLMConfig(
+     |
+help: Organize imports
+     |
+1661 |         """max_retries=0 → 只首次，不重试。"""
+     -         import httpx
+1662 |         from unittest.mock import AsyncMock, patch
+1663 |
+1664 +         import httpx
+1665 +
+1666 |         from novel2all.core.provider import LLMProvider
+     |
+
+Found 11 errors.
+[*] 11 fixable with the `--fix` option.

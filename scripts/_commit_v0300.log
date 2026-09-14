@@ -1,0 +1,12 @@
+STDOUT: [main 2602c36] feat(v0.30.0): 拆前端 SPA
+ 9 files changed, 501 insertions(+), 609 deletions(-)
+ create mode 100644 src/novel2all/web/static/alpine.min.js
+ create mode 100644 src/novel2all/web/static/htmx.min.js
+ create mode 100644 src/novel2all/web/templates/base.html
+ create mode 100644 src/novel2all/web/templates/index.html
+ create mode 100644 src/novel2all/web/templates/roles_partial.html
+ create mode 100644 src/novel2all/web/templates/skills_partial.html
+ create mode 100644 src/novel2all/web/templates/status_partial.html
+ create mode 100644 tests/unit/test_webui_v0300.py
+
+STDERR: 

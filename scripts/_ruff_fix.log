@@ -1,0 +1,27 @@
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+    --> tests\unit\test_provider_router.py:1048:9
+     |
+1046 |           provider = LLMProvider(LLMConfig())
+1047 |
+1048 | /         with patch.object(LLMProvider, "_anthropic_api_key_for", return_value="test-key"):
+1049 | |             # 直接 patch httpx.AsyncClient.post
+1050 | |             with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+     | |______________________________________________________________________________________^
+1051 |                   mock_resp = MagicMock()
+1052 |                   mock_resp.json.return_value = {
+     |
+help: Combine `with` statements
+
+RUF012 Mutable default value for class attribute
+    --> tests\unit\test_provider_router.py:1213:37
+     |
+1211 |             """async with httpx.AsyncClient(...) as client: 的 client 上下文"""
+1212 |
+1213 |             captured_kwargs: dict = {}
+     |                                     ^^
+1214 |
+1215 |             def __init__(self, *args, **kwargs):
+     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
+
+Found 6 errors (4 fixed, 2 remaining).

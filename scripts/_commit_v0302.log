@@ -1,0 +1,6 @@
+STDOUT: [main 0f2d75d] feat(v0.30.2): Cache 命中率面板 - 暴露 V0.24 + V0.29.0 LRU 价值
+ 4 files changed, 222 insertions(+)
+ create mode 100644 src/novel2all/web/templates/cache_panel.html
+ create mode 100644 tests/unit/test_cache_panel_v0302.py
+
+STDERR: 

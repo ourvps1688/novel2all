@@ -1,0 +1,2 @@
+src\novel2all\core\provider.py:672: error: Unused "type: ignore" comment  [unused-ignore]
+Found 1 error in 1 file (checked 1 source file)
