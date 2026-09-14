@@ -1,25 +1,69 @@
-{# V0.32 流式编辑器升级 — Alpine.js 状态机 + 取消按钮 + 「继续写」按钮 + task_id 追踪 #}
+{# V0.32 流式编辑器 — Alpine.js 状态机 + 取消按钮 + 「继续写」按钮 + task_id 追踪 #}
+{# V0.30.6 B3：+ 实时进度条 + phase stepper + ETA 估算 #}
 <div class="card"
      x-data="{
-        status: 'idle',  // idle | running | cancelling | done | error | cancelled
+        status: 'idle',
         content: '',
         charCount: 0,
         errorMsg: '',
         taskId: '',
-        cancelledAt: 0,  // V0.31：取消时的字数
-        resumedFrom: 0,  // V0.32：当前章节已存在的 partial 字数（启动前 fetch 检测）
-        startRun(taskId) {
+        cancelledAt: 0,
+        resumedFrom: 0,
+        minChars: 2000,
+        // V0.30.6 B3：进度条状态
+        startTime: 0,
+        chunkCount: 0,
+        charsPerSec: 0,
+        etaSec: 0,
+        currentPhase: 'init',
+        phases: [
+            {key: 'init',       label: '初始化',   status: 'pending'},
+            {key: 'pre_write',  label: '前置检查', status: 'pending'},
+            {key: 'writing',    label: '🍃 生成内容', status: 'active'},
+            {key: 'save',       label: '保存文件', status: 'pending'},
+            {key: 'extract',    label: '提取要素', status: 'pending'},
+            {key: 'merge',      label: '合并图谱', status: 'pending'},
+            {key: 'post_write', label: '后置检查', status: 'pending'},
+            {key: 'done',       label: '完成',     status: 'pending'},
+        ],
+        startRun(taskId, minC) {
             this.taskId = taskId;
             this.status = 'running';
             this.content = '';
             this.charCount = 0;
             this.errorMsg = '';
             this.cancelledAt = 0;
+            this.minChars = minC || 2000;
+            this.startTime = Date.now();
+            this.chunkCount = 0;
+            this.charsPerSec = 0;
+            this.etaSec = 0;
+            this.currentPhase = 'init';
+            this.resetPhases();
+            this.setPhase('init', 'active');
         },
         appendChunk(data) {
             if (data && data.text) {
                 this.content += data.text;
                 this.charCount = this.content.length;
+                this.chunkCount++;
+                const now = Date.now();
+                const elapsedSec = (now - this.startTime) / 1000;
+                if (elapsedSec > 0) {
+                    this.charsPerSec = Math.round(this.charCount / elapsedSec);
+                    const remaining = Math.max(0, this.minChars - this.charCount);
+                    if (this.charsPerSec > 0 && remaining > 0) {
+                        this.etaSec = Math.round(remaining / this.charsPerSec);
+                    } else {
+                        this.etaSec = 0;
+                    }
+                }
+                if (this.currentPhase === 'init' || this.currentPhase === 'pre_write') {
+                    this.markPhaseDone('init');
+                    this.markPhaseDone('pre_write');
+                    this.setPhase('writing', 'active');
+                    this.currentPhase = 'writing';
+                }
             }
         },
         endRun() {
@@ -30,37 +74,73 @@
         failRun(msg) {
             this.status = 'error';
             this.errorMsg = msg;
+            if (this.currentPhase) {
+                this.setPhase(this.currentPhase, 'error');
+            }
         },
         handleCancelled(data) {
-            // V0.31：处理 'cancelled' SSE 事件
             this.status = 'cancelled';
             this.cancelledAt = data.partial_chars || this.charCount;
-            this.resumedFrom = this.cancelledAt;  // V0.32：继续写按钮用
+            this.resumedFrom = this.cancelledAt;
+            this.setPhase('writing', 'cancelled');
         },
         async cancelRun() {
-            // V0.31：调 /api/write/cancel/{task_id} 取消正在运行的 pipeline
             if (!this.taskId || this.status !== 'running') return;
             this.status = 'cancelling';
             try {
-                const resp = await fetch('/api/write/cancel/' + this.taskId, {
-                    method: 'POST',
-                });
-                if (!resp.ok && resp.status !== 404) {
-                    console.error('Cancel failed:', resp.status);
-                }
+                const resp = await fetch('/api/write/cancel/' + this.taskId, {method: 'POST'});
+                if (!resp.ok && resp.status !== 404) console.error('Cancel failed:', resp.status);
             } catch (e) {
                 console.error('Cancel error:', e);
             }
         },
         resumeRun() {
-            // V0.32：点击「继续写」→ 重置状态 + 触发 form submit
-            // form 提交时携带 resumedFrom（HTMX 在 form 序列化时自动包含 input[name=resume_from_chars]）
             this.status = 'idle';
             this.content = '';
             this.charCount = 0;
         },
+        // V0.30.6 B3：phase helpers
+        resetPhases() {
+            this.phases = this.phases.map(p => ({...p, status: 'pending'}));
+        },
+        setPhase(key, status) {
+            const idx = this.phases.findIndex(p => p.key === key);
+            if (idx >= 0) {
+                this.phases[idx] = {...this.phases[idx], status: status};
+            }
+        },
+        markPhaseDone(key) {
+            this.setPhase(key, 'done');
+        },
+        handleProgress(data) {
+            if (data && data.phase) {
+                this.markPhaseDone(this.currentPhase);
+                this.setPhase(data.phase, 'active');
+                this.currentPhase = data.phase;
+            }
+        },
+        handleDone(data) {
+            for (const p of this.phases) {
+                if (p.status === 'active' || p.status === 'pending') {
+                    this.phases = this.phases.map(ph =>
+                        ph.key === p.key ? {...ph, status: 'done'} : ph
+                    );
+                }
+            }
+            this.currentPhase = 'done';
+        },
+        formatTime(sec) {
+            if (!sec || sec <= 0) return '--:--';
+            if (sec < 60) return sec + 's';
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return m + 'm' + (s < 10 ? '0' : '') + s + 's';
+        },
+        get progressPct() {
+            if (!this.minChars || this.minChars <= 0) return 0;
+            return Math.min(100, Math.round((this.charCount / this.minChars) * 100));
+        },
         async onSubmit(event) {
-            // V0.32：如果 cancelled 状态，自动填 resume_from_chars = resumedFrom
             const form = event.target;
             const resumeInput = form.querySelector('input[name=resume_from_chars]');
             if (resumeInput) {
@@ -69,7 +149,6 @@
             return true;
         },
         guardSubmit(event) {
-            // V0.31：运行中禁止再次提交；其他情况交给 onSubmit
             if (this.status === 'running' || this.status === 'cancelling') {
                 event.preventDefault();
                 return false;
@@ -78,17 +157,24 @@
             return true;
         },
         onSseEvent(detail) {
-            // V0.32：根据 SSE event 名分派
             const evtName = detail.event;
             const data = detail.data || {};
             if (evtName === 'started') {
                 this.taskId = data.task_id || this.taskId;
+                this.minChars = data.min_chars || 2000;
+                this.startRun(this.taskId, this.minChars);
             } else if (evtName === 'chunk') {
                 this.appendChunk(data);
+            } else if (evtName === 'progress') {
+                this.handleProgress(data);
+            } else if (evtName === 'pre_write_check') {
+                this.markPhaseDone('pre_write');
+            } else if (evtName === 'post_write_check') {
+                this.markPhaseDone('post_write');
             } else if (evtName === 'cancelled') {
                 this.handleCancelled(data);
             } else if (evtName === 'done') {
-                // done 由 hx-on::sse-after-message 处理
+                this.handleDone(data);
             } else if (evtName === 'error') {
                 this.failRun(data.message || '未知错误');
             }
@@ -109,11 +195,10 @@
           hx-swap="none"
           hx-ext="sse"
           sse-swap="message"
-          hx-on::sse-before-message="startRun($event.detail.data.task_id || (window.__currentTaskId || ''))"
+          hx-on::sse-before-message="startRun($event.detail.data.task_id || (window.__currentTaskId || ''), $event.detail.data.min_chars || 2000)"
           hx-on::sse-message="appendChunk($event.detail.data)"
           hx-on::sse-after-message="endRun()"
           @submit="guardSubmit($event)">
-        {# V0.32：resume_from_chars 隐藏 input（JS 在 cancelled 状态时自动填）#}
         <input type="hidden" name="resume_from_chars" value="0">
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
             <label>
@@ -149,17 +234,14 @@
                 <span x-show="status === 'idle' || status === 'done' || status === 'error'">开始写（流式）</span>
                 <span x-show="status === 'running'">⏳ 写作中...</span>
                 <span x-show="status === 'cancelling'">⚠ 取消中...</span>
-                {# V0.32：cancelled 状态显示「继续写」按钮（resume_from_chars 已自动填）#}
                 <span x-show="status === 'cancelled'">▶️ 继续写（从 <span x-text="cancelledAt"></span> 字接续）</span>
             </button>
-            {# V0.31：取消按钮（仅 running 状态显示）#}
             <button type="button"
                     x-show="status === 'running'"
                     @click="cancelRun()"
                     style="background: #f59e0b; color: white;">
                 🛑 停止
             </button>
-            {# V0.32：cancelled 状态的「重新开始」按钮（resume_from_chars=0 覆盖）#}
             <button type="button"
                     x-show="status === 'cancelled'"
                     @click="resumedFrom = 0; $event.target.closest('form').requestSubmit()"
@@ -169,7 +251,67 @@
         </div>
     </form>
 
-    {# 状态条 + 字数统计 #}
+    {# V0.30.6 B3：实时进度条 #}
+    <div x-show="status !== 'idle'"
+         x-cloak
+         style="margin-top: 16px; padding: 12px; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border);">
+        <h3 style="margin: 0 0 8px 0; font-size: 13px; color: var(--fg-muted); display: flex; align-items: center; gap: 8px;">
+            <span>📊 实时进度</span>
+            <span x-show="status === 'running'" class="badge progress-pulse" style="background: var(--accent); color: white; font-size: 10px;">LIVE</span>
+        </h3>
+
+        <div class="progress-stepper" data-testid="progress-stepper">
+            <template x-for="(p, i) in phases" :key="p.key">
+                <div style="display: flex; align-items: center;">
+                    <div class="progress-step"
+                         :class="p.status"
+                         :data-testid="'phase-' + p.key"
+                         :data-status="p.status">
+                        <span x-text="p.label"></span>
+                    </div>
+                    <span x-show="i < phases.length - 1" class="progress-step-arrow"
+                          :class="{ active: p.status === 'done' || p.status === 'active' }">→</span>
+                </div>
+            </template>
+        </div>
+
+        <div class="progress-bar-track" data-testid="progress-bar-track">
+            <div class="progress-bar-fill"
+                 :class="{ cancelled: status === 'cancelled', error: status === 'error' }"
+                 :style="'width: ' + progressPct + '%'"
+                 data-testid="progress-bar-fill">
+            </div>
+            <div class="progress-bar-label" data-testid="progress-bar-label">
+                <span x-text="progressPct + '%'" style="font-family: ui-monospace;"></span>
+            </div>
+        </div>
+
+        <div class="progress-stats" data-testid="progress-stats">
+            <div class="progress-stats-item">
+                <span>📝</span>
+                <span class="value" x-text="charCount.toLocaleString()"></span>
+                <span>/</span>
+                <span x-text="minChars.toLocaleString()"></span>
+                <span>字</span>
+            </div>
+            <div class="progress-stats-item">
+                <span>⚡</span>
+                <span class="value" x-text="charsPerSec.toLocaleString()"></span>
+                <span>字/秒</span>
+            </div>
+            <div class="progress-stats-item">
+                <span>🧩</span>
+                <span class="value" x-text="chunkCount.toLocaleString()"></span>
+                <span>chunks</span>
+            </div>
+            <div class="progress-stats-item">
+                <span>⏱️</span>
+                <span class="value" x-text="formatTime(etaSec)"></span>
+                <span>ETA</span>
+            </div>
+        </div>
+    </div>
+
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--fg-muted);">
         <div>
             <span x-show="status === 'running'">📝 正在生成...</span>
