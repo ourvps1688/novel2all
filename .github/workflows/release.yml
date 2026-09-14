@@ -7,16 +7,19 @@ on:
 
 permissions:
   contents: write
-  id-token: write  # 用于 PyPI trusted publishing
+  id-token: write  # PyPI trusted publishing
+  packages: write  # GHCR push
+  attestations: write  # SBOM attestation (V1.0 GA)
 
 jobs:
-  release:
-    name: Build & Publish Release
+  # ===== 阶段 1：PyPI 包发布 =====
+  pypi:
+    name: Build & Publish to PyPI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 完整历史用于版本号生成
+          fetch-depth: 0  # 完整历史用于 changelog 生成
 
       - uses: astral-sh/setup-uv@v3
         with:
@@ -24,6 +27,11 @@ jobs:
 
       - name: Install build tools
         run: uv pip install --system build twine
+
+      - name: Generate changelog
+        run: |
+          python scripts/generate_changelog.py "${{ github.ref_name }}" CHANGELOG_AUTO.md
+          cat CHANGELOG_AUTO.md
 
       - name: Build sdist + wheel
         run: python -m build
@@ -35,22 +43,26 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          # Trusted publishing（无需 API token，配置 PyPI project 后自动）
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          generate_release_notes: true
-          draft: false
-          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
-
-  # ===== Docker image =====
+  # ===== 阶段 2：Docker multi-arch image =====
   docker:
-    name: Build Docker image
+    name: Build & Push Docker (multi-arch)
     runs-on: ubuntu-latest
-    # 注意：test/lint 定义在 ci.yml，跨 workflow 的 needs 无效；release 由 tag 触发，依赖其自身步骤即可
+    needs: pypi  # PyPI 发布成功后再 push Docker
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+          - platform: linux/arm64
+            arch: arm64
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up QEMU (multi-arch)
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -66,14 +78,62 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Build and push
+      - name: Build and push (platform=${{ matrix.platform }})
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          provenance: true
+          sbom: true
+
+      - name: Create manifest (multi-arch aggregate)
+        if: matrix.arch == 'amd64'  # 只在 amd64 完成后统一合并
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository }}:${VERSION} \
+            --tag ghcr.io/${{ github.repository }}:latest \
+            ghcr.io/${{ github.repository }}:${VERSION}-amd64 \
+            ghcr.io/${{ github.repository }}:${VERSION}-arm64
+
+  # ===== 阶段 3：GitHub Release =====
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [pypi, docker]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read auto-generated changelog
+        id: read_changelog
+        run: |
+          python scripts/generate_changelog.py "${{ github.ref_name }}" /tmp/CHANGELOG.md
+          CHANGELOG=$(cat /tmp/CHANGELOG.md)
+          {
+            echo "body<<EOF"
+            echo "$CHANGELOG"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.read_changelog.outputs.body }}
+          files: dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
