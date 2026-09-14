@@ -335,12 +335,12 @@ def create_app() -> FastAPI:
         audit_store = request.app.state.audit_store
         if audit_store is not None:
             audit_store.record(
-            "login",
-            user_id=user.id,
-            username=user.username,
-            ip=client_ip,
-            success=True,
-        )
+                "login",
+                user_id=user.id,
+                username=user.username,
+                ip=client_ip,
+                success=True,
+            )
         from novel2all.core.metrics import get_metrics_registry
 
         registry = get_metrics_registry()
