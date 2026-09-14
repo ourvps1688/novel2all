@@ -870,6 +870,59 @@ def create_app() -> FastAPI:
             },
         )
 
+    # V0.30.6 B2：手动 rollback 端点（CLI/UI 触发）
+    @app.post("/api/chapter/{chapter}/rollback")
+    async def rollback_chapter(
+        chapter: int,
+        project_root: str = Query(".", description="项目根目录"),
+    ) -> dict[str, Any]:
+        """V0.30.6 B2：手动回滚章节。
+
+        注意：手动回滚需要存在 .bak 备份文件。
+        如果 7 天前备份已被清理，回滚失败。
+
+        正常流程：B1 review verdict=fail 时自动回滚（无需手动调）。
+        本端点用于：
+        - 用户后悔想撤回刚才的章节
+        - 自动回滚失败后手动恢复
+
+        Returns:
+            dict 含 success / restored_from_backup / state_changes_reverted / message
+        """
+        from novel2all.core.memory.rollback import RollbackManager
+
+        root = Path(project_root).resolve()
+        manager = RollbackManager(project_root=root)
+
+        # 找最新的 .bak 备份
+        prose_dir = root / "正文"
+        if not prose_dir.exists():
+            raise HTTPException(status_code=404, detail="Prose directory not found")
+
+        pattern = f"第{chapter:03d}章.md.bak.*"
+        backups = sorted(prose_dir.glob(pattern), reverse=True)
+        if not backups:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No backup found for chapter {chapter}. Auto-rollback only works within 7 days.",
+            )
+
+        latest_backup = backups[0]
+        from novel2all.core.memory.rollback import WriteSnapshot
+
+        snapshot = WriteSnapshot(
+            chapter_number=chapter,
+            backup_path=latest_backup,
+            state_changes=[],
+            timestamp=latest_backup.stat().st_mtime,
+            state_file=root / "_tracking-state.json",
+        )
+
+        result = manager.rollback(snapshot)
+        if not result.success:
+            raise HTTPException(status_code=500, detail=result.message)
+        return result.to_dict()
+
     # V0.30.6 B1：4-agent 审查端点
     @app.post("/api/chapter/{chapter}/review")
     async def review_chapter(
