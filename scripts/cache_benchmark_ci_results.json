@@ -1,0 +1,228 @@
+{
+  "metadata": {
+    "timestamp": "2026-09-13T23:59:15.718963+00:00",
+    "num_ops": 2000,
+    "regression_threshold": 0.25,
+    "elapsed_total_seconds": 14.17
+  },
+  "results": [
+    {
+      "backend": "memory",
+      "workload": "read_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 1.62,
+      "throughput_ops_sec": 1237240.9,
+      "p99_ms": 0.0009,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "json",
+      "workload": "read_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 1524.23,
+      "throughput_ops_sec": 1312.1,
+      "p99_ms": 4.7172,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "sqlite",
+      "workload": "read_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 33.99,
+      "throughput_ops_sec": 58839.3,
+      "p99_ms": 0.0393,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "redis",
+      "workload": "read_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 84.68,
+      "throughput_ops_sec": 23617.8,
+      "p99_ms": 0.1041,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "memory",
+      "workload": "write_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 1.64,
+      "throughput_ops_sec": 1222867.6,
+      "p99_ms": 0.0009,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "json",
+      "workload": "write_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 6656.85,
+      "throughput_ops_sec": 300.4,
+      "p99_ms": 4.9571,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "sqlite",
+      "workload": "write_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 46.17,
+      "throughput_ops_sec": 43314.7,
+      "p99_ms": 0.0511,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "redis",
+      "workload": "write_heavy",
+      "num_ops": 2000,
+      "elapsed_ms": 102.82,
+      "throughput_ops_sec": 19450.7,
+      "p99_ms": 0.104,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "memory",
+      "workload": "mixed",
+      "num_ops": 2000,
+      "elapsed_ms": 1.63,
+      "throughput_ops_sec": 1224964.8,
+      "p99_ms": 0.0011,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "json",
+      "workload": "mixed",
+      "num_ops": 2000,
+      "elapsed_ms": 4064.91,
+      "throughput_ops_sec": 492.0,
+      "p99_ms": 4.9207,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "sqlite",
+      "workload": "mixed",
+      "num_ops": 2000,
+      "elapsed_ms": 39.14,
+      "throughput_ops_sec": 51102.9,
+      "p99_ms": 0.0362,
+      "note": "ops=2000, value_size=800, keys=200"
+    },
+    {
+      "backend": "redis",
+      "workload": "mixed",
+      "num_ops": 2000,
+      "elapsed_ms": 96.78,
+      "throughput_ops_sec": 20665.7,
+      "p99_ms": 0.1209,
+      "note": "ops=2000, value_size=800, keys=200"
+    }
+  ],
+  "comparison": [
+    {
+      "backend": "memory",
+      "workload": "read_heavy",
+      "baseline_throughput": 1184680,
+      "current_throughput": 1237240.9,
+      "regression_pct": 0.0444,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "json",
+      "workload": "read_heavy",
+      "baseline_throughput": 1211,
+      "current_throughput": 1312.1,
+      "regression_pct": 0.0835,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "sqlite",
+      "workload": "read_heavy",
+      "baseline_throughput": 53339,
+      "current_throughput": 58839.3,
+      "regression_pct": 0.1031,
+      "is_regression": false,
+      "is_improvement": true
+    },
+    {
+      "backend": "redis",
+      "workload": "read_heavy",
+      "baseline_throughput": 23758,
+      "current_throughput": 23617.8,
+      "regression_pct": -0.0059,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "memory",
+      "workload": "write_heavy",
+      "baseline_throughput": 1258384,
+      "current_throughput": 1222867.6,
+      "regression_pct": -0.0282,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "json",
+      "workload": "write_heavy",
+      "baseline_throughput": 295,
+      "current_throughput": 300.4,
+      "regression_pct": 0.0183,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "sqlite",
+      "workload": "write_heavy",
+      "baseline_throughput": 54205,
+      "current_throughput": 43314.7,
+      "regression_pct": -0.2009,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "redis",
+      "workload": "write_heavy",
+      "baseline_throughput": 19782,
+      "current_throughput": 19450.7,
+      "regression_pct": -0.0167,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "memory",
+      "workload": "mixed",
+      "baseline_throughput": 1271149,
+      "current_throughput": 1224964.8,
+      "regression_pct": -0.0363,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "json",
+      "workload": "mixed",
+      "baseline_throughput": 471,
+      "current_throughput": 492.0,
+      "regression_pct": 0.0446,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "sqlite",
+      "workload": "mixed",
+      "baseline_throughput": 53783,
+      "current_throughput": 51102.9,
+      "regression_pct": -0.0498,
+      "is_regression": false,
+      "is_improvement": false
+    },
+    {
+      "backend": "redis",
+      "workload": "mixed",
+      "baseline_throughput": 21123,
+      "current_throughput": 20665.7,
+      "regression_pct": -0.0216,
+      "is_regression": false,
+      "is_improvement": false
+    }
+  ]
+}

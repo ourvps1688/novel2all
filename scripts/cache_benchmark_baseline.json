@@ -1,0 +1,84 @@
+{
+  "_comment": "V0.52 Cache benchmark baseline. Updated by V0.51/V0.52 cache_benchmark_ci.py --update-baseline. Lower = slower; CI fails if throughput drops >25%.",
+  "metadata": {
+    "updated_at": "2026-09-14",
+    "version": "V0.52",
+    "platform": "ubuntu-latest (GitHub Actions runner)",
+    "python_version": "3.12",
+    "note": "Numbers are throughput (ops/sec). Higher = faster. CI compares against this baseline."
+  },
+  "results": [
+    {
+      "backend": "memory",
+      "workload": "read_heavy",
+      "throughput_ops_sec": 1184680,
+      "p99_ms": 0.0010
+    },
+    {
+      "backend": "memory",
+      "workload": "write_heavy",
+      "throughput_ops_sec": 1258384,
+      "p99_ms": 0.0008
+    },
+    {
+      "backend": "memory",
+      "workload": "mixed",
+      "throughput_ops_sec": 1271149,
+      "p99_ms": 0.0008
+    },
+    {
+      "backend": "sqlite",
+      "workload": "read_heavy",
+      "throughput_ops_sec": 53339,
+      "p99_ms": 0.0320
+    },
+    {
+      "backend": "sqlite",
+      "workload": "write_heavy",
+      "throughput_ops_sec": 54205,
+      "p99_ms": 0.0348
+    },
+    {
+      "backend": "sqlite",
+      "workload": "mixed",
+      "throughput_ops_sec": 53783,
+      "p99_ms": 0.0382
+    },
+    {
+      "backend": "redis",
+      "workload": "read_heavy",
+      "throughput_ops_sec": 23758,
+      "p99_ms": 0.0945
+    },
+    {
+      "backend": "redis",
+      "workload": "write_heavy",
+      "throughput_ops_sec": 19782,
+      "p99_ms": 0.1146
+    },
+    {
+      "backend": "redis",
+      "workload": "mixed",
+      "throughput_ops_sec": 21123,
+      "p99_ms": 0.1149
+    },
+    {
+      "backend": "json",
+      "workload": "read_heavy",
+      "throughput_ops_sec": 1211,
+      "p99_ms": 4.7898
+    },
+    {
+      "backend": "json",
+      "workload": "write_heavy",
+      "throughput_ops_sec": 295,
+      "p99_ms": 5.0836
+    },
+    {
+      "backend": "json",
+      "workload": "mixed",
+      "throughput_ops_sec": 471,
+      "p99_ms": 5.0029
+    }
+  ]
+}

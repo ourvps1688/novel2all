@@ -211,6 +211,31 @@ jobs:
           print('All CI scripts import OK')
           "
 
+  # ===== V0.52 Cache 性能回归检测 =====
+  cache-benchmark:
+    name: Cache benchmark regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv python install ${{ env.PYTHON_VERSION }}
+      - run: uv sync --all-extras --dev
+      - name: Run cache benchmark + regression check
+        # V0.52：跑简化的 cache benchmark + 对比 baseline
+        # 失败 → CI 失败（throughput 下降 >25%）
+        run: uv run python scripts/benchmark_cache_ci.py
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-benchmark-results
+          path: scripts/cache_benchmark_ci_results.json
+          retention-days: 30
+
   # ===== Build sdist + wheel =====
   build:
     name: Build package
