@@ -90,10 +90,14 @@ def create_app() -> FastAPI:
         app.state.auth_store = AuthStore()
         app.state.session_store = SessionStore()
         app.state.rate_limiter = RateLimiter()
-        # V1.0 GA Day 11-15：audit log store
-        from novel2all.core.audit import AuditStore
+        # V1.0 GA Day 11-15：audit log store（fail-safe：失败不阻塞 lifespan）
+        try:
+            from novel2all.core.audit import AuditStore
 
-        app.state.audit_store = AuditStore()
+            app.state.audit_store = AuditStore()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("V1.0 GA: AuditStore init failed (audit disabled): %s", e)
+            app.state.audit_store = None
 
         # V0.30.6 C3 收尾：初始化 LLMProvider 内 AdaptiveRouter（数据驱动选模型）
         try:
@@ -312,7 +316,9 @@ def create_app() -> FastAPI:
             if locked:
                 detail = "Too many failed attempts. Account temporarily locked."
             # V1.0 GA Day 11-15：audit 记录登录失败
-            request.app.state.audit_store.record(
+            audit_store = request.app.state.audit_store
+        if audit_store is not None:
+            audit_store.record(
                 "login_failed",
                 username=username,
                 ip=client_ip,
@@ -326,7 +332,9 @@ def create_app() -> FastAPI:
         sess = request.app.state.session_store.create(user.id)
 
         # V1.0 GA Day 11-15：audit + metrics
-        request.app.state.audit_store.record(
+        audit_store = request.app.state.audit_store
+        if audit_store is not None:
+            audit_store.record(
             "login",
             user_id=user.id,
             username=user.username,
