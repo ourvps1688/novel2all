@@ -6,15 +6,16 @@
 [![CodeQL](https://github.com/ourvps1688/novel2all/workflows/CodeQL/badge.svg)](https://github.com/ourvps1688/novel2all/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-161_passing-brightgreen.svg)](tests/)
-[![v0.21](https://img.shields.io/badge/version-0.21-blue.svg)](docs/v0.21-summary.md)
+[![Tests](https://img.shields.io/badge/tests-866_passing-brightgreen.svg)](tests/)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](Dockerfile)
 
 > 部署指南: [docs/DEPLOY.md](docs/DEPLOY.md)
-> V0.21 收官报告: [docs/v0.21-summary.md](docs/v0.21-summary.md)
+> V1.0 GA 路线图: [docs/next-steps-roadmap.md](docs/next-steps-roadmap.md)
+> V0.30.6 收官报告: [docs/v0.30.6-summary.md](docs/v0.30.6-summary.md)
 
 ## 核心特性
 
-### 🧠 5 层长记忆系统 (核心技术)
+### 🧠 5 层长记忆系统 (V0.21 核心技术)
 
 novel2all 的差异化竞争点是**自动化的长篇一致性**:
 
@@ -31,34 +32,26 @@ L5: 知识图谱 (tool call 查询)  按需 (V0.22)
 - **L1/L2/L3 集成**: `MemoryManager.load_for_writing` 5 层合并 + token 预算控制
 - **50 章零丢失**: 通过 `tests/e2e/test_50_chapters.py` 验证
 
-加上:
-- **pre-write 一致性检查** (critical / warning / info 三级)
-- **post-write 自动提取** + merge tracking
-- **verifier 智能分级**: 软问题 (节奏/文风) 不再误报为 critical
-
-参考 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) § 长记忆系统。
-
-### 🚀 端到端写作流 (V0.21 新增)
+### 🚀 端到端写作流 (V0.21)
 
 `WritingPipeline` 编排完整流程:
 
 ```
 pre-write check → load memory → skill prompt → LLM stream → save
                 → extract → merge → post-write check
+                → 4-agent 审查 (B1) → 自动回滚 (B2) → AdaptiveRouter 记录 (C3)
 ```
 
-- `stream_callback` 让调用方实时接收每个 LLM chunk
-- 失败类型清晰: `OutlineNotFoundError` / `BlockingIssuesError` / `LLMAuthError`
-- 不依赖真实 LLM (mock provider 也能跑完整流程)
-
-### 🌐 Web UI + SSE 实时流 (V0.21 新增)
+### 🌐 Web UI + SSE 实时流 (V0.21 + V0.30.6 B3)
 
 启动 `novel2all web` 后:
-- **项目状态** dashboard (项目名/题材/文风/章节数/角色/伏笔/时间线)
-- **角色面板** 卡片网格 (按最近更新排序，dead 状态红框)
-- **伏笔面板** 4 状态过滤 (all / active / advanced / revealed / abandoned)
-- **章节详情弹窗** 点击章节列表项查看完整内容
-- **SSE 流式写作** `/api/write/stream` 1920 个 chunk 事件实时拼接
+- **项目状态** dashboard
+- **角色面板** / **伏笔面板** / **章节列表**
+- **SSE 流式写作** `/api/write/stream` 含 8 阶段进度条 + 实时字数/字秒/ETA
+- **Cache 实时统计** `/api/cache/stats`（4 backend 选择）
+- **Cache 智能推荐** `/api/cache/recommend`（V0.51 自动调优）
+- **Prompt prefix cache** `/api/cache/prompt-stats`（V0.30.6 C1 实测节省 27%）
+- **多用户登录** `/login`（V0.30.6 B5 Session + rate limit）
 
 ### 📚 13 个 Skill + 7 个 Role
 
@@ -90,7 +83,61 @@ pre-write check → load memory → skill prompt → LLM stream → save
 | `story-explorer` | 故事查询 |
 | `chapter-extractor` | 章节提取 |
 
+### 🛡️ V0.30.6 生产级特性
+
+#### 4-agent 并行审查（V0.30.6 B1）
+
+```
+async.gather(
+    Critical Auditor,    # 致命错误（事实/逻辑/设定/位置/跑题）
+    Major Auditor,       # 中度问题（pacing/dialogue/consistency/OOC）
+    Minor Auditor,       # 细节优化（writing/punctuation/ai_smell/format）
+    Quality Judge,       # 5 维度评分（pacing/emotion/readability/immersion/ai_smell）
+)
+# 实测 ~100ms（vs 串行 ~400ms，4x 加速）
+```
+
+#### Critical 自动回滚（V0.30.6 B2）
+
+```
+manager.snapshot(chapter)            # 备份文件 + state
+... pipeline 写章节 + 更新 state ...
+if review.verdict == "fail":
+    manager.rollback(snapshot)        # 恢复文件 + 反向 state 变更
+```
+
+#### Prompt prefix cache（V0.30.6 C1）
+
+100 章 novel 写作实测：**95% hit rate，节省 27%**（input-only 90%+）。
+
+#### 自适应路由（V0.30.6 C3）
+
+按历史成功率/延迟/质量自动选模型（4 策略：best_avg / best_quality / best_speed / best_success）。
+
+#### 多用户基础（V0.30.6 B5）
+
+- Session HttpOnly + SameSite=Strict cookie（7 天）
+- Rate limit 5 次/5 分钟防爆破
+- PBKDF2-HMAC-SHA256 + 600K 迭代密码哈希
+- ProjectMembership（owner / editor / viewer）
+
 ## 安装
+
+### 方式 1：Docker（推荐 V1.0 GA）
+
+```bash
+# 1. 设置环境变量
+export NOVEL2ALL_ADMIN_USER=admin
+export NOVEL2ALL_ADMIN_PASS=<强密码>
+export DEEPSEEK_API_KEY=sk-xxxxx
+
+# 2. 启动
+docker-compose up -d
+
+# 3. 访问 http://localhost:8000
+```
+
+### 方式 2：源码安装（开发）
 
 ```bash
 # 需要 Python 3.12+
@@ -105,11 +152,12 @@ uv sync --all-extras --dev
 
 # 3. 配置 LLM API Key (写到 .env)
 export DEEPSEEK_API_KEY=sk-...        # 推荐 (便宜 + 中文强)
+export NOVEL2ALL_ADMIN_USER=admin
+export NOVEL2ALL_ADMIN_PASS=secret
 # 或
 export ANTHROPIC_API_KEY=sk-...       # Claude Sonnet
 export OPENAI_API_KEY=sk-...          # GPT-4o
-# 并设置默认模型
-export NOVEL2ALL_MODEL=deepseek/deepseek-chat
+export MINIMAX_API_KEY=xxxxx          # minimax
 
 # 4. 验证
 uv run novel2all version
@@ -131,10 +179,10 @@ novel2all setup --name "我的小说" --genre "玄幻" --style "古风古韵"
 novel2all write chapter 1
 # -> 流式输出到 console，写完后自动 extract + merge tracking
 
-# 5. 启动 Web UI (含 SSE 实时写作)
+# 5. 启动 Web UI (含 SSE 实时写作 + 多用户登录)
 novel2all web
 # -> http://127.0.0.1:8000
-# -> 打开后: 角色面板 + 伏笔面板 + 点击章节看详情
+# -> 用 NOVEL2ALL_ADMIN_USER/PASS 登录
 ```
 
 ## 技术栈
@@ -191,34 +239,46 @@ novel2all/
 ```bash
 # 全套测试
 uv run pytest tests/ -v
-# 161 passed + 7 skipped (沙箱 chromadb DLL 缺失)
+# 当前: 866 passed + 8 skipped (V1.0 GA 准备中)
 
 # ruff
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 
 # 一键验证
-make verify-ci   # ruff + pytest + tsc 等价
+make verify-ci   # ruff + pytest 等价
+
+# 性能基准
+uv run python scripts/benchmark_cache.py            # 4 backend benchmark
+uv run python scripts/benchmark_cache_rtt.py        # Redis RTT 影响
+uv run python scripts/benchmark_prompt_cache.py     # C1 prefix cache 收益
 ```
 
-GitHub Actions (12 个 job):
+GitHub Actions (15 个 job):
 - **Lint** (ruff check + format)
 - **Type check** (mypy)
 - **Test matrix** (6 个: windows / macos / linux × py3.12 / 3.13)
+- **E2E** (playwright × 2 OS)
 - **Build package** (uv build + twine check)
+- **Cache benchmark** (advisory 模式，V0.52)
 - **License headers / Skills+Roles manifest / CI integration scripts**
 - **CodeQL** (Python analysis)
 
-详见 [docs/CI-INTEGRATION.md](docs/CI-INTEGRATION.md) 和 [`.github/workflows/`](.github/workflows/)。
+详见 [`.github/workflows/`](.github/workflows/)。
 
 ## 路线图
 
-- **v0.21** ✅ (2026-09-12) — 检索 + 摘要 + LLM 真写 + Web SSE + UX 面板 (16 commit, 161 tests)
-- **v0.22** — 知识图谱 (NetworkX) + 多模型路由 (~2 周)
-- **v0.30** — Self-verification loop (多 agent 审查 + 自动回滚) + 完整 Web UI (~2 周)
-- **v1.0** — GA (性能优化 / 文档 / Docker / 团队版)
+- **v0.21** ✅ (2026-09-12) — 检索 + 摘要 + LLM 真写 + Web SSE + UX 面板 (16 commits, 161 tests)
+- **v0.22-v0.30** ✅ — 知识图谱 + 多模型路由 + LLM 路由优化
+- **v0.33-v0.49** ✅ — Cache 工程化（17 commits，4 backend 跨 OS 跨进程）
+- **v0.51-v0.52** ✅ — 智能推荐 + CI 性能守护（advisory 模式）
+- **v0.30.6 B3-B6 + C1** ✅ — 实时进度条 + 章节导出 + Prompt Cache 节省 27%
+- **v0.30.6 B1-B2 + B5 + C3** ✅ — 4-agent 审查 + 自动回滚 + 多用户 + 自适应路由
+- **v1.0 GA** 🚧 (当前) — 完整测试 + 性能优化 + 文档完善 + Docker
+- **v1.5** 📋 — WebUI 全面升级（React + Vite 替换 Jinja2）
+- **v2.0** 📋 — 多模型扩展 + 商业化 + 市场发布
 
-详见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+详见 [docs/next-steps-roadmap.md](docs/next-steps-roadmap.md)。
 
 ## License
 

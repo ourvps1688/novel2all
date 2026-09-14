@@ -1,0 +1,52 @@
+# V1.0 GA：Docker 构建时排除
+# 减少镜像体积 + 避免泄漏 secrets
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 虚拟环境
+.venv/
+venv/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 项目临时文件
+.tmp/
+*.tmp
+*.bak
+*.bak.*
+
+# 数据文件（运行时挂载）
+.novel2all/
+正文/
+projects/
+
+# 测试产物
+tests/.tmp_*
+
+# 文档（不需要在镜像中）
+docs/
+
+# 部署脚本（CI 用，不进镜像）
+scripts/
+
+# 本地配置
+.env
+.env.local
+*.log

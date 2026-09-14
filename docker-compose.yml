@@ -1,0 +1,72 @@
+# V1.0 GA：novel2all docker-compose 编排
+# 包含：
+# - web: FastAPI 应用
+# - redis: 跨 worker 共享 cache（V0.45）
+
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: novel2all-web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # V0.30.6 B5：必填 admin 凭证
+      NOVEL2ALL_ADMIN_USER: ${NOVEL2ALL_ADMIN_USER:-admin}
+      NOVEL2ALL_ADMIN_PASS: ${NOVEL2ALL_ADMIN_PASS:?请设置 NOVEL2ALL_ADMIN_PASS 环境变量}
+
+      # V0.33 cache 配置
+      NOVEL2ALL_LLM_CACHE_ENABLED: "true"
+      NOVEL2ALL_LLM_CACHE_BACKEND: redis
+      NOVEL2ALL_LLM_CACHE_TTL: "86400"
+      NOVEL2ALL_LLM_CACHE_MAX_SIZE: "4096"
+
+      # V0.45 Redis 连接（指向 redis 服务）
+      NOVEL2ALL_LLM_CACHE_REDIS_URL: redis://redis:6379/0
+
+      # V0.23 LLM provider
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+    volumes:
+      # 持久化数据：auth.db / sessions.db / adaptive_routing.db
+      - novel2all-data:/app/.novel2all
+      # 小说项目（用户挂载或 docker run 注入）
+      - ./projects:/app/projects
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/cache/stats').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: novel2all-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  novel2all-data:
+    driver: local
+  redis-data:
+    driver: local
+
+# 网络隔离（可选）
+# networks:
+#   default:
+#     driver: bridge
