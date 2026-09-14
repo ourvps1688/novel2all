@@ -23,6 +23,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from novel2all.core import LLMConfig, LLMProvider
+from novel2all.core.auth_middleware import (
+    admin_required,
+    get_client_ip,
+    get_request_session_id,
+    get_request_user,
+)
 from novel2all.core.memory import MemoryManager, Tracker
 from novel2all.core.pipeline import (
     BlockingIssuesError,
@@ -67,12 +73,29 @@ def create_app() -> FastAPI:
         - V0.30 WebUI 暴露 cache 命中率时无法跨请求累计
 
         收益：cache 跨请求连续、stats 稳定、单进程多请求共享 provider
+
+        V0.30.6 B5：新增 auth_store / session_store / rate_limiter（多用户）。
+        V0.30.6 C3：adaptive_router 已集成在 LLMProvider 内。
         """
         load_dotenv(".env", override=False)
         app.state.provider = LLMProvider(LLMConfig())
         # V0.31：活跃 pipeline task 注册表（用于 /api/write/cancel/{task_id} 取消正在运行的写作任务）
         # key = task_id (uuid4 hex[:8])，value = asyncio.Task
         app.state.active_pipelines = {}
+
+        # V0.30.6 B5 收尾：auth + session + rate limiter
+        from novel2all.core.auth import AuthStore, RateLimiter
+        from novel2all.core.session import SessionStore
+
+        app.state.auth_store = AuthStore()
+        app.state.session_store = SessionStore()
+        app.state.rate_limiter = RateLimiter()
+
+        # V0.30.6 C3 收尾：初始化 LLMProvider 内 AdaptiveRouter（数据驱动选模型）
+        try:
+            app.state.provider.init_adaptive_router()
+        except Exception as e:
+            logger.warning("V0.30.6 C3: AdaptiveRouter init failed (V0.23 router 仍生效): %s", e)
         logger.info(
             "Web app started: LLMProvider initialized (model=%s, cache_enabled=%s)",
             app.state.provider.config.default_model,
@@ -93,12 +116,204 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="novel2all Web UI",
-        version="0.21.0",
         lifespan=lifespan,
     )
+    # V0.30.6 B5 收尾：注入 AuthMiddleware 到 FastAPI（处理每个请求的 session cookie）
+    try:
+        from starlette.middleware.base import BaseHTTPMiddleware
 
+        class AuthMiddleware(BaseHTTPMiddleware):
+            """V0.30.6 B5 收尾：从 session cookie 注入 user 到 request.state。"""
+
+            async def dispatch(self, request, call_next):
+                session_id = request.cookies.get("n2a_session")
+                user = None
+                active_session = None
+                if session_id:
+                    active_session = app.state.session_store.get(session_id)
+                    if active_session:
+                        user = app.state.auth_store.get_user_by_id(active_session.user_id)
+                request.state.user = user
+                request.state.session_id = active_session.id if user else None
+                return await call_next(request)
+
+        app.add_middleware(AuthMiddleware)
+    except Exception as e:
+        logger.warning("V0.30.6 B5: AuthMiddleware init failed: %s", e)
     # V0.30.0：mount 静态文件（HTMX + Alpine.js 本地化，零 CDN 依赖）
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    # ============================================================
+    # V0.30.6 B5 收尾：Auth API 端点
+    # ============================================================
+
+    # V0.30.6 B5 收尾：登录页面（HTML）
+    @app.get("/login", response_class=HTMLResponse)
+    async def page_login(request: Request) -> HTMLResponse:
+        """V0.30.6 B5 收尾：登录页（HTMX form 提交到 /api/auth/login）。
+
+        已登录用户访问 /login → 重定向到 /（首页）。
+        """
+        user = get_request_user(request)
+        if user is not None:
+            from starlette.responses import RedirectResponse
+
+            return RedirectResponse(url="/", status_code=302)
+        return templates.TemplateResponse(request, "login.html")
+
+    @app.post("/api/auth/login")
+    async def auth_login(
+        request: Request,
+        username: str = Form(...),
+        password: str = Form(...),
+    ) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：登录（username + password → set cookie）。
+
+        Returns:
+            {user: {...}, message: "Login successful"}
+        Set-Cookie: n2a_session=<id>; HttpOnly; SameSite=Strict; Max-Age=604800
+        """
+        from starlette.responses import JSONResponse
+
+        client_ip = await get_client_ip(request)
+        limiter = request.app.state.rate_limiter
+
+        # V0.30.6 B5：rate limit
+        if limiter.is_locked(client_ip):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many failed attempts. Try again later.",
+            )
+
+        auth_store = request.app.state.auth_store
+        user = auth_store.authenticate(username, password)
+        if user is None:
+            locked = limiter.record_fail(client_ip)
+            detail = "Invalid credentials"
+            if locked:
+                detail = "Too many failed attempts. Account temporarily locked."
+            raise HTTPException(status_code=401, detail=detail)
+
+        # 登录成功：创建 session + 重置 rate limit
+        limiter.record_success(client_ip)
+        sess = request.app.state.session_store.create(user.id)
+
+        response = JSONResponse(
+            {
+                "user": user.to_dict(),
+                "message": "Login successful",
+            }
+        )
+        # V0.30.6 B5：HttpOnly + SameSite=Strict cookie（per 用户偏好）
+        response.set_cookie(
+            key="n2a_session",
+            value=sess.id,
+            max_age=7 * 24 * 3600,
+            httponly=True,
+            samesite="strict",
+            path="/",
+        )
+        return response
+
+    @app.post("/api/auth/logout")
+    async def auth_logout(request: Request) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：注销（删除 session + clear cookie）。"""
+        session_id = get_request_session_id(request)
+        if session_id:
+            request.app.state.session_store.delete(session_id)
+
+        from starlette.responses import JSONResponse
+
+        response = JSONResponse({"message": "Logged out"})
+        response.delete_cookie("n2a_session", path="/")
+        return response
+
+    @app.get("/api/auth/me")
+    async def auth_me(request: Request) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：当前用户信息（未登录返回 null user）。"""
+        user = get_request_user(request)
+        return {
+            "user": user.to_dict() if user else None,
+            "authenticated": user is not None,
+        }
+
+    # V0.30.6 B5 收尾：admin-only 用户管理
+    @app.get("/api/auth/users")
+    async def list_all_users(request: Request) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：admin 列所有用户。"""
+        await admin_required(request)
+        users = request.app.state.auth_store.list_users()
+        return {"users": [u.to_dict() for u in users]}
+
+    @app.post("/api/auth/users")
+    async def create_user_endpoint(
+        request: Request,
+        username: str = Form(...),
+        password: str = Form(...),
+        role: str = Form("editor"),
+    ) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：admin 创建用户。"""
+        await admin_required(request)
+        try:
+            user = request.app.state.auth_store.create_user(username, password, role=role)
+            return {"user": user.to_dict()}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @app.delete("/api/auth/users/{user_id}")
+    async def delete_user_endpoint(request: Request, user_id: int) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：admin 删除用户。"""
+        current = await admin_required(request)
+        if current.id == user_id:
+            raise HTTPException(status_code=400, detail="Cannot delete yourself")
+        if not request.app.state.auth_store.delete_user(user_id):
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"deleted": user_id}
+
+    # V0.30.6 B5 收尾：项目授权
+    @app.post("/api/auth/projects/{project_root:path}/share")
+    async def share_project(
+        request: Request,
+        project_root: str,
+        user_id: int = Form(...),
+        role: str = Form("viewer"),
+    ) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：admin 给用户授权项目访问（owner/editor/viewer）。"""
+        await admin_required(request)
+        admin = get_request_user(request)
+        abs_path = str(Path(project_root).resolve())
+        try:
+            m = request.app.state.auth_store.grant_project_access(
+                user_id,
+                abs_path,
+                role,
+                admin.id,
+            )
+            return {"membership": m.to_dict()}
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @app.delete("/api/auth/projects/{project_root:path}/share/{user_id}")
+    async def revoke_project(
+        request: Request,
+        project_root: str,
+        user_id: int,
+    ) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：admin 撤销用户项目访问。"""
+        await admin_required(request)
+        abs_path = str(Path(project_root).resolve())
+        if not request.app.state.auth_store.revoke_project_access(user_id, abs_path):
+            raise HTTPException(status_code=404, detail="Membership not found")
+        return {"revoked": True}
+
+    @app.get("/api/auth/users/{user_id}/projects")
+    async def list_user_projects(request: Request, user_id: int) -> dict[str, Any]:
+        """V0.30.6 B5 收尾：列用户的所有项目授权。"""
+        await admin_required(request)
+        memberships = request.app.state.auth_store.list_user_projects(user_id)
+        return {"memberships": [m.to_dict() for m in memberships]}
+
+    # ============================================================
 
     # V0.29.3：测试 fallback（TestClient 默认不触发 lifespan 上下文）
     # 生产路径走 lifespan；测试路径直接初始化 provider

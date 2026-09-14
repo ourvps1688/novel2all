@@ -237,7 +237,8 @@
             <a href="/" hx-get="/" hx-target="main" hx-swap="innerHTML" hx-push-url="true">项目状态</a>
             <a href="/skills" hx-get="/page/skills" hx-target="main" hx-swap="innerHTML" hx-push-url="true">Skill</a>
             <a href="/roles" hx-get="/page/roles" hx-target="main" hx-swap="innerHTML" hx-push-url="true">Role</a>
-        </nav>
+    <span hx-get="/api/auth/me" hx-trigger="load" hx-swap="innerHTML" style="margin-left: auto; display: flex; gap: 12px; align-items: center;" id="auth-info"></span>
+  </nav>
     </header>
     <main id="main-content">
         {% block content %}{% endblock %}

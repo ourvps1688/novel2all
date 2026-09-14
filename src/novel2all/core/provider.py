@@ -168,6 +168,10 @@ class LLMProvider:
 
         self._prompt_tracker = PromptCacheTracker()
 
+        # V0.30.6 C3 收尾：AdaptiveRouter 集成（按历史自动选最佳模型）
+        # 注意：默认 None，由 init_adaptive_router() 显式启用（web lifespan 或测试）
+        self._adaptive_router: Any = None
+
     def _configure_env(self) -> None:
         """从 config 同步设置环境变量（LiteLLM 需要）。"""
         _strip_proxy_env()  # 沙箱/CI 环境必须
@@ -611,8 +615,9 @@ class LLMProvider:
 
         优先级（高 → 低）：
         1. 显式 model= 参数（测试 / 调试场景）
-        2. task 参数 + ModelRouter（V0.22.5+）
-        3. config.default_model（向后兼容）
+        2. V0.30.6 C3：task 参数 + AdaptiveRouter（按历史自动选最佳）
+        3. task 参数 + ModelRouter（V0.22.5+ 静态路由）
+        4. config.default_model（向后兼容）
         """
         if explicit_model:
             return explicit_model
@@ -623,9 +628,74 @@ class LLMProvider:
             if not isinstance(task, TaskType):
                 # 容错：非 TaskType 实例就当作普通 model name 处理
                 return str(task)
+
+            # V0.30.6 C3：优先用 AdaptiveRouter（数据驱动，按历史选最佳）
+            #   - 冷启动（样本 < min_samples）→ fall back to ModelRouter
+            #   - 避免硬依赖：若 adaptive_router 未初始化（测试场景），fall back
+            try:
+                if hasattr(self, "_adaptive_router") and self._adaptive_router is not None:
+                    return self._adaptive_router.select(task)
+            except Exception:
+                # AdaptiveRouter 失败 → fall back to ModelRouter（V0.23）
+                pass
+
             router = ModelRouter(self.config)
             return router.select(task)
         return self.config.default_model
+
+    def _record_adaptive_run(
+        self,
+        task: Any,
+        model: str,
+        *,
+        success: bool,
+        latency_ms: float,
+        quality_score: float | None = None,
+    ) -> None:
+        """V0.30.6 C3：记录一次 LLM 调用到 AdaptiveRouter（用于下次 select）。"""
+        try:
+            from novel2all.core.provider_router import TaskType
+            if not isinstance(task, TaskType):
+                return  # 仅 TaskType 才记录
+            if hasattr(self, "_adaptive_router") and self._adaptive_router is not None:
+                self._adaptive_router.record_run(
+                    task, model,
+                    success=success,
+                    latency_ms=latency_ms,
+                    quality_score=quality_score,
+                )
+        except Exception:
+            pass  # 记录失败不影响主流程
+
+    def init_adaptive_router(
+        self,
+        default_model: str | None = None,
+        strategy: str | None = None,
+        min_samples: int | None = None,
+        window_size: int | None = None,
+        db_path: Path | str | None = None,
+    ) -> None:
+        """V0.30.6 C3：初始化 AdaptiveRouter（在 lifespan 中调用）。
+
+        不调用则 V0.23 ModelRouter 静态路由生效（向后兼容）。
+        """
+        from novel2all.core.adaptive_router import (
+            AdaptiveRouter,
+            AdaptiveStrategy,
+        )
+
+        kwargs = {
+            "default_model": default_model or self.config.default_model,
+            "db_path": Path(db_path) if db_path else Path(".novel2all/adaptive_routing.db"),
+        }
+        if strategy:
+            kwargs["strategy"] = AdaptiveStrategy(strategy)
+        if min_samples:
+            kwargs["min_samples"] = min_samples
+        if window_size:
+            kwargs["window_size"] = window_size
+        self._adaptive_router = AdaptiveRouter(**kwargs)
+        logger.info("V0.30.6 C3: AdaptiveRouter initialized (default=%s)", kwargs["default_model"])
 
     def _get_model_config(self, model_name: str) -> Any:
         """V0.23.5：返回模型的完整 litellm 配置。
