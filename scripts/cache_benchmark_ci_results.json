@@ -1,17 +1,17 @@
 {
   "metadata": {
-    "timestamp": "2026-09-13T23:59:15.718963+00:00",
+    "timestamp": "2026-09-14T00:23:17.499645+00:00",
     "num_ops": 2000,
-    "regression_threshold": 0.25,
-    "elapsed_total_seconds": 14.17
+    "regression_threshold": 0.5,
+    "elapsed_total_seconds": 14.4
   },
   "results": [
     {
       "backend": "memory",
       "workload": "read_heavy",
       "num_ops": 2000,
-      "elapsed_ms": 1.62,
-      "throughput_ops_sec": 1237240.9,
+      "elapsed_ms": 1.59,
+      "throughput_ops_sec": 1258811.7,
       "p99_ms": 0.0009,
       "note": "ops=2000, value_size=800, keys=200"
     },
@@ -19,27 +19,27 @@
       "backend": "json",
       "workload": "read_heavy",
       "num_ops": 2000,
-      "elapsed_ms": 1524.23,
-      "throughput_ops_sec": 1312.1,
-      "p99_ms": 4.7172,
+      "elapsed_ms": 1475.42,
+      "throughput_ops_sec": 1355.5,
+      "p99_ms": 4.3806,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "sqlite",
       "workload": "read_heavy",
       "num_ops": 2000,
-      "elapsed_ms": 33.99,
-      "throughput_ops_sec": 58839.3,
-      "p99_ms": 0.0393,
+      "elapsed_ms": 34.01,
+      "throughput_ops_sec": 58810.7,
+      "p99_ms": 0.0463,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "redis",
       "workload": "read_heavy",
       "num_ops": 2000,
-      "elapsed_ms": 84.68,
-      "throughput_ops_sec": 23617.8,
-      "p99_ms": 0.1041,
+      "elapsed_ms": 84.59,
+      "throughput_ops_sec": 23642.7,
+      "p99_ms": 0.1008,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
@@ -47,7 +47,7 @@
       "workload": "write_heavy",
       "num_ops": 2000,
       "elapsed_ms": 1.64,
-      "throughput_ops_sec": 1222867.6,
+      "throughput_ops_sec": 1216175.1,
       "p99_ms": 0.0009,
       "note": "ops=2000, value_size=800, keys=200"
     },
@@ -55,63 +55,63 @@
       "backend": "json",
       "workload": "write_heavy",
       "num_ops": 2000,
-      "elapsed_ms": 6656.85,
-      "throughput_ops_sec": 300.4,
-      "p99_ms": 4.9571,
+      "elapsed_ms": 6786.68,
+      "throughput_ops_sec": 294.7,
+      "p99_ms": 5.311,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "sqlite",
       "workload": "write_heavy",
       "num_ops": 2000,
-      "elapsed_ms": 46.17,
-      "throughput_ops_sec": 43314.7,
-      "p99_ms": 0.0511,
+      "elapsed_ms": 42.49,
+      "throughput_ops_sec": 47064.6,
+      "p99_ms": 0.0553,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "redis",
       "workload": "write_heavy",
       "num_ops": 2000,
-      "elapsed_ms": 102.82,
-      "throughput_ops_sec": 19450.7,
-      "p99_ms": 0.104,
+      "elapsed_ms": 104.4,
+      "throughput_ops_sec": 19157.5,
+      "p99_ms": 0.1291,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "memory",
       "workload": "mixed",
       "num_ops": 2000,
-      "elapsed_ms": 1.63,
-      "throughput_ops_sec": 1224964.8,
-      "p99_ms": 0.0011,
+      "elapsed_ms": 1.68,
+      "throughput_ops_sec": 1191327.2,
+      "p99_ms": 0.0012,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "json",
       "workload": "mixed",
       "num_ops": 2000,
-      "elapsed_ms": 4064.91,
-      "throughput_ops_sec": 492.0,
-      "p99_ms": 4.9207,
+      "elapsed_ms": 4169.53,
+      "throughput_ops_sec": 479.7,
+      "p99_ms": 5.4351,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "sqlite",
       "workload": "mixed",
       "num_ops": 2000,
-      "elapsed_ms": 39.14,
-      "throughput_ops_sec": 51102.9,
-      "p99_ms": 0.0362,
+      "elapsed_ms": 37.88,
+      "throughput_ops_sec": 52792.3,
+      "p99_ms": 0.0478,
       "note": "ops=2000, value_size=800, keys=200"
     },
     {
       "backend": "redis",
       "workload": "mixed",
       "num_ops": 2000,
-      "elapsed_ms": 96.78,
-      "throughput_ops_sec": 20665.7,
-      "p99_ms": 0.1209,
+      "elapsed_ms": 94.96,
+      "throughput_ops_sec": 21062.6,
+      "p99_ms": 0.1126,
       "note": "ops=2000, value_size=800, keys=200"
     }
   ],
@@ -119,108 +119,108 @@
     {
       "backend": "memory",
       "workload": "read_heavy",
-      "baseline_throughput": 1184680,
-      "current_throughput": 1237240.9,
-      "regression_pct": 0.0444,
+      "baseline_throughput": 871075,
+      "current_throughput": 1258811.7,
+      "regression_pct": 0.4451,
       "is_regression": false,
-      "is_improvement": false
+      "is_improvement": true
     },
     {
       "backend": "json",
       "workload": "read_heavy",
-      "baseline_throughput": 1211,
-      "current_throughput": 1312.1,
-      "regression_pct": 0.0835,
-      "is_regression": false,
+      "baseline_throughput": 2921,
+      "current_throughput": 1355.5,
+      "regression_pct": -0.5359,
+      "is_regression": true,
       "is_improvement": false
     },
     {
       "backend": "sqlite",
       "workload": "read_heavy",
-      "baseline_throughput": 53339,
-      "current_throughput": 58839.3,
-      "regression_pct": 0.1031,
+      "baseline_throughput": 23372,
+      "current_throughput": 58810.7,
+      "regression_pct": 1.5163,
       "is_regression": false,
       "is_improvement": true
     },
     {
       "backend": "redis",
       "workload": "read_heavy",
-      "baseline_throughput": 23758,
-      "current_throughput": 23617.8,
-      "regression_pct": -0.0059,
+      "baseline_throughput": 25988,
+      "current_throughput": 23642.7,
+      "regression_pct": -0.0902,
       "is_regression": false,
       "is_improvement": false
     },
     {
       "backend": "memory",
       "workload": "write_heavy",
-      "baseline_throughput": 1258384,
-      "current_throughput": 1222867.6,
-      "regression_pct": -0.0282,
+      "baseline_throughput": 832595,
+      "current_throughput": 1216175.1,
+      "regression_pct": 0.4607,
       "is_regression": false,
-      "is_improvement": false
+      "is_improvement": true
     },
     {
       "backend": "json",
       "workload": "write_heavy",
-      "baseline_throughput": 295,
-      "current_throughput": 300.4,
-      "regression_pct": 0.0183,
+      "baseline_throughput": 239,
+      "current_throughput": 294.7,
+      "regression_pct": 0.2331,
       "is_regression": false,
-      "is_improvement": false
+      "is_improvement": true
     },
     {
       "backend": "sqlite",
       "workload": "write_heavy",
-      "baseline_throughput": 54205,
-      "current_throughput": 43314.7,
-      "regression_pct": -0.2009,
+      "baseline_throughput": 13690,
+      "current_throughput": 47064.6,
+      "regression_pct": 2.4379,
       "is_regression": false,
-      "is_improvement": false
+      "is_improvement": true
     },
     {
       "backend": "redis",
       "workload": "write_heavy",
-      "baseline_throughput": 19782,
-      "current_throughput": 19450.7,
-      "regression_pct": -0.0167,
+      "baseline_throughput": 21570,
+      "current_throughput": 19157.5,
+      "regression_pct": -0.1118,
       "is_regression": false,
       "is_improvement": false
     },
     {
       "backend": "memory",
       "workload": "mixed",
-      "baseline_throughput": 1271149,
-      "current_throughput": 1224964.8,
-      "regression_pct": -0.0363,
+      "baseline_throughput": 874822,
+      "current_throughput": 1191327.2,
+      "regression_pct": 0.3618,
       "is_regression": false,
-      "is_improvement": false
+      "is_improvement": true
     },
     {
       "backend": "json",
       "workload": "mixed",
-      "baseline_throughput": 471,
-      "current_throughput": 492.0,
-      "regression_pct": 0.0446,
-      "is_regression": false,
+      "baseline_throughput": 975,
+      "current_throughput": 479.7,
+      "regression_pct": -0.508,
+      "is_regression": true,
       "is_improvement": false
     },
     {
       "backend": "sqlite",
       "workload": "mixed",
-      "baseline_throughput": 53783,
-      "current_throughput": 51102.9,
-      "regression_pct": -0.0498,
+      "baseline_throughput": 19946,
+      "current_throughput": 52792.3,
+      "regression_pct": 1.6468,
       "is_regression": false,
-      "is_improvement": false
+      "is_improvement": true
     },
     {
       "backend": "redis",
       "workload": "mixed",
-      "baseline_throughput": 21123,
-      "current_throughput": 20665.7,
-      "regression_pct": -0.0216,
+      "baseline_throughput": 23425,
+      "current_throughput": 21062.6,
+      "regression_pct": -0.1008,
       "is_regression": false,
       "is_improvement": false
     }

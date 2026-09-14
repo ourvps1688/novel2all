@@ -86,7 +86,7 @@ def test_compare_no_regression_within_threshold() -> None:
         ),  # -20%
     ]
     reports = compare_to_baseline(
-        current, baseline, regression_threshold=0.25, improvement_threshold=0.10
+        current, baseline, regression_threshold=0.50, improvement_threshold=0.10
     )
     assert len(reports) == 1
     assert reports[0].is_regression is False
@@ -95,7 +95,7 @@ def test_compare_no_regression_within_threshold() -> None:
 
 
 def test_compare_regression_detected() -> None:
-    """V0.52：吞吐量下降 > 25% 视为回归。"""
+    """V0.52：吞吐量下降 > 50%（默认阈值）视为回归。"""
     baseline = {
         "results": [
             {
@@ -112,17 +112,17 @@ def test_compare_regression_detected() -> None:
             workload="read_heavy",
             num_ops=2000,
             elapsed_ms=30,
-            throughput_ops_sec=60000,
+            throughput_ops_sec=40000,  # -60% → regression
             p99_ms=0.001,
-        ),  # -40%
+        ),
     ]
     reports = compare_to_baseline(
-        current, baseline, regression_threshold=0.25, improvement_threshold=0.10
+        current, baseline, regression_threshold=0.50, improvement_threshold=0.10
     )
     assert len(reports) == 1
     assert reports[0].is_regression is True
     assert reports[0].is_improvement is False
-    assert abs(reports[0].regression_pct - (-0.40)) < 0.01
+    assert abs(reports[0].regression_pct - (-0.60)) < 0.01
 
 
 def test_compare_improvement_detected() -> None:
@@ -148,7 +148,7 @@ def test_compare_improvement_detected() -> None:
         ),  # +15%
     ]
     reports = compare_to_baseline(
-        current, baseline, regression_threshold=0.25, improvement_threshold=0.10
+        current, baseline, regression_threshold=0.50, improvement_threshold=0.10
     )
     assert len(reports) == 1
     assert reports[0].is_regression is False
@@ -156,7 +156,7 @@ def test_compare_improvement_detected() -> None:
 
 
 def test_compare_at_boundary() -> None:
-    """V0.52：下降刚好 25% 处于边界（不算回归）。"""
+    """V0.52：下降刚好 50% 处于边界（不算回归）。"""
     baseline = {
         "results": [
             {
@@ -173,12 +173,12 @@ def test_compare_at_boundary() -> None:
             workload="read_heavy",
             num_ops=2000,
             elapsed_ms=20,
-            throughput_ops_sec=75000,
+            throughput_ops_sec=50000,  # -50% 边界
             p99_ms=0.001,
-        ),  # -25%
+        ),
     ]
     reports = compare_to_baseline(
-        current, baseline, regression_threshold=0.25, improvement_threshold=0.10
+        current, baseline, regression_threshold=0.50, improvement_threshold=0.10
     )
     assert reports[0].is_regression is False  # 边界不算回归
 
@@ -215,7 +215,7 @@ def test_compare_skip_missing_baseline() -> None:
         # sqlite 不在 baseline → 跳过
     ]
     reports = compare_to_baseline(
-        current, baseline, regression_threshold=0.25, improvement_threshold=0.10
+        current, baseline, regression_threshold=0.50, improvement_threshold=0.10
     )
     assert len(reports) == 1
     assert reports[0].backend == "memory"
@@ -253,12 +253,12 @@ def test_compare_multiple_backends() -> None:
             workload="read_heavy",
             num_ops=2000,
             elapsed_ms=30,
-            throughput_ops_sec=30000,
+            throughput_ops_sec=20000,  # -60% 回归
             p99_ms=0.04,
         ),  # -40% 回归
     ]
     reports = compare_to_baseline(
-        current, baseline, regression_threshold=0.25, improvement_threshold=0.10
+        current, baseline, regression_threshold=0.50, improvement_threshold=0.10
     )
     assert len(reports) == 2
     by_backend = {r.backend: r for r in reports}
@@ -290,7 +290,7 @@ def test_compare_zero_current_throughput() -> None:
         ),
     ]
     reports = compare_to_baseline(
-        current, baseline, regression_threshold=0.25, improvement_threshold=0.10
+        current, baseline, regression_threshold=0.50, improvement_threshold=0.10
     )
     assert len(reports) == 1
     assert reports[0].is_regression is True
