@@ -90,6 +90,10 @@ def create_app() -> FastAPI:
         app.state.auth_store = AuthStore()
         app.state.session_store = SessionStore()
         app.state.rate_limiter = RateLimiter()
+        # V1.0 GA Day 11-15：audit log store
+        from novel2all.core.audit import AuditStore
+
+        app.state.audit_store = AuditStore()
 
         # V0.30.6 C3 收尾：初始化 LLMProvider 内 AdaptiveRouter（数据驱动选模型）
         try:
@@ -183,6 +187,14 @@ def create_app() -> FastAPI:
         app.add_middleware(AuthMiddleware)
     except Exception as e:
         logger.warning("V0.30.6 B5: AuthMiddleware init failed: %s", e)
+
+    # V1.0 GA：安全 headers 中间件（X-Content-Type-Options / X-Frame-Options / CSP）
+    try:
+        from novel2all.core.security_headers import SecurityHeadersMiddleware
+
+        app.add_middleware(SecurityHeadersMiddleware)
+    except Exception as e:
+        logger.warning("V1.0 GA: SecurityHeadersMiddleware init failed: %s", e)
     # V0.30.0：mount 静态文件（HTMX + Alpine.js 本地化，零 CDN 依赖）
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -203,6 +215,70 @@ def create_app() -> FastAPI:
 
             return RedirectResponse(url="/", status_code=302)
         return templates.TemplateResponse(request, "login.html")
+
+    # ============================================================
+    # V1.0 GA Day 11-15：监控端点（metrics / traces / audit）
+    # ============================================================
+
+    @app.get("/metrics", response_class=Response)
+    async def metrics_endpoint() -> Response:
+        """V1.0 GA Day 11-15：Prometheus scrape endpoint。
+
+        暴露 metrics：
+        - novel2all_llm_calls_total（按 model / task / status）
+        - novel2all_cache_operations_total（按 backend / operation）
+        - novel2all_chapter_writes_total（按 verdict）
+        - novel2all_rollbacks_total
+        - novel2all_llm_latency_seconds（histogram）
+        - novel2all_active_sessions（gauge）
+
+        Prometheus scrape config:
+          scrape_configs:
+            - job_name: novel2all
+              metrics_path: /metrics
+              static_configs:
+                - targets: [localhost:8000]
+        """
+        from novel2all.core.metrics import get_metrics_registry
+
+        registry = get_metrics_registry()
+        text = registry.export_prometheus()
+        return Response(content=text, media_type="text/plain; version=0.0.4")
+
+    @app.get("/api/debug/traces")
+    async def get_recent_traces(limit: int = 100) -> dict[str, Any]:
+        """V1.0 GA Day 11-15：最近 N 个 trace spans。"""
+        from novel2all.core.tracing import get_tracer
+
+        tracer = get_tracer()
+        spans = tracer.get_recent_spans(limit=limit)
+        return {"spans": spans, "count": len(spans)}
+
+    @app.get("/api/debug/trace-stats")
+    async def get_trace_stats() -> dict[str, Any]:
+        """V1.0 GA Day 11-15：tracer 统计（按 span name 分组）。"""
+        from novel2all.core.tracing import get_tracer
+
+        tracer = get_tracer()
+        return tracer.get_stats()
+
+    @app.get("/api/auth/audit")
+    async def get_audit_log(
+        request: Request,
+        event_type: str | None = None,
+        user_id: int | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """V1.0 GA Day 11-15：审计日志查询（admin only）。"""
+        await admin_required(request)
+        events = request.app.state.audit_store.query(
+            event_type=event_type,
+            user_id=user_id,
+            limit=limit,
+        )
+        return {"events": events, "count": len(events)}
+
+    # ============================================================
 
     @app.post("/api/auth/login")
     async def auth_login(
@@ -235,11 +311,34 @@ def create_app() -> FastAPI:
             detail = "Invalid credentials"
             if locked:
                 detail = "Too many failed attempts. Account temporarily locked."
+            # V1.0 GA Day 11-15：audit 记录登录失败
+            request.app.state.audit_store.record(
+                "login_failed",
+                username=username,
+                ip=client_ip,
+                success=False,
+                detail=detail,
+            )
             raise HTTPException(status_code=401, detail=detail)
 
         # 登录成功：创建 session + 重置 rate limit
         limiter.record_success(client_ip)
         sess = request.app.state.session_store.create(user.id)
+
+        # V1.0 GA Day 11-15：audit + metrics
+        request.app.state.audit_store.record(
+            "login",
+            user_id=user.id,
+            username=user.username,
+            ip=client_ip,
+            success=True,
+        )
+        from novel2all.core.metrics import get_metrics_registry
+
+        registry = get_metrics_registry()
+        registry.counter(
+            "novel2all_chapter_writes_total", "", ()
+        ).inc()  # placeholder; real metric below
 
         response = JSONResponse(
             {
