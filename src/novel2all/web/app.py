@@ -801,7 +801,6 @@ def create_app() -> FastAPI:
         """
         from novel2all.core.exporter import (
             Chapter,
-            export_chapter_file,
             get_exporter,
         )
 
@@ -850,7 +849,8 @@ def create_app() -> FastAPI:
         - txt：纯文本（多章节拼接）
         - epub：EPUB 3.0（含导航 + 元数据 + 完整结构）
         """
-        from novel2all.core.exporter import BookMetadata, export_project as do_export
+        from novel2all.core.exporter import BookMetadata
+        from novel2all.core.exporter import export_project as do_export
 
         root = Path(project_root).resolve()
         try:
@@ -872,6 +872,7 @@ def create_app() -> FastAPI:
         exporter = get_exporter(format)
         # V0.30.6 B6: HTTP header latin-1 only, so strip non-ASCII
         import re as _re
+
         safe_title = (title or "未命名作品").replace("/", "_").replace("\\", "_")
         safe_title_ascii = _re.sub(r"[^\\w\\-]", "_", safe_title) or "novel"
         return Response(
