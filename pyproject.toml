@@ -1,6 +1,6 @@
 [project]
 name = "novel2all"
-version = "0.20.0"
+version = "1.0.0"
 description = "novel-to-all 创作工具集：长篇 / 短篇小说 + 自动化长记忆"
 license = { text = "MIT" }
 authors = [
@@ -80,7 +80,7 @@ markers = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "1.0.0"
 extend-exclude = ["src/**/templates/*.html", "Dockerfile", "docker-compose.yml", ".dockerignore", "scripts/benchmark_v035.py", "scripts/test_quality_compare.py"]
 
 ["invalid-syntax"]
@@ -105,7 +105,7 @@ known-first-party = ["novel2all"]
 "tests/*" = ["B011", "RUF012", "SIM117"]  # RUF012/SIM117 测试 mock 类的常见 pattern  # pytest 的 assert False 是合法写法
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "1.0.0"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
