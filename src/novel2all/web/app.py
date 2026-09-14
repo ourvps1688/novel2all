@@ -870,6 +870,59 @@ def create_app() -> FastAPI:
             },
         )
 
+    # V0.30.6 B1：4-agent 审查端点
+    @app.post("/api/chapter/{chapter}/review")
+    async def review_chapter(
+        request: Request,
+        chapter: int,
+        project_root: str = Query(".", description="项目根目录"),
+    ) -> dict[str, Any]:
+        """V0.30.6 B1：4-agent 并行审查章节（critical/major/minor + quality）。
+
+        Returns:
+            dict 含 critical_issues / major_issues / minor_issues / quality_score /
+            total_* / overall_verdict / elapsed_seconds / content_chars / chapter_number
+        """
+        from novel2all.core.memory.multi_reviewer import MultiAgentReviewer
+
+        root = Path(project_root).resolve()
+        project = ProjectStructure(root=root)
+        if not project.exists():
+            raise HTTPException(status_code=404, detail="Project not initialized")
+
+        prose_path = project.chapter_prose(chapter)
+        if not prose_path.exists():
+            raise HTTPException(status_code=404, detail=f"Chapter {chapter} not found")
+
+        # 读取章节正文
+        try:
+            content = prose_path.read_text(encoding="utf-8")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Read failed: {e}") from e
+
+        # 读取 state（_tracking-state.json）
+        state_data = {}
+        if project.tracking_state_file.exists():
+            try:
+                state_data = json.loads(project.tracking_state_file.read_text(encoding="utf-8"))
+            except Exception:
+                state_data = {}
+
+        # 构建 minimal state 对象（MultiAgentReviewer._state_to_text 兼容）
+        from types import SimpleNamespace
+
+        state = SimpleNamespace(
+            characters=state_data.get("characters", {}),
+            foreshadowing=state_data.get("foreshadowing", []),
+            style_anchor=state_data.get("style_anchor"),
+        )
+
+        # 跑 4-agent 并行审查
+        provider: LLMProvider = request.app.state.provider
+        reviewer = MultiAgentReviewer(llm=provider)
+        report = await reviewer.review(state=state, content=content, chapter_number=chapter)
+        return report.to_dict()
+
     # V0.30.6 B6：批量导出端点（整本书）
     @app.get("/api/export")
     async def export_project(

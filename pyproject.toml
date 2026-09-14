@@ -102,7 +102,7 @@ extend-ignore = [
 known-first-party = ["novel2all"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["B011"]  # pytest 的 assert False 是合法写法
+"tests/*" = ["B011", "RUF012", "SIM117"]  # RUF012/SIM117 测试 mock 类的常见 pattern  # pytest 的 assert False 是合法写法
 
 [tool.mypy]
 python_version = "3.12"
