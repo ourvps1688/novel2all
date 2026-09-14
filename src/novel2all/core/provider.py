@@ -851,10 +851,18 @@ class LLMProvider:
                             "[_call_anthropic_compat] attempt #%d",
                             attempt.retry_state.attempt_number,
                         )
-                    async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
-                        resp = await client.post(url, json=body, headers=headers)
-                        resp.raise_for_status()
-                        data = resp.json()
+                    # V1.0 GA：复用 httpx 连接池（避免每次调用新建 client 的 TCP/TLS 握手开销）
+                    if not hasattr(self, "_http_pool"):
+                        from novel2all.core.http_pool import HttpxConnectionPool
+
+                        self._http_pool = HttpxConnectionPool()
+                    client = await self._http_pool.get_client(
+                        api_base=api_base,
+                        timeout=self.config.timeout_seconds,
+                    )
+                    resp = await client.post(url, json=body, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
 
                     # Anthropic 响应：content 是数组，每个 element.type="text" 含 text 字段
                     content_blocks = data.get("content", [])

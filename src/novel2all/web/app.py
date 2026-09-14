@@ -112,6 +112,16 @@ def create_app() -> FastAPI:
             )
             # V0.42：显式关闭 cache backend（SQLite 连接池等）
             app.state.provider.close()
+            # V1.0 GA：关闭 httpx 连接池
+            if hasattr(app.state.provider, "_http_pool"):
+                try:
+                    import asyncio as _aio
+
+                    _aio.get_event_loop().run_until_complete(
+                        app.state.provider._http_pool.close_all()
+                    )
+                except Exception:
+                    pass  # ignore close errors
             del app.state.provider
 
     app = FastAPI(
