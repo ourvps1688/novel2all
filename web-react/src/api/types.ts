@@ -23,7 +23,7 @@ export const UserSchema = z.object({
   password_hash: z.string().optional(),
   role: z.enum(['admin', 'editor', 'viewer']),
   created_at: z.number(),
-  disabled: z.boolean(),
+  disabled: z.number(),
 });
 export type User = z.infer<typeof UserSchema>;
 
