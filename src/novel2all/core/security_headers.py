@@ -42,7 +42,7 @@ DEFAULT_SECURITY_HEADERS: dict[str, str] = {
         "default-src 'self'; "
         "img-src 'self' data:; "
         "style-src 'self' 'unsafe-inline'; "  # Alpine.js x-* 属性需要
-        "script-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "  # V1.0.2 hotfix: 'unsafe-inline' for V1.5 React index.html inline FOUC prevention script
         "connect-src 'self'; "
         "font-src 'self' data:; "
         "frame-ancestors 'none'; "  # 同 X-Frame-Options: DENY
