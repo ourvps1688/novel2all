@@ -1,0 +1,124 @@
+%% Login Flow
+sequenceDiagram
+    actor User
+    participant LoginPage
+    participant AuthProvider
+    participant ApiClient
+    participant Backend
+    participant AuthStore
+
+    User->>LoginPage: input username/password
+    User->>LoginPage: click "Login"
+    LoginPage->>AuthProvider: useLogin().mutate({username, password})
+    AuthProvider->>ApiClient: client.postForm('/api/auth/login', formData)
+    ApiClient->>Backend: POST /api/auth/login (Form)
+    Backend-->>ApiClient: 200 + Set-Cookie: n2a_session
+    ApiClient-->>AuthProvider: { user, message }
+    AuthProvider->>AuthStore: setUser(user)
+    AuthProvider->>ApiClient: queryClient.invalidateQueries(['auth','me'])
+    AuthProvider-->>LoginPage: onSuccess
+    LoginPage->>User: navigate('/')
+
+%% SSE Writing Flow
+sequenceDiagram
+    actor User
+    participant WritePage
+    participant WriteToolbar
+    participant useSSE
+    participant ApiClient
+    participant Backend
+    participant ChapterEditor
+
+    User->>WriteToolbar: click "AI Continue"
+    WriteToolbar->>useSSE: start({chapter, model, min_chars})
+    useSSE->>ApiClient: open EventSource('/api/write/stream?...')
+    ApiClient->>Backend: GET /api/write/stream (cookie auto)
+    Backend-->>useSSE: event: started {task_id, chapter}
+    useSSE->>WriteToolbar: setProgress({phase: 'init'})
+    WriteToolbar-->>User: show "Initializing..."
+    loop multiple chunks
+        Backend-->>useSSE: event: chunk {text}
+        useSSE->>WriteToolbar: appendChunk(text)
+        WriteToolbar->>ChapterEditor: editor.commands.insertContent(text)
+    end
+    Backend-->>useSSE: event: progress {phase: 'save'}
+    useSSE->>WriteToolbar: setProgress({phase: 'save'})
+    WriteToolbar-->>User: show "Saving..."
+    Backend-->>useSSE: event: done {content_chars, output_path}
+    useSSE->>WriteToolbar: setProgress({phase: 'done'})
+    WriteToolbar->>ChapterEditor: markDirty(false)
+    WriteToolbar->>ApiClient: queryClient.invalidateQueries(['chapters'])
+    useSSE->>ApiClient: close EventSource
+
+%% Dashboard Load Flow
+sequenceDiagram
+    participant DashboardPage
+    participant QueryClient
+    participant ApiClient
+    participant Backend
+
+    DashboardPage->>QueryClient: useQuery(['status'])
+    DashboardPage->>QueryClient: useQuery(['chapters'])
+    DashboardPage->>QueryClient: useQuery(['cache','stats'])
+    DashboardPage->>QueryClient: useQuery(['cache','prompt-stats'])
+    par parallel requests
+        QueryClient->>ApiClient: GET /api/status
+        ApiClient->>Backend: GET /api/status
+        Backend-->>ApiClient: ProjectStatus
+    and
+        QueryClient->>ApiClient: GET /api/chapters
+        ApiClient->>Backend: GET /api/chapters
+        Backend-->>ApiClient: Chapter[]
+    and
+        QueryClient->>ApiClient: GET /api/cache/stats
+        ApiClient->>Backend: GET /api/cache/stats
+        Backend-->>ApiClient: CacheStats
+    and
+        QueryClient->>ApiClient: GET /api/cache/prompt-stats
+        ApiClient->>Backend: GET /api/cache/prompt-stats
+        Backend-->>ApiClient: PromptPrefixStats
+    end
+    DashboardPage->>DashboardPage: if !status.initialized -> OnboardingWizard
+    DashboardPage->>DashboardPage: else -> 4 Cards
+
+%% Review Flow (Idempotency)
+sequenceDiagram
+    actor User
+    participant ReviewQueue
+    participant ApiClient
+    participant Backend
+    participant Store
+
+    User->>ReviewQueue: click "Review" chapter N
+    ReviewQueue->>ApiClient: client.post('/api/chapter/N/review', {idempotencyKey: uuid()})
+    Note over ApiClient: header: Idempotency-Key: uuid
+    ApiClient->>Backend: POST /api/chapter/N/review
+    alt first request
+        Backend->>Backend: 4-agent parallel
+        Backend-->>ApiClient: ReviewReport
+        ApiClient-->>ReviewQueue: render
+        ReviewQueue->>Store: queryClient.setQueryData(['review', N], report)
+    else same key replay (5min TTL)
+        Backend-->>ApiClient: cached + _idempotent_replay: true
+        ApiClient-->>ReviewQueue: direct render (no LLM call)
+    end
+
+%% AI Rewrite Flow
+sequenceDiagram
+    actor User
+    participant ChapterEditor
+    participant WriteToolbar
+    participant ApiClient
+    participant Backend
+
+    User->>ChapterEditor: select text (start, end)
+    User->>WriteToolbar: click "AI Rewrite"
+    WriteToolbar->>WriteToolbar: prompt("改写指令", default="改写得更生动自然")
+    WriteToolbar->>ApiClient: client.postForm('/api/chapter/N/rewrite', {start, end, instruction})
+    ApiClient->>Backend: POST /api/chapter/N/rewrite
+    Backend-->>ApiClient: {original, rewritten}
+    ApiClient-->>WriteToolbar: result
+    WriteToolbar->>WriteToolbar: show diff (original vs rewritten)
+    User->>WriteToolbar: click "Apply"
+    WriteToolbar->>ChapterEditor: editor.commands.setContent(rewritten)
+    WriteToolbar->>ApiClient: POST /api/chapter/N/save (new content)

@@ -1,0 +1,148 @@
+classDiagram
+    class ApiClient {
+      -axios: AxiosInstance
+      +get(url, config) Promise~T~
+      +post(url, data, config) Promise~T~
+      +postForm(url, formData) Promise~T~
+      +delete(url, config) Promise~void~
+      +stream(url, onEvent, onError) EventSource
+      -handleError(error) never
+    }
+
+    class AuthStore {
+      -user: User | null
+      -loading: boolean
+      -error: string | null
+      +setUser(user) void
+      +clear() void
+      +get isAuthenticated() boolean
+      +get isAdmin() boolean
+    }
+
+    class AuthProvider {
+      -queryClient: QueryClient
+      -authStore: AuthStore
+      +useMe() UseQueryResult
+      +useLogin() UseMutationResult
+      +useLogout() UseMutationResult
+    }
+
+    class User {
+      +id: number
+      +username: string
+      +role: 'admin' | 'editor' | 'viewer'
+      +createdAt: string
+    }
+
+    class Chapter {
+      +chapter: number
+      +filename: string
+      +charCount: number
+      +firstLine: string
+      +content?: string
+    }
+
+    class ProjectStatus {
+      +initialized: boolean
+      +projectName: string
+      +genre: string
+      +totalChaptersTarget: number
+      +lastUpdatedChapter: number
+      +characterCount: number
+      +activeForeshadowingCount: number
+    }
+
+    class CacheStats {
+      +hitRate: number
+      +hits: number
+      +misses: number
+      +size: number
+      +maxSize: number
+      +promptPrefix: PromptPrefixStats
+    }
+
+    class PromptPrefixStats {
+      +prefixHits: number
+      +prefixMisses: number
+      +prefixHitRate: number
+      +costSavedCny: number
+      +potentialSavingsCny: number
+    }
+
+    class WriteProgress {
+      +phase: 'init' | 'pre_write_check' | 'writing' | 'save' | 'extract' | 'merge' | 'post_write_check' | 'done'
+      +charsWritten: number
+      +charsPerSecond?: number
+      +etaSeconds?: number
+      +taskId?: string
+      +message?: string
+    }
+
+    class ReviewReport {
+      +chapter: number
+      +criticalIssues: ReviewIssue[]
+      +majorIssues: ReviewIssue[]
+      +minorIssues: ReviewIssue[]
+      +qualityScore: number
+      +overallVerdict: 'pass' | 'warn' | 'fail'
+      +elapsedSeconds: number
+    }
+
+    class ReviewIssue {
+      +severity: 'critical' | 'major' | 'minor'
+      +category: string
+      +description: string
+      +suggestion?: string
+    }
+
+    class ProtectedRoute {
+      -authStore: AuthStore
+      +render() JSX.Element
+    }
+
+    class AppShell {
+      -authStore: AuthStore
+      +render() JSX.Element
+    }
+
+    class DashboardPage {
+      -queryClient: QueryClient
+      +render() JSX.Element
+    }
+
+    class WritePage {
+      -chapterId: number
+      +render() JSX.Element
+    }
+
+    class ChapterEditor {
+      -editor: Editor
+      -content: string
+      +onSave() void
+      +onInsertAI() void
+      +onRewriteAI() void
+    }
+
+    class WriteToolbar {
+      -sse: SSEController
+      +onContinue() void
+      +onSave() void
+      +onReview() void
+      +onExport(format) void
+    }
+
+    ApiClient --> AuthStore : uses (401 -> clear)
+    AuthProvider --> AuthStore : manages
+    AuthProvider --> User : exposes
+    ProtectedRoute --> AuthStore : reads
+    AppShell --> AuthStore : reads user
+    DashboardPage --> ProjectStatus : fetches
+    DashboardPage --> CacheStats : fetches
+    DashboardPage --> Chapter : fetches
+    WritePage --> Chapter : fetches
+    WritePage --> WriteProgress : subscribes SSE
+    WriteToolbar --> WriteProgress : updates
+    ChapterEditor --> Chapter : edits
+    ReviewQueuePage --> ReviewReport : fetches
+    ReviewReport --> ReviewIssue : contains
+    CacheStats --> PromptPrefixStats : contains
