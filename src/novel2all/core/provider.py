@@ -14,6 +14,15 @@ V0.33 cache 后端抽象 + TTL + 持久化：
 - LLMProvider._cache 改为 CacheBackend 实例（不再是裸 OrderedDict）
 - LLMConfig 加 cache_backend / cache_ttl_seconds / cache_persist_path 配置
 - 行为保持向后兼容：默认 cache_backend="memory" + cache_ttl_seconds=0（无 TTL）
+
+V1.0.2 cache key 扩展（B1 + B2）：
+- 旧 key = (model, sys_hash, user_hash, temperature)
+- 新 key = (model, sys_hash, user_hash, temperature, max_tokens, top_p, api_base_hash, settings_hash)
+  - ``max_tokens``：影响输出截断位置（1000 vs 4000 的 LLM 返回不同）
+  - ``top_p``：影响采样（核采样阈值）
+  - ``api_base_hash``：同模型不同 endpoint（如 minimax 国内 / 国际）必须区分
+  - ``settings_hash``：项目设定文件 hash（文风 / 创作设定 / 角色卡 修改后自动失效）
+- 向后兼容：所有新参数可选，默认值产生稳定 hash
 """
 
 from __future__ import annotations
@@ -195,6 +204,9 @@ class LLMProvider:
         system: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
+        top_p: float | None = None,
+        project_root: str | Path | None = None,
+        user_id: int | None = None,
         task: Any = None,
     ) -> str:
         """调 LLM 完成文本生成。
@@ -202,17 +214,53 @@ class LLMProvider:
         Args:
             task: TaskType 枚举（V0.22.5+）。若提供，router 选 model；若 model= 也提供，
                 model= 优先（向后兼容测试 / 调试场景）。
+            top_p: V1.0.2 B1：核采样阈值。``None`` = 不传（用模型默认）。
+                影响 LLM 输出采样，参与 cache key。
+            project_root: V1.0.2 B2：项目根目录。传入后自动计算 ``settings_hash``
+                （创作设定 + 文风 + 角色卡），参与 cache key — 改文风后旧 cache 自动失效。
+                ``None`` = 不计算 settings hash（向后兼容）。
+            user_id: V1.0.2 B4：调用者用户 ID。若提供，会触发 per-user LLM rate limit
+                检查（按预估 token 数累计；超额抛 ``LLMRateLimitExceeded``）。
+                ``None`` = 不限流（向后兼容 CLI / 测试场景）。
 
         V0.24：自动应用 prompt cache（如果 config.cache_enabled=True）：
-        - key = (model, system_hash, user_hash, temperature)
+        - key = (model, system_hash, user_hash, temperature, max_tokens, top_p,
+                 api_base_hash, settings_hash)
         - 命中：直接返回缓存，不调 API
         - miss：调 API 并缓存响应
         """
         # 决定模型：显式 model= > task router > config.default_model
         model_name = self._resolve_model(task=task, explicit_model=model)
 
+        # V1.0.2 B2：计算 settings hash（项目设定文件变化 → cache 失效）
+        from novel2all.core.settings_hash import compute_settings_hash
+
+        settings_hash = compute_settings_hash(Path(project_root) if project_root else None)
+
+        # V1.0.2 B4：per-user LLM rate limit（按预估 token 累计）
+        # 注意：rate limit 在 cache 命中之前检查（防止恶意用户用 cache 探测绕过限流）
+        if user_id is not None:
+            from novel2all.core.llm_rate_limiter import (
+                estimate_tokens,
+                get_global_llm_rate_limiter,
+            )
+
+            est_input = estimate_tokens(prompt) + estimate_tokens(system)
+            est_total = est_input + max_tokens
+            limiter = get_global_llm_rate_limiter()
+            limiter.check(user_id=user_id, est_tokens=est_total)
+
         # V0.33：cache lookup（通过 CacheBackend.get，命中则直接返回 + 自动 LRU 更新）
-        cache_key = self._make_cache_key(model_name, system, prompt, temperature)
+        cache_key = self._make_cache_key(
+            model_name,
+            system,
+            prompt,
+            temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            api_base=self._get_model_config(model_name).api_base,
+            settings_hash=settings_hash,
+        )
         # V0.30.6 C1：sys_hash 记录已在 _make_cache_key() 内部完成
         if self.config.cache_enabled:
             cached = self._cache.get(cache_key)
@@ -260,6 +308,9 @@ class LLMProvider:
             "timeout": self.config.timeout_seconds,
             "num_retries": self.config.max_retries,
         }
+        # V1.0.2 B1：top_p 透传（None = 不传，用模型默认）
+        if top_p is not None:
+            kwargs["top_p"] = top_p
         # V0.23.5：自动应用模型完整配置（api_base + extra_body + headers）
         model_cfg = self._get_model_config(model_name)
         if model_cfg.api_base:
@@ -279,13 +330,29 @@ class LLMProvider:
         return content
 
     def _make_cache_key(
-        self, model: str, system: str | None, user: str, temperature: float
-    ) -> tuple[str, str, str, float]:
-        """生成 cache key（V0.24）。
+        self,
+        model: str,
+        system: str | None,
+        user: str,
+        temperature: float,
+        *,
+        max_tokens: int | None = None,
+        top_p: float | None = None,
+        api_base: str | None = None,
+        settings_hash: str | None = None,
+    ) -> tuple:
+        """生成 cache key（V0.24 + V1.0.2 B1 + V1.0.2 B2）。
 
-        key = (model, sha256(system), sha256(user), temperature)
+        V0.24 key = (model, sha256(system), sha256(user), temperature)
+        V1.0.2 新增（保持向后兼容 - 新参数都是 keyword-only 且有默认值）：
+        - max_tokens：影响输出截断位置（不同 max_tokens LLM 返回不同）
+        - top_p：影响采样（核采样阈值）
+        - api_base：同模型不同 endpoint 必须区分（minimax 国内/国际）
+        - settings_hash：项目设定文件 hash（文风修改后自动失效）
+
         - hash 用 sha256 截前 16 字符（足够唯一 + 省内存）
         - None system 用空字符串
+        - 新参数为 None 时统一用空字符串 hash（保证完全相同的输入产生相同的 key）
 
         V0.30.6 C1：同时记录到 _prompt_tracker，统计 sys_hash 复用。
         这样无论调用方是否实际查 cache（cache_enabled=False），
@@ -293,14 +360,20 @@ class LLMProvider:
         """
         sys_h = hashlib.sha256((system or "").encode("utf-8")).hexdigest()[:16]
         usr_h = hashlib.sha256(user.encode("utf-8")).hexdigest()[:16]
+        # V1.0.2 B1：endpoint hash + max_tokens + top_p
+        ep_h = hashlib.sha256((api_base or "").encode("utf-8")).hexdigest()[:16]
+        # V1.0.2 B2：项目设定 hash（None → 全 0 占位，确保 backward-compat）
+        sh = settings_hash or "0" * 16
         # V0.30.6 C1：prompt prefix cache tracking（与 response cache 解耦）
         self._prompt_tracker.record(sys_h)
-        return (model, sys_h, usr_h, temperature)
+        return (model, sys_h, usr_h, temperature, max_tokens or 0, top_p or 0.0, ep_h, sh)
 
-    def _cache_store(self, key: tuple[str, str, str, float], content: str) -> None:
+    def _cache_store(self, key: tuple, content: str) -> None:
         """存储到 cache（V0.33：通过 CacheBackend.set，LRU/TTL 由后端管理）。
 
         V0.29 真 LRU + V0.33 TTL + 持久化 → 全部委托给 self._cache 后端。
+        V1.0.2：key tuple 现在含 max_tokens / top_p / api_base / settings_hash（8 元组）。
+        CacheBackend 接口未变（仍接 tuple / str），由 encode_key 统一编码。
         """
         self._cache.set(key, content)
 
@@ -472,20 +545,53 @@ class LLMProvider:
         model: str | None = None,
         system: str | None = None,
         temperature: float = 0.7,
+        max_tokens: int = 4096,
+        top_p: float | None = None,
+        project_root: str | Path | None = None,
+        user_id: int | None = None,
         task: Any = None,
     ) -> Any:
         """流式输出：返回 async iterator。
 
         Args:
             task: TaskType 枚举（V0.22.5+）。若提供，router 选 model。
+            top_p: V1.0.2 B1：核采样阈值。参与 cache key。
+            project_root: V1.0.2 B2：项目根目录。参与 cache key（settings hash）。
+            user_id: V1.0.2 B4：调用者用户 ID。若提供，触发 per-user LLM rate limit。
 
         V0.24：cache 命中时直接 yield 完整 content（不调 API，零延迟）。
         """
         model_name = self._resolve_model(task=task, explicit_model=model)
 
+        # V1.0.2 B2：settings hash（项目设定变更 → cache 失效）
+        from novel2all.core.settings_hash import compute_settings_hash
+
+        settings_hash = compute_settings_hash(Path(project_root) if project_root else None)
+
+        # V1.0.2 B4：per-user LLM rate limit
+        if user_id is not None:
+            from novel2all.core.llm_rate_limiter import (
+                estimate_tokens,
+                get_global_llm_rate_limiter,
+            )
+
+            est_input = estimate_tokens(prompt) + estimate_tokens(system)
+            est_total = est_input + max_tokens
+            limiter = get_global_llm_rate_limiter()
+            limiter.check(user_id=user_id, est_tokens=est_total)
+
         # V0.30.6 C1：sys_hash 记录已在 _make_cache_key() 内部完成
         # V0.33：cache 命中 → 返回 cached stream（通过 CacheBackend.get）
-        cache_key = self._make_cache_key(model_name, system, prompt, temperature)
+        cache_key = self._make_cache_key(
+            model_name,
+            system,
+            prompt,
+            temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            api_base=self._get_model_config(model_name).api_base,
+            settings_hash=settings_hash,
+        )
         if self.config.cache_enabled:
             cached_content = self._cache.get(cache_key)
             if cached_content is not None:
@@ -518,6 +624,7 @@ class LLMProvider:
                 messages=messages,
                 system=system,
                 temperature=temperature,
+                max_tokens=max_tokens,
                 extra_body=model_cfg.extra_body,
                 cache_key=cache_key,
             )
@@ -526,8 +633,12 @@ class LLMProvider:
             "model": model_name,
             "messages": messages,
             "temperature": temperature,
+            "max_tokens": max_tokens,
             "stream": True,
         }
+        # V1.0.2 B1：top_p 透传
+        if top_p is not None:
+            kwargs["top_p"] = top_p
         # V0.23.5：自动应用模型完整配置
         model_cfg = self._get_model_config(model_name)
         if model_cfg.api_base:
@@ -582,7 +693,7 @@ class LLMProvider:
         temperature: float,
         max_tokens: int = 4096,
         extra_body: dict[str, Any] | None = None,
-        cache_key: tuple[str, str, str, float] | None = None,
+        cache_key: tuple | None = None,
     ) -> AsyncIterator[str]:
         """V0.27：流式 httpx 调 Anthropic Messages API + 缓存。
 

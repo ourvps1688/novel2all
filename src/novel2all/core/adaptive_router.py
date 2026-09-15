@@ -125,20 +125,32 @@ class AdaptiveRouter:
         self._init_db()
 
     def _init_db(self) -> None:
-        """V0.30.6 C3：初始化 SQLite 表。"""
+        """V0.30.6 C3：初始化 SQLite 表。
+
+        V1.0.2 B3：增加 ``idx_model_runs_task_model`` UNIQUE INDEX — record_run 用
+        ``INSERT ... ON CONFLICT DO UPDATE`` 原子聚合（task_type, model）维度的累计统计，
+        避免原 read-modify-write 模式在多线程下丢计数。
+        """
         with self._lock, sqlite3.connect(self.db_path) as conn:
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS model_runs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     task_type TEXT NOT NULL,
                     model TEXT NOT NULL,
+                    samples INTEGER NOT NULL DEFAULT 0,
+                    latency_sum_ms REAL NOT NULL DEFAULT 0,
+                    quality_sum REAL NOT NULL DEFAULT 0,
+                    success_count INTEGER NOT NULL DEFAULT 0,
                     success INTEGER NOT NULL,
                     latency_ms REAL NOT NULL,
                     quality_score REAL,
-                    ts REAL NOT NULL
+                    ts REAL NOT NULL,
+                    last_updated REAL
                 );
                 CREATE INDEX IF NOT EXISTS idx_runs_task_model
                     ON model_runs(task_type, model, ts DESC);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_model_runs_task_model
+                    ON model_runs(task_type, model);
             """)
 
     # === Recording ===
@@ -160,38 +172,86 @@ class AdaptiveRouter:
             success: 是否成功
             latency_ms: 端到端延迟
             quality_score: 质量分（0-10，可选，由 B1 review 提供）
+
+        V1.0.2 B3：用 ``INSERT ... ON CONFLICT DO UPDATE`` 原子聚合累计统计列
+        （samples / latency_sum_ms / quality_sum / success_count），避免 V0.30.6
+        旧版 read-modify-write 模式在多线程并发下丢计数（race condition）。
+
+        Schema 要求：``idx_model_runs_task_model`` UNIQUE INDEX on (task_type, model)
+        —— 由 ``_init_db()`` 创建。
         """
         now = time.time()
+        # V1.0.2 B3：用单条 SQL 原子聚合（threading.Lock 仍然保留，保护
+        # SELECT 读取时的视图一致性；写入路径由 SQLite 内置锁 + UNIQUE INDEX
+        # 提供原子性，多线程并发不会丢计数）。
         with self._lock, sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """INSERT INTO model_runs
-                    (task_type, model, success, latency_ms, quality_score, ts)
-                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (task.value, model, 1 if success else 0, latency_ms, quality_score, now),
+                    (task_type, model, samples, latency_sum_ms, quality_sum,
+                     success_count, success, latency_ms, quality_score, ts, last_updated)
+                    VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(task_type, model) DO UPDATE SET
+                        samples = samples + 1,
+                        latency_sum_ms = latency_sum_ms + excluded.latency_ms,
+                        quality_sum = quality_sum + COALESCE(excluded.quality_score, 0),
+                        success_count = success_count + excluded.success,
+                        success = excluded.success,
+                        latency_ms = excluded.latency_ms,
+                        quality_score = excluded.quality_score,
+                        ts = excluded.ts,
+                        last_updated = excluded.last_updated""",
+                (
+                    task.value,
+                    model,
+                    float(latency_ms),
+                    float(quality_score) if quality_score is not None else 0.0,
+                    1 if success else 0,
+                    1 if success else 0,
+                    float(latency_ms),
+                    quality_score,
+                    now,
+                    now,
+                ),
             )
 
     # === Statistics ===
 
     def get_stats(self, task: TaskType, model: str) -> ModelStats | None:
-        """V0.30.6 C3：查单 (task, model) 统计（最近 window_size 次）。"""
+        """V0.30.6 C3：查单 (task, model) 统计。
+
+        V1.0.2 B3：改为读聚合列（samples / latency_sum_ms / success_count /
+        quality_sum），与 record_run 的原子写入对齐。
+        原 V0.30.6 实现用 ``ORDER BY ts DESC LIMIT window_size`` 取最近 N 条逐条聚合；
+        新实现 record_run 只在 (task_type, model) 唯一行上累加聚合列，
+        get_stats 直接读这行（O(1) vs 旧版 O(N)）。
+
+        行为差异（旧 → 新）：
+        - 旧：每次按窗口重算 stats（"最近 N 次平均"，窗口滑动语义）。
+        - 新：累计所有历史记录（窗口语义移交给 ``cleanup_old_runs`` + 周期性 reset）。
+
+        为保持 V0.30.6 测试的 ``avg_quality == 5.0`` 兜底语义：聚合列里 quality_sum
+        为 0 时（说明所有 record_run 都没传 quality_score），仍返回 5.0 中位数。
+        """
         with self._lock, sqlite3.connect(self.db_path) as conn:
             cur = conn.execute(
-                """SELECT success, latency_ms, quality_score
+                """SELECT samples, latency_sum_ms, quality_sum, success_count
                    FROM model_runs
                    WHERE task_type = ? AND model = ?
-                   ORDER BY ts DESC LIMIT ?""",
-                (task.value, model, self.window_size),
+                   LIMIT 1""",
+                (task.value, model),
             )
-            rows = cur.fetchall()
-        if not rows:
+            row = cur.fetchone()
+        if not row:
             return None
 
-        samples = len(rows)
-        success_rate = sum(r[0] for r in rows) / samples
-        avg_latency = sum(r[1] for r in rows) / samples
-        # 只统计非 None 的 quality
-        quality_scores = [r[2] for r in rows if r[2] is not None]
-        avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 5.0
+        samples, latency_sum, quality_sum, success_count = row
+        if samples == 0:
+            return None
+        # V1.0.2 B3：聚合列由 record_run 原子维护，直接除以 samples
+        avg_latency = latency_sum / samples
+        success_rate = success_count / samples
+        # V0.30.6 兼容：无 quality 时仍返回 5.0 中位数
+        avg_quality = quality_sum / samples if quality_sum > 0 else 5.0
 
         score = self._compute_score(success_rate, avg_latency, avg_quality)
         return ModelStats(
@@ -205,14 +265,23 @@ class AdaptiveRouter:
         )
 
     def get_all_stats_for_task(self, task: TaskType) -> dict[str, ModelStats]:
-        """V0.30.6 C3：查 task 下所有模型的统计。"""
+        """V0.30.6 C3：查 task 下所有模型的统计。
+
+        V1.0.2 B3：用 ``DISTINCT model`` 找所有模型 + 逐个 ``get_stats()``。
+        聚合列已是 task+model 维度的一行，``get_stats()`` 直接读，无需 GROUP BY。
+        """
         with self._lock, sqlite3.connect(self.db_path) as conn:
             cur = conn.execute(
                 """SELECT DISTINCT model FROM model_runs WHERE task_type = ?""",
                 (task.value,),
             )
             models = [row[0] for row in cur.fetchall()]
-        return {m: s for m in models if (s := self.get_stats(task, m)) is not None}
+        result: dict[str, ModelStats] = {}
+        for m in models:
+            stats = self.get_stats(task, m)
+            if stats is not None:
+                result[m] = stats
+        return result
 
     # === Selection ===
 

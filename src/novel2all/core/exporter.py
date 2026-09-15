@@ -18,6 +18,12 @@ EPUB 3.0 最小结构：
 - OEBPS/nav.xhtml（EPUB 3 navigation）
 - OEBPS/chapter_NNN.xhtml（每章 XHTML）
 
+V1.0.2 B5：EPUB 大文件 OOM 防护：
+- 单章 > 5 MB 拒绝导出（返回 ValueError，含章节号 + 文件大小）
+- 整个 EPUB 字节流大小超阈值（默认 100 MB）也拒绝（防御恶意输入）
+- ``export_chapters`` / ``export_book`` 会预先扫描所有章节大小，
+  避免组装到一半才发现 OOM（fail-fast）
+
 参考：https://www.w3.org/publishing/epub3/
 """
 
@@ -41,6 +47,9 @@ class Chapter:
         title: 章节标题（从 markdown 首行 # 解析）
         content: 章节正文（不含标题行）
         source_path: 源文件路径（用于调试）
+
+    V1.0.2 B5：``content_size_bytes`` 在构造时自动计算（不存 content 字符串的
+    多份拷贝），用于 EPUB 大文件预检（5 MB 上限）。
     """
 
     chapter_num: int
@@ -55,6 +64,15 @@ class Chapter:
         english = len(re.findall(r"[a-zA-Z]+", self.content))
         return chinese + english
 
+    @property
+    def content_size_bytes(self) -> int:
+        """V1.0.2 B5：章节正文 UTF-8 编码字节数（用于大小预检）。
+
+        注意：用 ``len(content.encode("utf-8"))`` 计算 — 字符数 × 3（中文 worst case）
+        不准。utf-8 编码字节数与 EPUB 实际占用基本一致。
+        """
+        return len(self.content.encode("utf-8"))
+
     @classmethod
     def from_md_file(cls, path: Path) -> Chapter:
         """V0.30.6 B6：从 markdown 文件加载章节。
@@ -62,6 +80,10 @@ class Chapter:
         解析规则：
         - 首行 `# 第N章 标题` 提取 chapter_num + title
         - 移除首行后剩余作为 content
+
+        V1.0.2 B5：保留 ``from_md_file`` 不变（仍一次读完整文件），因单章文件大小
+        受 ``ChapterTooLargeError`` 在调用方（exporter）层做防御性预检，
+        即使错过来源层校验，仍会被 exporter 拒绝。
         """
         text = path.read_text(encoding="utf-8")
         lines = text.split("\n", 1)
@@ -79,6 +101,57 @@ class Chapter:
             title = first_line.lstrip("#").strip() or path.stem
             content = text
         return cls(chapter_num=chapter_num, title=title, content=content, source_path=path)
+
+
+# V1.0.2 B5：EPUB 大文件保护阈值
+# - 单章 > 5 MB：通常意味着数据错误（500K 中文字 ≈ 1.5 MB，正常章节远低于此）
+# - 整书 > 100 MB：1000+ 章 50K 字平均的合理上限
+CHAPTER_TOO_LARGE_BYTES = 5 * 1024 * 1024  # 5 MB
+BOOK_TOO_LARGE_BYTES = 100 * 1024 * 1024  # 100 MB
+
+
+class ChapterTooLargeError(ValueError):
+    """V1.0.2 B5：单章过大拒绝导出。"""
+
+    def __init__(self, chapter_num: int, size_bytes: int, limit_bytes: int) -> None:
+        """V1.0.2 B5：构造异常。
+
+        Args:
+            chapter_num: 触发限流的章节号（1-based）
+            size_bytes: 章节实际 UTF-8 字节数
+            limit_bytes: 配置的上限（默认 5 MB）
+        """
+        self.chapter_num = chapter_num
+        self.size_bytes = size_bytes
+        self.limit_bytes = limit_bytes
+        size_mb = size_bytes / 1024 / 1024
+        limit_mb = limit_bytes / 1024 / 1024
+        super().__init__(
+            f"Chapter {chapter_num} is too large for EPUB export: "
+            f"{size_mb:.1f} MB > {limit_mb:.1f} MB limit. "
+            f"Please split the chapter into smaller parts before exporting."
+        )
+
+
+class BookTooLargeError(ValueError):
+    """V1.0.2 B5：整书过大拒绝导出。"""
+
+    def __init__(self, total_bytes: int, limit_bytes: int) -> None:
+        """V1.0.2 B5：构造异常。
+
+        Args:
+            total_bytes: 整书实际 UTF-8 字节数（章节内容累加）
+            limit_bytes: 配置的上限（默认 100 MB）
+        """
+        self.total_bytes = total_bytes
+        self.limit_bytes = limit_bytes
+        size_mb = total_bytes / 1024 / 1024
+        limit_mb = limit_bytes / 1024 / 1024
+        super().__init__(
+            f"Total book content too large for EPUB export: "
+            f"{size_mb:.1f} MB > {limit_mb:.1f} MB limit. "
+            f"Please export in smaller batches or use the web UI for streaming."
+        )
 
 
 @dataclass
@@ -209,7 +282,12 @@ class EPUBExporter(BaseExporter):
         return self._chapter_to_xhtml(chapter, 1, 1).encode("utf-8")
 
     def export_chapter(self, chapter: Chapter) -> bytes:
-        """V0.30.6 B6：导出单章节为完整 EPUB（含 mimetype/container/opf/ncx/nav/单章 xhtml）。"""
+        """V0.30.6 B6：导出单章节为完整 EPUB（含 mimetype/container/opf/ncx/nav/单章 xhtml）。
+
+        V1.0.2 B5：大文件 OOM 防护 — 单章 > 5 MB 拒绝导出（raise ChapterTooLargeError）。
+        """
+        # V1.0.2 B5：单章大小预检（fail-fast，避免 assemble 到一半 OOM）
+        self._check_chapter_size(chapter)
         # 单章 = 1 章节的"完整 EPUB"
         return self._build_epub([chapter], BookMetadata(title=chapter.title))
 
@@ -218,9 +296,34 @@ class EPUBExporter(BaseExporter):
         chapters: list[Chapter],
         metadata: BookMetadata | None = None,
     ) -> bytes:
-        """V0.30.6 B6：构建完整 EPUB。"""
+        """V0.30.6 B6：构建完整 EPUB。
+
+        V1.0.2 B5：逐章预检（任一章 > 5 MB 立即拒绝），并扫描整书总字节
+        （> 100 MB 拒绝）。fail-fast 设计 — 比"组装到一半 OOM"友好。
+        """
+        if not chapters:
+            raise ValueError("Cannot export empty chapter list")
         metadata = metadata or BookMetadata(title=chapters[0].title if chapters else "未命名作品")
+        # V1.0.2 B5：先逐章预检（fail-fast on first oversize chapter）
+        total_bytes = 0
+        for ch in chapters:
+            self._check_chapter_size(ch)
+            total_bytes += ch.content_size_bytes
+        # V1.0.2 B5：整书总字节上限
+        if total_bytes > BOOK_TOO_LARGE_BYTES:
+            raise BookTooLargeError(total_bytes, BOOK_TOO_LARGE_BYTES)
         return self._build_epub(chapters, metadata)
+
+    @staticmethod
+    def _check_chapter_size(chapter: Chapter) -> None:
+        """V1.0.2 B5：单章大小预检（EPUB 入口）。"""
+        size = chapter.content_size_bytes
+        if size > CHAPTER_TOO_LARGE_BYTES:
+            raise ChapterTooLargeError(
+                chapter_num=chapter.chapter_num,
+                size_bytes=size,
+                limit_bytes=CHAPTER_TOO_LARGE_BYTES,
+            )
 
     def _build_epub(self, chapters: list[Chapter], metadata: BookMetadata) -> bytes:
         """V0.30.6 B6：构建 EPUB zip 文件。"""

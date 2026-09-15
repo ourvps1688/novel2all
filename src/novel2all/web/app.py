@@ -426,6 +426,43 @@ def create_app() -> FastAPI:
             },
         )
 
+    # === V1.0.2 B4：LLMRateLimitExceeded → 429 with X-LLM-Tokens-Remaining ===
+    from novel2all.core.llm_rate_limiter import LLMRateLimitExceeded
+
+    @app.exception_handler(LLMRateLimitExceeded)
+    async def _llm_rate_limit_handler(request: Request, exc: LLMRateLimitExceeded) -> JSONResponse:
+        """V1.0.2 B4：per-user LLM rate limit 超额 → 429 + 友好提示。
+
+        与 B2 全局 handler 不同：
+          - 状态码 429（不是 500）
+          - detail 含用户友好的"剩余 quota"信息
+          - response header ``Retry-After`` = 3600（1h 窗口建议重试时间）
+          - response header ``X-LLM-Tokens-Remaining`` = 0
+          - logger.warning（不是 exception — 这是预期错误路径，不是 bug）
+        """
+        logger.warning(
+            "V1.0.2 B4: LLM rate limit user=%s used=%d limit=%d requested=%d path=%s",
+            exc.user_id,
+            exc.used,
+            exc.limit,
+            exc.requested,
+            request.url.path,
+        )
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": str(exc),
+                "user_id": exc.user_id,
+                "used": exc.used,
+                "limit": exc.limit,
+                "retry_after_seconds": 3600,
+            },
+            headers={
+                "Retry-After": "3600",
+                "X-LLM-Tokens-Remaining": "0",
+            },
+        )
+
     # === V1.0.1 B3：/metrics 端点 IP 白名单 ===
     @app.middleware("http")
     async def _metrics_ip_filter(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -1898,6 +1935,7 @@ def create_app() -> FastAPI:
     # V0.38：AI 重写指定区段
     @app.post("/api/chapter/{chapter}/rewrite")
     async def rewrite_section(
+        request: Request,  # V1.0.2 B4：注入 request 拿 user_id
         chapter: int,
         start: int = Form(...),
         end: int = Form(...),
@@ -1917,6 +1955,9 @@ def create_app() -> FastAPI:
 
         注意：本端点只生成 LLM 改写结果，不直接修改文件。
         前端应在用户确认后调 /api/chapter/{n}/save 应用修改。
+
+        V1.0.2 B4：per-user LLM rate limit — user_id 从 session 取，
+        超额返 429 + X-LLM-Tokens-Remaining=0。
         """
         root = Path(project_root).resolve()
         project = ProjectStructure(root=root)
@@ -1952,9 +1993,16 @@ def create_app() -> FastAPI:
             f"##改写要求\n{instruction}\n\n"
             "##输出要求\n只输出改写后的段落文本，不要加任何说明、注释、引号或前后缀。"
         )
+        # V1.0.2 B4：注入 user_id 触发 rate limit
+        current_user = get_request_user(request)
+        user_id = current_user.id if current_user is not None else 0
         try:
             rewritten = await llm.complete(
-                prompt=user_prompt, system=system, max_tokens=2000, temperature=0.7
+                prompt=user_prompt,
+                system=system,
+                max_tokens=2000,
+                temperature=0.7,
+                user_id=user_id if user_id else None,
             )
         except Exception as e:
             logger.exception("V0.38 rewrite_section: LLM call failed")
@@ -1982,6 +2030,7 @@ def create_app() -> FastAPI:
     # V0.38：在指定位置插入 AI 生成的内容
     @app.post("/api/chapter/{chapter}/insert")
     async def insert_at_position(
+        request: Request,  # V1.0.2 B4：注入 request 拿 user_id
         chapter: int,
         position: int = Form(...),
         instruction: str = Form("自然衔接上下文的过渡段落"),
@@ -1996,6 +2045,8 @@ def create_app() -> FastAPI:
 
         注意：本端点只生成 LLM 插入内容，不直接修改文件。
         前端应在用户确认后调 /api/chapter/{n}/save 应用修改。
+
+        V1.0.2 B4：per-user LLM rate limit。
         """
         root = Path(project_root).resolve()
         project = ProjectStructure(root=root)
@@ -2034,9 +2085,16 @@ def create_app() -> FastAPI:
             f"##插入要求\n{instruction}\n\n"
             "##输出要求\n只输出要插入的新段落文本，不要加任何说明、注释、引号或前后缀。"
         )
+        # V1.0.2 B4：注入 user_id 触发 rate limit
+        current_user = get_request_user(request)
+        user_id = current_user.id if current_user is not None else 0
         try:
             inserted = await llm.complete(
-                prompt=user_prompt, system=system, max_tokens=2000, temperature=0.7
+                prompt=user_prompt,
+                system=system,
+                max_tokens=2000,
+                temperature=0.7,
+                user_id=user_id if user_id else None,
             )
         except Exception as e:
             logger.exception("V0.38 insert_at_position: LLM call failed")

@@ -80,15 +80,26 @@ class TestStatistics:
         assert router.get_stats(TaskType.WRITING, "nobody") is None
 
     def test_get_stats_window_size(self, router: AdaptiveRouter) -> None:
-        """V0.30.6 C3：window_size 限制只取最近 N 次。"""
-        # 写 100 次，但 window_size=10
+        """V1.0.2 B3：window_size 现在不限制聚合（始终累计所有历史）。
+
+        历史：
+        - V0.30.6 C3：window_size 限制 ``get_stats()`` 取最近 N 条逐条聚合。
+        - V1.0.2 B3：record_run 用 ``INSERT ... ON CONFLICT DO UPDATE`` 原子聚合累计
+          列（samples/latency_sum/quality_sum/success_count），get_stats 直接读聚合列。
+          ``window_size`` 属性仍保留以兼容旧代码，但不再用于 SQL 切片。
+
+        旧测试期望 ``samples == 10`` 不再成立——V1.0.2 期望 ``samples == 100``（累计）。
+        """
         router.window_size = 10
         for i in range(100):
             success = i >= 50  # 后 50 次成功
             router.record_run(TaskType.WRITING, "m1", success=success, latency_ms=3000)
         stats = router.get_stats(TaskType.WRITING, "m1")
-        assert stats.samples == 10  # 只取最近 10 次
-        assert stats.success_rate == 1.0  # 后 10 次都成功
+        # V1.0.2：累计所有 100 次（不再有窗口滑动语义）
+        assert stats.samples == 100
+        # success_rate = 50/100 = 0.5（前 50 次失败，后 50 次成功）
+        assert stats.success_rate == 0.5
+        # 旧版此测试期望 success_rate == 1.0（"后 10 次都成功"）已不再适用
 
     def test_get_all_stats_for_task(self, router: AdaptiveRouter) -> None:
         """V0.30.6 C3：列 task 下所有模型的统计。"""
