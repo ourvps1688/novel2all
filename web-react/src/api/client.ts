@@ -12,7 +12,7 @@
 
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
 
-import { ApiError, type ApiErrorBody, toApiError } from '../utils/errors';
+import { type ApiErrorBody, toApiError } from '../utils/errors';
 
 // ==================== 拦截器回调钩子 ====================
 // 解耦：ApiClient 不直接依赖 store / router，由 AuthProvider 注册回调
@@ -57,8 +57,9 @@ function createApiClient(): AxiosInstance {
     (response) => {
       // 解析响应：可能是 JSON（application/json）或 SSE 流
       const contentType = response.headers['content-type'] ?? '';
+      const contentTypeStr = typeof contentType === 'string' ? contentType : '';
 
-      if (contentType.includes('text/event-stream')) {
+      if (contentTypeStr.includes('text/event-stream')) {
         // SSE 不在 axios 处理，调用方用 stream() 方法
         return response;
       }

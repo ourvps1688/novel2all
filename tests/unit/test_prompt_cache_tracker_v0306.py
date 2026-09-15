@@ -270,24 +270,6 @@ class TestCostSavingsCalculation:
         # 900 × 0.0049 = 4.41
         assert t.cost_saved_cny == pytest.approx(4.41, abs=0.01)
 
-    def test_prompt_cache_panel_endpoint(self) -> None:
-        """V0.30.6 C1：GET /page/prompt-cache-panel 返回 HTML 面板。"""
-        from fastapi.testclient import TestClient
-
-        from novel2all.web.app import create_app
-
-        app = create_app()
-        with TestClient(app) as client:
-            response = client.get("/page/prompt-cache-panel")
-            assert response.status_code == 200
-            html = response.text
-            # 验证关键 UI 元素存在
-            assert "Prompt Prefix Cache" in html
-            assert 'data-testid="prompt-cache-panel"' in html
-            assert "¥" in html  # 成本金额
-            assert "Prefix Hits" in html
-            assert "Prefix Misses" in html
-
     def test_zero_hits_zero_savings(self) -> None:
         """V0.30.6 C1：零命中时 cost_saved_cny = 0。
 

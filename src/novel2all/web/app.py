@@ -1,7 +1,8 @@
-"""novel2all Web UI（FastAPI + SSE SPA）。
+"""novel2all Web UI（FastAPI + V1.5 React SPA）。
 
 v0.20 基础：项目状态 + skill 列表 + role 列表 + tracking state
 v0.21 Step 3：SSE 流式写作端点 + 前端实时显示
+v1.5 React 迁移：移除 Jinja2Templates，改为 mount V1.5 React dist/
 """
 
 from __future__ import annotations
@@ -21,9 +22,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from novel2all.core import LLMConfig, LLMProvider
 from novel2all.core.auth_middleware import (
@@ -44,11 +44,6 @@ from novel2all.core.role import RoleRegistry
 from novel2all.core.skill import SkillRegistry
 
 logger = logging.getLogger(__name__)
-
-# V0.30.0：Jinja2 模板 + 静态文件（HTMX 2.x + Alpine.js 3.x 本地化）
-TEMPLATES_DIR = Path(__file__).parent / "templates"
-STATIC_DIR = Path(__file__).parent / "static"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # === SSE 工具函数 ===
 
@@ -367,7 +362,6 @@ def create_app() -> FastAPI:
 -  - 章节管理
 -  - Cache 管理
 -  - 项目授权（B5）
--  - 登录页
 -  - 本 OpenAPI 文档
         """,
         version="1.0.0",
@@ -519,26 +513,6 @@ def create_app() -> FastAPI:
         app.add_middleware(SecurityHeadersMiddleware)
     except Exception as e:
         logger.warning("V1.0 GA: SecurityHeadersMiddleware init failed: %s", e)
-    # V0.30.0：mount 静态文件（HTMX + Alpine.js 本地化，零 CDN 依赖）
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-    # ============================================================
-    # V0.30.6 B5 收尾：Auth API 端点
-    # ============================================================
-
-    # V0.30.6 B5 收尾：登录页面（HTML）
-    @app.get("/login", response_class=HTMLResponse)
-    async def page_login(request: Request) -> HTMLResponse:
-        """V0.30.6 B5 收尾：登录页（HTMX form 提交到 /api/auth/login）。
-
-        已登录用户访问 /login → 重定向到 /（首页）。
-        """
-        user = get_request_user(request)
-        if user is not None:
-            from starlette.responses import RedirectResponse
-
-            return RedirectResponse(url="/", status_code=302)
-        return templates.TemplateResponse(request, "login.html")
 
     # ============================================================
     # V1.0 GA Day 11-15：监控端点（metrics / traces / audit）
@@ -707,6 +681,9 @@ def create_app() -> FastAPI:
             secure=not is_dev_mode,
             path="/",
         )
+        # V1.5 React：登录成功后 React 端拿到 200 JSON 后自行 navigate("/")
+        # 不再依赖 HTMX HX-Redirect header（V1.0.2 兼容保留无害）
+        response.headers["HX-Redirect"] = "/"
         return response
 
     @app.post("/api/auth/logout")
@@ -861,11 +838,6 @@ def create_app() -> FastAPI:
     if not hasattr(app.state, "idempotency_store"):
         app.state.idempotency_store = InMemoryIdempotencyStore(ttl_seconds=300)
 
-    @app.get("/", response_class=HTMLResponse)
-    async def index(request: Request) -> HTMLResponse:
-        """V0.30.0：渲染 base.html + index.html（Jinja2 模板）。"""
-        return templates.TemplateResponse(request, "index.html")
-
     @app.get("/api/status")
     async def status(project_root: str = ".") -> dict:
         root = Path(project_root).resolve()
@@ -919,130 +891,6 @@ def create_app() -> FastAPI:
             for r in registry.list()
         ]
 
-    # V0.30.0：HTMX 局部更新端点（返回 HTML 片段而非 JSON）
-    @app.get("/page/status", response_class=HTMLResponse)
-    async def page_status(request: Request, project_root: str = ".") -> HTMLResponse:
-        """HTMX 用：渲染 status_partial.html。"""
-        root = Path(project_root).resolve()
-        tracker = Tracker(root / "_tracking-state.json")
-        if not tracker.exists():
-            return templates.TemplateResponse(
-                request,
-                "status_partial.html",
-                {"initialized": False, "project_root": str(root)},
-            )
-        state = tracker.read()
-        return templates.TemplateResponse(
-            request,
-            "status_partial.html",
-            {
-                "initialized": True,
-                "project_root": str(root),
-                "project_name": state.project_name,
-                "genre": state.genre,
-                "style_anchor": state.style_anchor,
-                "total_chapters_target": state.total_chapters_target,
-                "total_word_count_target": state.total_word_count_target,
-                "last_updated_chapter": state.last_updated_chapter,
-                "character_count": len(state.characters),
-                "active_foreshadowing_count": len(
-                    [f for f in state.foreshadowing.values() if f.status == "active"]
-                ),
-                "timeline_count": len(state.timeline),
-                "summary_count": len(state.recent_chapter_summaries),
-            },
-        )
-
-    @app.get("/page/skills", response_class=HTMLResponse)
-    async def page_skills(request: Request) -> HTMLResponse:
-        """HTMX 用：渲染 skills_partial.html。"""
-        skills_dir = Path(__file__).parent.parent / "skills"
-        registry = SkillRegistry(skills_dir)
-        registry.discover()
-        skills = [
-            {
-                "name": s.name,
-                "description": s.description,
-                "user_invocable": s.user_invocable,
-                "model_invocable": s.model_invocable,
-            }
-            for s in registry.list()
-        ]
-        return templates.TemplateResponse(request, "skills_partial.html", {"skills": skills})
-
-    @app.get("/page/roles", response_class=HTMLResponse)
-    async def page_roles(request: Request) -> HTMLResponse:
-        """HTMX 用：渲染 roles_partial.html。"""
-        roles_dir = Path(__file__).parent.parent / "roles"
-        registry = RoleRegistry(roles_dir)
-        registry.discover()
-        roles = [
-            {
-                "name": r.name,
-                "description": r.description,
-                "preferred_model": r.preferred_model,
-            }
-            for r in registry.list()
-        ]
-        return templates.TemplateResponse(request, "roles_partial.html", {"roles": roles})
-
-    # V0.30.1：模型选择器 + 写章节表单（HTMX partial）
-    @app.get("/page/model-selector", response_class=HTMLResponse)
-    async def page_model_selector(request: Request) -> HTMLResponse:
-        """HTMX 用：渲染 model_selector.html（带当前模型 + 可选列表）。"""
-        from novel2all.core.provider_router import MODEL_CONFIG
-
-        provider: LLMProvider = request.app.state.provider
-        models = [
-            {
-                "name": name,
-                "anthropic_compat": bool(cfg.api_base and "anthropic" in cfg.api_base),
-                "api_base": cfg.api_base,
-                "api_key_env": cfg.api_key_env,
-            }
-            for name, cfg in MODEL_CONFIG.items()
-        ]
-        return templates.TemplateResponse(
-            request,
-            "model_selector.html",
-            {"models": models, "current_model": provider.config.default_model},
-        )
-
-    @app.get("/page/write-form", response_class=HTMLResponse)
-    async def page_write_form(request: Request) -> HTMLResponse:
-        """HTMX 用：渲染 write_form.html（带模型下拉 + 流式提交按钮）。"""
-        from novel2all.core.provider_router import MODEL_CONFIG
-
-        provider: LLMProvider = request.app.state.provider
-        models = [
-            {
-                "name": name,
-                "anthropic_compat": bool(cfg.api_base and "anthropic" in cfg.api_base),
-                "api_base": cfg.api_base,
-                "api_key_env": cfg.api_key_env,
-            }
-            for name, cfg in MODEL_CONFIG.items()
-        ]
-        return templates.TemplateResponse(
-            request,
-            "write_form.html",
-            {"models": models, "current_model": provider.config.default_model},
-        )
-
-    # V0.30.2：Cache 命中率面板（暴露 V0.24 + V0.29.0 LRU）
-    @app.get("/page/cache-panel", response_class=HTMLResponse)
-    async def page_cache_panel(request: Request) -> HTMLResponse:
-        """HTMX 用：渲染 cache_panel.html（含 hit_rate 颜色逻辑 + LRU 进度条）。"""
-        provider: LLMProvider = request.app.state.provider
-        stats = provider.cache_stats()
-        return templates.TemplateResponse(request, "cache_panel.html", {"stats": stats})
-
-    # V0.34：章节编辑器（手动编辑 + AI 扩写引导）
-    @app.get("/page/chapter-edit", response_class=HTMLResponse)
-    async def page_chapter_edit(request: Request) -> HTMLResponse:
-        """V0.34：章节编辑器页面（Alpine.js 加载章节内容 + textarea + 保存/扩写按钮）。"""
-        return templates.TemplateResponse(request, "chapter_edit.html")
-
     @app.get("/api/cache/stats")
     async def cache_stats(request: Request) -> dict[str, Any]:
         """V0.29.3：返回 lifespan provider 的 cache 统计。
@@ -1074,19 +922,6 @@ def create_app() -> FastAPI:
         provider: LLMProvider = request.app.state.provider
         provider.reset_prompt_cache_stats()
         return {"reset": True, "stats": provider.prompt_cache_stats()}
-
-    # V0.30.6 C1：HTMX partial — prompt cache panel
-    @app.get("/page/prompt-cache-panel", response_class=HTMLResponse)
-    async def page_prompt_cache_panel(request: Request) -> HTMLResponse:
-        """V0.30.6 C1：HTMX 渲染 prompt prefix cache 面板（每 30s 刷新）。
-
-        实时显示 prefix hit rate + cost saved，激励用户：
-        - 复用 system prompt（多章节共用同一角色卡）
-        - 避免频繁更换写作风格
-        """
-        provider: LLMProvider = request.app.state.provider
-        stats = provider.prompt_cache_stats()
-        return templates.TemplateResponse(request, "prompt_cache_panel.html", {"stats": stats})
 
     # V0.43：Cache 迁移端点（POST 表单）
     @app.post("/api/cache/migrate")
@@ -1197,28 +1032,6 @@ def create_app() -> FastAPI:
             current_ttl_seconds=config.cache_ttl_seconds,
         )
         return rec.to_dict()
-
-    # V0.51：Cache 推荐面板（HTMX partial 渲染）
-    @app.get("/page/cache-recommend", response_class=HTMLResponse)
-    async def page_cache_recommend(request: Request) -> HTMLResponse:
-        """V0.51：HTMX 渲染推荐面板（含健康评分 + 推荐动作列表）。"""
-        from novel2all.core.cache_recommend import recommend_cache_config
-
-        provider: LLMProvider = request.app.state.provider
-        stats = provider.cache_stats()
-        config = provider.config
-
-        rec = recommend_cache_config(
-            stats=stats,
-            current_backend=config.cache_backend,
-            current_max_size=config.cache_max_size,
-            current_ttl_seconds=config.cache_ttl_seconds,
-        )
-        return templates.TemplateResponse(
-            request,
-            "cache_recommend.html",
-            {"rec": rec.to_dict()},
-        )
 
     # V0.30.1：模型选择器 API
     @app.get("/api/models")
@@ -2309,5 +2122,77 @@ def create_app() -> FastAPI:
                 "X-Accel-Buffering": "no",  # 防止 nginx 等缓冲
             },
         )
+
+    # ============================================================
+    # V1.5 React SPA mount（必须在所有 /api/* 路由注册之后）
+    # ============================================================
+    # __file__ = src/novel2all/web/app.py
+    # parents[0] = web/, parents[1] = novel2all/, parents[2] = src/, parents[3] = 项目根
+    _dist_dir = Path(__file__).resolve().parents[3] / "web-react" / "dist"
+    if _dist_dir.exists():
+        # 静态资源（JS / CSS / 图片等）
+        _assets_dir = _dist_dir / "assets"
+        if _assets_dir.exists():
+            app.mount(
+                "/assets",
+                StaticFiles(directory=str(_assets_dir)),
+                name="react-assets",
+            )
+
+        # favicon（Vite 默认输出 favicon.svg）
+        @app.get("/favicon.ico", include_in_schema=False)
+        async def favicon() -> FileResponse:
+            return FileResponse(str(_dist_dir / "favicon.svg"), media_type="image/svg+xml")
+
+        # SPA fallback — 未匹配的前端路径返回 index.html（让 React Router 处理）
+        # 用 404 exception handler 而不是 catch-all 路由，原因：
+        #   - catch-all `/{full_path:path}` 会在注册顺序上排在最后，可能吞掉测试
+        #     在 create_app() 之后动态注入的端点（如 /test/boom）
+        #   - 404 handler 只在确实没有匹配路由时才触发，更安全
+        # 行为：
+        #   - /api/* /docs /openapi.json /redoc /metrics /assets → 走 FastAPI 默认
+        #     JSON 404（保留原始 detail，如 "task xxx 不存在"）
+        #   - 其他路径（前端路由）→ 返回 SPA index.html
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+
+        @app.exception_handler(StarletteHTTPException)
+        async def _spa_404_handler(request: Request, exc: StarletteHTTPException) -> Response:
+            """V1.5 React：404 → SPA index.html（除 API / docs / static）。"""
+            if exc.status_code != 404:
+                # 非 404 仍走 FastAPI 默认行为
+                return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+            path = request.url.path
+            if path.startswith(
+                (
+                    "/api/",
+                    "/assets",
+                    "/docs",
+                    "/openapi.json",
+                    "/redoc",
+                    "/metrics",
+                )
+            ):
+                # API / docs / static 路径仍按 FastAPI 默认 404 JSON 返回
+                # 保留 exc.detail（如 "task xxx 不存在或已完成"）
+                return JSONResponse({"detail": exc.detail}, status_code=404)
+            # 前端路径：返回 SPA index.html（让 React Router 处理）
+            return FileResponse(str(_dist_dir / "index.html"))
+
+        # 显式注册 / 避免被 catch-all 吞掉（其实 catch-all 已能匹配，
+        # 但显式声明可让 OpenAPI / logs 更清晰）
+        @app.get("/", include_in_schema=False)
+        async def root_spa() -> FileResponse:
+            return FileResponse(str(_dist_dir / "index.html"))
+    else:
+        # dist/ 不存在时的 fallback（开发阶段友好）
+        @app.get("/", include_in_schema=False)
+        async def root_no_dist() -> JSONResponse:
+            return JSONResponse(
+                {
+                    "error": "V1.5 React dist not built",
+                    "hint": "cd web-react && npm install && npm run build",
+                    "api_docs": "/docs",
+                }
+            )
 
     return app

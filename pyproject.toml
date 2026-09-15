@@ -81,7 +81,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["src/**/templates/*.html", "Dockerfile", "docker-compose.yml", ".dockerignore", "scripts/benchmark_v035.py", "scripts/test_quality_compare.py"]
+extend-exclude = ["Dockerfile", "docker-compose.yml", ".dockerignore", "scripts/benchmark_v035.py", "scripts/test_quality_compare.py"]
 
 ["invalid-syntax"]
 

@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
             // 拆 vendor 提升缓存命中率
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
             'vendor-mui': ['@mui/material', '@mui/icons-material'],
-            'vendor-tiptap': ['@tiptap/react', '@tiptap/starter-kit', '@tiptap/pm'],
+            'vendor-tiptap': ['@tiptap/react', '@tiptap/starter-kit'],
             'vendor-query': ['@tanstack/react-query'],
             'vendor-utils': ['axios', 'zod', 'uuid', 'zustand', 'recharts'],
           },

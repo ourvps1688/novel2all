@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 
 import { useWriteStream } from '../src/hooks/useSSE';
 import { computePhaseProgress } from '../src/types/models';

@@ -26,7 +26,6 @@ export const UserSchema = z.object({
   disabled: z.boolean(),
 });
 export type User = z.infer<typeof UserSchema>;
-export type User = z.infer<typeof UserSchema>;
 
 export const AuthMeSchema = z.object({
   user: UserSchema.nullable(),

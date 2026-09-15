@@ -100,56 +100,6 @@ class TestModelSelectorAPIv0301:
             assert "未知模型" in r.text or "Unknown" in r.text
 
 
-class TestModelSelectorPartialsV0301:
-    """V0.30.1：HTMX partial 端点（model_selector.html + write_form.html）。"""
-
-    def test_page_model_selector_returns_html(self) -> None:
-        """GET /page/model-selector 返回 HTML partial（含 <select>）。"""
-        app = create_app()
-        with TestClient(app) as client:
-            response = client.get("/page/model-selector")
-            assert response.status_code == 200
-            assert "text/html" in response.headers["content-type"]
-            html = response.text
-            # model_selector.html 特征
-            assert "<select" in html
-            assert "model" in html
-            # 应包含所有模型
-            for name in MODEL_CONFIG:
-                assert name in html, f"model_selector 应含模型 {name}"
-
-    def test_page_write_form_returns_html(self) -> None:
-        """GET /page/write-form 返回 HTML partial（含章节号/Skill/Model 输入 + submit）。"""
-        app = create_app()
-        with TestClient(app) as client:
-            response = client.get("/page/write-form")
-            assert response.status_code == 200
-            assert "text/html" in response.headers["content-type"]
-            html = response.text
-            # write_form.html 特征
-            assert "chapter" in html
-            assert "skill" in html
-            assert "<button" in html
-            # hx-post 到 /api/write/stream/model
-            assert "/api/write/stream/model" in html
-            # 应包含 model <select>
-            assert 'name="model"' in html
-
-    def test_index_uses_model_selector_and_write_form(self) -> None:
-        """GET / 主页含模型选择器 + 写章节表单 partial 引用。"""
-        app = create_app()
-        with TestClient(app) as client:
-            response = client.get("/")
-            assert response.status_code == 200
-            html = response.text
-            # V0.30.1 partial 引用
-            assert "/page/model-selector" in html
-            assert "/page/write-form" in html
-            # HTMX hx-get 触发
-            assert 'hx-get="/page/model-selector"' in html
-            assert 'hx-get="/page/write-form"' in html
-
-
 class TestWriteStreamWithModelV0301:
     """V0.30.1：/api/write/stream/model 端点（带 model 参数的流式写作）。"""
 

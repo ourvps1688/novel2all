@@ -447,47 +447,6 @@ def test_api_cache_recommend_with_cache_enabled() -> None:
         os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
 
 
-# === Test 9：Web 端点 /page/cache-recommend ===
-
-
-def test_page_cache_recommend_returns_html() -> None:
-    """V0.51：GET /page/cache-recommend 返回 HTML partial。"""
-    app = create_app()
-    with TestClient(app) as client:
-        response = client.get("/page/cache-recommend")
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        html = response.text
-        # 必备 UI 元素
-        assert "Cache 智能推荐" in html
-        assert "V0.51" in html
-        assert "健康度" in html
-        assert "置信度" in html
-
-
-def test_page_cache_recommend_with_actions() -> None:
-    """V0.51：cache 配置需调整时显示 actions。"""
-    import os
-
-    os.environ["NOVEL2ALL_LLM_CACHE"] = "true"
-    try:
-        app = create_app()
-        with TestClient(app) as client:
-            response = client.get("/page/cache-recommend")
-            html = response.text
-            # 应包含建议操作 UI 元素
-            assert "建议操作" in html or "切换 backend" in html or "调整" in html
-    finally:
-        os.environ.pop("NOVEL2ALL_LLM_CACHE", None)
-
-
-def test_index_html_includes_cache_recommend() -> None:
-    """V0.51：index.html 集成 cache-recommend 面板。"""
-    import pathlib
-
-    index_path = (
-        pathlib.Path(__file__).parent.parent.parent / "src/novel2all/web/templates/index.html"
-    )
-    content = index_path.read_text(encoding="utf-8")
-    assert "/page/cache-recommend" in content
-    assert "cache-recommend" in content
+# === Test 9: Web 端点 /page/cache-recommend ===
+# V1.5 React 迁移：移除 Jinja2 模板后，/page/cache-recommend 端点已删除。
+# /api/cache/recommend 仍保留（被 React 端消费）。

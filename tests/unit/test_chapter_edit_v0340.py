@@ -45,17 +45,9 @@ def project_root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-# === Test 1: /page/chapter-edit 端点返回 HTML ===
-
-
-def test_chapter_edit_page_endpoint_exists() -> None:
-    """V0.34：/page/chapter-edit 端点返回 HTML 200。"""
-    app = create_app()
-    with TestClient(app) as client:
-        response = client.get("/page/chapter-edit")
-        assert response.status_code == 200
-        # 返回 chapter_edit.html 模板
-        assert "chapter-edit" in response.text or "章节编辑器" in response.text
+# === Test 1: /page/chapter-edit 端点 ===
+# V1.5 React 迁移：移除 Jinja2 模板后，/page/chapter-edit 端点已删除。
+# React 端通过 /api/chapter/{n}/content + /save + /expand 直接调用。
 
 
 # === Test 2: POST /api/chapter/{n}/save 保存内容 ===
@@ -225,64 +217,5 @@ def test_get_chapter_content_still_works(project_root: Path) -> None:
         assert "林雷" in data["content"]
 
 
-# === Test 5: 模板渲染验证（V0.34 chapter_edit.html 存在 + 含 Alpine.js）===
-
-
-def test_chapter_edit_template_has_alpine_state() -> None:
-    """V0.34：chapter_edit.html 含 V0.34 7 态状态机 + textarea 编辑器。"""
-    template_path = Path("src/novel2all/web/templates/chapter_edit.html")
-    assert template_path.exists()
-
-    content = template_path.read_text(encoding="utf-8")
-
-    # Alpine.js 状态机
-    assert "status: 'idle'" in content
-    assert "loading" in content
-    assert "loaded" in content
-    assert "saving" in content
-    assert "saved" in content
-    assert "expanding" in content
-    assert "error" in content
-
-    # Alpine.js 字段
-    assert "chapter" in content
-    assert "content" in content
-    assert "originalContent" in content
-    assert "charCount" in content
-    assert "modified" in content
-
-    # 关键方法
-    assert "loadChapter" in content
-    assert "saveChapter" in content
-    assert "expandChapter" in content
-    assert "discardChanges" in content
-
-    # 按钮
-    assert "加载章节" in content
-    assert "保存修改" in content
-    assert "撤销修改" in content
-    assert "AI 扩写" in content
-
-    # textarea 编辑器
-    assert "<textarea" in content
-    assert 'x-model="content"' in content
-
-
-def test_chapter_edit_template_calls_v034_endpoints() -> None:
-    """V0.34：chapter_edit.html 调用 /api/chapter/{n}/save 和 /expand。"""
-    template_path = Path("src/novel2all/web/templates/chapter_edit.html")
-    content = template_path.read_text(encoding="utf-8")
-
-    # 应含端点 URL
-    assert "/api/chapter/" in content
-    assert "/save" in content
-    assert "/expand" in content
-    assert "/content" in content
-
-
-def test_index_template_links_to_chapter_edit() -> None:
-    """V0.34：index.html 含 chapter-edit div（让首页能看到编辑器）。"""
-    index_path = Path("src/novel2all/web/templates/index.html")
-    content = index_path.read_text(encoding="utf-8")
-    assert "/page/chapter-edit" in content
-    assert 'id="chapter-edit"' in content
+# === Test 5: 模板渲染验证 ===
+# V1.5 React 迁移：模板已删除，React 端 ChapterEditPage 组件实现同等功能。

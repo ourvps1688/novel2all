@@ -29,7 +29,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const setLoading = useAuthStore((s) => s.setLoading);
   const setInitialized = useAuthStore((s) => s.setInitialized);
   const clear = useAuthStore((s) => s.clear);
-  const user = useAuthStore((s) => s.user);
   const initialized = useAuthStore((s) => s.initialized);
   const loading = useAuthStore((s) => s.loading);
 

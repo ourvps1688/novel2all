@@ -10,7 +10,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 import { get, postForm, setUnauthorizedHandler } from './client';
-import { AuthMeSchema, LoginResponseSchema, type AuthMe, type LoginResponse, type User } from './types';
+import { AuthMeSchema, LoginResponseSchema, type AuthMe, type LoginResponse } from './types';
 
 // ============ Query Keys ============
 

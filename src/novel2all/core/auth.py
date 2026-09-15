@@ -145,7 +145,9 @@ class AuthStore:
     def __init__(self, db_path: Path | None = None) -> None:
         self.db_path = Path(db_path) if db_path else self.DEFAULT_DB_PATH
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.RLock()  # V1.0.2 hotfix：RLock 而非 Lock，避免 _bootstrap_admin_from_env → create_user 重入死锁
+        self._lock = (
+            threading.RLock()
+        )  # V1.0.2 hotfix：RLock 而非 Lock，避免 _bootstrap_admin_from_env → create_user 重入死锁
         self._init_db()
         self._bootstrap_admin_from_env()
 
@@ -397,7 +399,9 @@ class RateLimiter:
         self.max_fails = max_fails
         self.window_seconds = window_seconds
         self.lockout_seconds = lockout_seconds
-        self._lock = threading.RLock()  # V1.0.2 hotfix：RLock 而非 Lock，避免 _bootstrap_admin_from_env → create_user 重入死锁
+        self._lock = (
+            threading.RLock()
+        )  # V1.0.2 hotfix：RLock 而非 Lock，避免 _bootstrap_admin_from_env → create_user 重入死锁
         self._fail_counts: dict[str, list[float]] = {}  # ip -> [timestamps]
         self._locked_until: dict[str, float] = {}  # ip -> epoch
 
