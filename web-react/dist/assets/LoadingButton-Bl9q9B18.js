@@ -1,0 +1,1 @@
+import{j as s}from"./vendor-query-CmkHWkQo.js";import{s as a,C as e}from"./vendor-mui-BGPOkZOI.js";function x({loading:r,disabled:t,children:o,startIcon:i,...n}){return s.jsx(a,{...n,disabled:t||r,startIcon:r?s.jsx(e,{size:16,color:"inherit"}):i,children:o})}export{x as L};
