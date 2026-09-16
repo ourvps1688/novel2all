@@ -1258,6 +1258,17 @@ def create_app() -> FastAPI:
                 # V1.5.2 兜底：失败也 emit progress + done，前端 useSkillStream 能识别 "已完成"
                 event_queue.put_nowait(
                     sse_event(
+                        "progress",
+                        {
+                            "task_id": task_id,
+                            "phase": "failed",
+                            "code": "outline_not_found",
+                            "error": str(e),
+                        },
+                    )
+                )
+                event_queue.put_nowait(
+                    sse_event(
                         "done",
                         {
                             "task_id": task_id,
@@ -1285,6 +1296,17 @@ def create_app() -> FastAPI:
                 # V1.5.2 兜底
                 event_queue.put_nowait(
                     sse_event(
+                        "progress",
+                        {
+                            "task_id": task_id,
+                            "phase": "failed",
+                            "code": "blocking_issues",
+                            "error": f"pre-write blocking: {len(e.issues)}",
+                        },
+                    )
+                )
+                event_queue.put_nowait(
+                    sse_event(
                         "done",
                         {
                             "task_id": task_id,
@@ -1308,6 +1330,17 @@ def create_app() -> FastAPI:
                     )
                 )
                 # V1.5.2 兜底
+                event_queue.put_nowait(
+                    sse_event(
+                        "progress",
+                        {
+                            "task_id": task_id,
+                            "phase": "failed",
+                            "code": "pipeline_error",
+                            "error": f"{type(e).__name__}: {e}",
+                        },
+                    )
+                )
                 event_queue.put_nowait(
                     sse_event(
                         "done",
