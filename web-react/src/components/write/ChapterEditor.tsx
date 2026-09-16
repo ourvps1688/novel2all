@@ -19,9 +19,10 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, 
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import { Box, Stack, Typography, CircularProgress, Card, CardContent } from '@mui/material';
+import { Box, Stack, Typography, CircularProgress, Card, CardContent, Alert } from '@mui/material';
 
 import { useChapterContent, useSaveChapter } from '../../api/chapters';
+import { useProjectStatus } from '../../api/projects';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import { formatNumber } from '../../utils/format';
 import { Toolbar } from './Toolbar';
@@ -71,6 +72,7 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
 ) {
   const snackbar = useSnackbar();
   const { data, isLoading } = useChapterContent(chapter, projectRoot);
+  const { data: projectStatus } = useProjectStatus(projectRoot);
   const saveMutation = useSaveChapter(projectRoot);
 
   const [isDirty, setIsDirty] = useState(false);
@@ -83,6 +85,10 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
 
   // SSE 流 (AI 续写)
   const stream = useWriteStream();
+
+  // V1.5.x bug fix: 项目未初始化时禁止自动保存 (后端会 404 "Project not initialized")
+  // 用户体验: 阻止一直重试,改显示明确提示并引导回主页
+  const isProjectInitialized = projectStatus?.initialized !== false;
 
   const editor = useEditor({
     extensions: [
@@ -160,6 +166,11 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
   // 自动保存: isDirty 变化时 debounce 2s
   useEffect(() => {
     if (!isDirty || !editor) return;
+    // V1.5.x bug fix: 项目未初始化 → 跳过自动保存 (避免一直 404 + 一直重试)
+    if (!isProjectInitialized) {
+      snackbar.warning('项目未初始化，无法自动保存。请先在主页创建项目。');
+      return;
+    }
     if (autosaveTimerRef.current !== null) {
       window.clearTimeout(autosaveTimerRef.current);
     }
@@ -176,8 +187,13 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
         setLastSavedAt(new Date());
         onSaved?.(result.char_count);
       } catch (err) {
+        // V1.5.x bug fix: 检测后端 404 "Project not initialized" → 给出明确提示,不再盲重试
         const errMsg = err instanceof Error ? err.message : '保存失败';
-        snackbar.error(`自动保存失败: ${errMsg}`);
+        if (/404|not\s*found|not\s*initialized/i.test(errMsg)) {
+          snackbar.error('项目未初始化，无法保存。请先在主页创建项目。');
+        } else {
+          snackbar.error(`自动保存失败: ${errMsg}`);
+        }
       } finally {
         setIsAutoSaving(false);
       }
@@ -188,7 +204,7 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
         window.clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [isDirty, editor, chapter, saveMutation, onSaved, snackbar]);
+  }, [isDirty, editor, chapter, saveMutation, onSaved, snackbar, isProjectInitialized]);
 
   // 字数统计
   const charCount = useMemo(() => {
@@ -200,6 +216,11 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
   // 手动保存
   const handleManualSave = useCallback(async () => {
     if (!editor) return;
+    // V1.5.x bug fix: 项目未初始化 → 直接提示,不发请求
+    if (!isProjectInitialized) {
+      snackbar.warning('项目未初始化，无法保存。请先在主页创建项目。');
+      return;
+    }
     if (autosaveTimerRef.current !== null) {
       window.clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
@@ -216,12 +237,17 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
       onSaved?.(result.char_count);
       snackbar.success(`已保存 ${result.char_count} 字`);
     } catch (err) {
+      // V1.5.x bug fix: 同样检测 404 → 给出明确提示
       const errMsg = err instanceof Error ? err.message : '保存失败';
-      snackbar.error(errMsg);
+      if (/404|not\s*found|not\s*initialized/i.test(errMsg)) {
+        snackbar.error('项目未初始化，无法保存。请先在主页创建项目。');
+      } else {
+        snackbar.error(errMsg);
+      }
     } finally {
       setIsAutoSaving(false);
     }
-  }, [editor, chapter, saveMutation, onSaved, snackbar]);
+  }, [editor, chapter, saveMutation, onSaved, snackbar, isProjectInitialized]);
 
   // 撤销 / 重做
   const handleUndo = useCallback(() => {
@@ -256,6 +282,29 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
               加载章节内容...
             </Typography>
           </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // V1.5.x bug fix: 项目未初始化 → 显示明确提示,禁用自动保存
+  if (!isProjectInitialized) {
+    return (
+      <Card
+        variant="outlined"
+        data-testid="chapter-editor-uninitialized"
+        sx={{ height: '100%', minHeight: 480 }}
+      >
+        <CardContent>
+          <Alert severity="warning" data-testid="chapter-editor-uninitialized-alert">
+            <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              项目未初始化
+            </Typography>
+            <Typography variant="body2">
+              当前项目根目录（<code>{projectRoot}</code>）下未检测到 <code>_tracking-state.json</code>。
+              请先在主页通过 Onboarding 向导初始化项目，然后再开始写作。
+            </Typography>
+          </Alert>
         </CardContent>
       </Card>
     );

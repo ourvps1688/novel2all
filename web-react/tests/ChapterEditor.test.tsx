@@ -29,6 +29,13 @@ vi.mock('../src/api/chapters', () => ({
   useCachedReview: vi.fn(),
 }));
 
+vi.mock('../src/api/projects', () => ({
+  useProjectStatus: vi.fn(() => ({
+    data: { initialized: true, project_name: 'test-novel' },
+    isLoading: false,
+  })),
+}));
+
 vi.mock('../src/hooks/useSSE', () => ({
   useWriteStream: () => ({
     progress: { phase: 'idle', charsWritten: 0 },
@@ -211,5 +218,59 @@ describe('ChapterEditor', () => {
     // 真正验证应该: 用户输入 → 等 debounce → saveMock 被调
     // 但 jsdom 不容易触发 Tiptap 输入事件, 这里跳过
     expect(saveMock).toBeDefined();
+  });
+
+  // ========== V1.5.x bug fix: 项目未初始化时的 UX ==========
+
+  it('shows uninitialized-project Alert when project_root has no _tracking-state.json', async () => {
+    // Mock useProjectStatus 返回 initialized: false
+    const projects = await import('../src/api/projects');
+    (projects.useProjectStatus as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { initialized: false },
+      isLoading: false,
+    });
+    await setupContent('内容');
+
+    renderEditor({ chapter: 1 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chapter-editor-uninitialized')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('chapter-editor-uninitialized-alert')).toBeInTheDocument();
+    expect(screen.getByText(/项目未初始化/)).toBeInTheDocument();
+    // 不应渲染 Tiptap 编辑器本体
+    expect(screen.queryByTestId('tiptap-editor-content')).not.toBeInTheDocument();
+  });
+
+  it('save success path: returns ChapterSaveResponse with correct shape', async () => {
+    // V1.5.x bug fix 测试: 后端返回 200 + 正确的 ChapterSaveResponse shape
+    // (前端用 ChapterSaveResponseSchema.parse 校验)
+    // 重置 useProjectStatus 为已初始化 (避免上一测试的 mock 泄漏)
+    const projects = await import('../src/api/projects');
+    (projects.useProjectStatus as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { initialized: true, project_name: 'test-novel' },
+      isLoading: false,
+    });
+    const { saveMock } = await setupContent('初始内容');
+    renderEditor({ chapter: 1 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chapter-editor')).toBeInTheDocument();
+    });
+
+    // 模拟保存成功 → mutateAsync 返回符合 ChapterSaveResponseSchema 的响应
+    const chapters = await import('../src/api/chapters');
+    const saveMut = (chapters.useSaveChapter as ReturnType<typeof vi.fn>).mock.results[0]
+      ?.value as { mutateAsync: ReturnType<typeof vi.fn> };
+    const result = await saveMut.mutateAsync({ chapter: 1, content: '新内容, 测试保存成功' });
+
+    // 验证响应 shape 正确 (前端 zod parse 不报错)
+    expect(result).toMatchObject({
+      chapter: 1,
+      char_count: expect.any(Number),
+      output_path: expect.any(String),
+    });
+    expect(result.char_count).toBeGreaterThan(0);
+    expect(saveMock).toHaveBeenCalledWith({ chapter: 1, content: expect.any(String) });
   });
 });
