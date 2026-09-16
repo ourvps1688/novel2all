@@ -105,3 +105,21 @@ _*.py
 /web-react/*.tsbuildinfo
 # web-react 根目录下的临时测试/build 输出（_*.txt 已在根规则覆盖，但 web-react/ 下需要独立路径）
 /web-react/*.txt
+
+# Runtime data（应用运行产生，不应污染仓库）—— 2026-09-16 prod-deploy 补
+# auth.db / sessions.db / adaptive_routing.db 是 runtime data，但 .gitignore 已覆盖子路径
+# audit.db / traces.jsonl 也是 runtime data，但同样已覆盖
+# 显式补：避免新人误以为它们是源码
+/.novel2all/cache/
+/.novel2all/*.db
+/.novel2all/*.jsonl
+
+# pytest 临时目录（沙箱 safe-delete 阈值 50 撞点）—— 2026-09-16 prod-deploy 补
+.pytest_tmp/
+
+# web-react/dist/ 全部是 vite build 产物，不应源码化 — 2026-09-16 prod-deploy 补
+# src/ 是源码但 dist/ 是输出（与 src/api/*.ts 区分）
+/web-react/dist/
+
+# docs/archive/ 本地归档（git history 已有，不入仓）—— 2026-09-16 docs cleanup 补
+/docs/archive/
