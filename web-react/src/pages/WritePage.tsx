@@ -32,6 +32,7 @@ import {
   Chip,
   Button,
   Alert,
+  TextField,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -50,6 +51,7 @@ import {
 import { AIRewriteModal } from '../components/write/AIRewriteModal';
 import { AIInsertModal } from '../components/write/AIInsertModal';
 import { AIDeslopModal } from '../components/write/AIDeslopModal';
+import { ShortModePanel } from '../components/write/ShortModePanel';
 import { WriteProgress } from '../components/write/WriteProgress';
 import { useWriteStream } from '../hooks/useSSE';
 import { formatNumber } from '../utils/format';
@@ -86,6 +88,12 @@ export function WritePage() {
 
   // ChapterEditor ref (暴露给 AI 操作调用)
   const editorRef = useRef<ChapterEditorHandle | null>(null);
+
+  // 长篇/短篇模式切换
+  const [mode, setMode] = useState<'long' | 'short'>('long');
+  const [storyCore, setStoryCore] = useState('');
+  const [shortPlatform, setShortPlatform] = useState('盐言');
+  const [shortTargetChars, setShortTargetChars] = useState(5000);
 
   // AI 重写状态
   const [rewriteOpen, setRewriteOpen] = useState(false);
@@ -265,6 +273,52 @@ export function WritePage() {
 
         {/* 中: Tiptap 编辑器 */}
         <Grid item xs={12} md={6.5} sx={{ minHeight: 0 }}>
+          {/* 长篇/短篇模式 toggle */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary">模式：</Typography>
+            <Button
+              size="small"
+              variant={mode === 'long' ? 'contained' : 'outlined'}
+              onClick={() => setMode('long')}
+            >
+              长篇
+            </Button>
+            <Button
+              size="small"
+              variant={mode === 'short' ? 'contained' : 'outlined'}
+              onClick={() => setMode('short')}
+            >
+              短篇 8 节
+            </Button>
+            {mode === 'short' && (
+              <>
+                <TextField
+                  size="small"
+                  label="故事核"
+                  value={storyCore}
+                  onChange={(e) => setStoryCore(e.target.value)}
+                  sx={{ flex: 1, minWidth: 240 }}
+                  placeholder="一句话讲清核心反转"
+                />
+                <TextField
+                  size="small"
+                  label="平台"
+                  value={shortPlatform}
+                  onChange={(e) => setShortPlatform(e.target.value)}
+                  sx={{ width: 100 }}
+                />
+                <TextField
+                  size="small"
+                  label="字数"
+                  type="number"
+                  value={shortTargetChars}
+                  onChange={(e) => setShortTargetChars(parseInt(e.target.value, 10) || 5000)}
+                  sx={{ width: 100 }}
+                />
+              </>
+            )}
+          </Stack>
+
           <ChapterEditor
             ref={editorRef}
             chapter={currentChapter}
@@ -273,6 +327,19 @@ export function WritePage() {
               void qc.invalidateQueries({ queryKey: ['chapters'] });
             }}
           />
+          {mode === 'short' && storyCore.trim() && (
+            <Box sx={{ mt: 2, minHeight: 600 }}>
+              <ShortModePanel
+                storyCore={storyCore}
+                platform={shortPlatform}
+                targetChars={shortTargetChars}
+                onSave={(md) => {
+                  editorRef.current?.replaceSelection(md);
+                  snackbar.success('短篇已填入编辑器');
+                }}
+              />
+            </Box>
+          )}
           {/* AI 操作触发按钮 (额外快捷入口, 工具栏内已集成) */}
           <Stack direction="row" spacing={1} sx={{ mt: 1 }} justifyContent="flex-end">
             <Button
