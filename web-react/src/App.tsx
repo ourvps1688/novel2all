@@ -29,8 +29,17 @@ const ReviewQueuePage = lazy(() =>
 const ExportPage = lazy(() =>
   import('./pages/ExportPage').then((m) => ({ default: m.ExportPage })),
 );
-const ManagementPage = lazy(() =>
-  import('./pages/ManagementPage').then((m) => ({ default: m.ManagementPage })),
+const AdminLayout = lazy(() =>
+  import('./layouts/AdminLayout').then((m) => ({ default: m.AdminLayout })),
+);
+const AdminUsersPage = lazy(() =>
+  import('./pages/admin/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })),
+);
+const AdminAuditPage = lazy(() =>
+  import('./pages/admin/AdminAuditPage').then((m) => ({ default: m.AdminAuditPage })),
+);
+const AdminProjectsPage = lazy(() =>
+  import('./pages/admin/AdminProjectsPage').then((m) => ({ default: m.AdminProjectsPage })),
 );
 const SettingsPage = lazy(() =>
   import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
@@ -82,12 +91,27 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/cover" element={<CoverPage />} />
 
-          {/* Admin 专属 */}
+          {/* Admin 专属（嵌套路由：/admin → /admin/users） */}
+          <Route
+            path="/admin"
+            element={
+              <AdminGuard>
+                <Navigate to="/admin/users" replace />
+              </AdminGuard>
+            }
+          />
           <Route
             path="/admin/*"
             element={
               <AdminGuard>
-                <ManagementPage />
+                <AdminLayout title="管理员后台">
+                  <Routes>
+                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route path="audit" element={<AdminAuditPage />} />
+                    <Route path="projects" element={<AdminProjectsPage />} />
+                    <Route path="*" element={<Navigate to="users" replace />} />
+                  </Routes>
+                </AdminLayout>
               </AdminGuard>
             }
           />

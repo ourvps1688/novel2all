@@ -44,6 +44,24 @@ export const UsersListSchema = z.object({
 });
 export type UsersList = z.infer<typeof UsersListSchema>;
 
+// ============ Admin: User Projects ============
+
+export const ProjectEntrySchema = z.object({
+  path: z.string(),
+  name: z.string().optional(),
+  created_at: z.string().optional(),
+  shared: z.boolean().optional(),
+  role: z.string().optional(),
+});
+export type ProjectEntry = z.infer<typeof ProjectEntrySchema>;
+
+export const UserProjectsSchema = z.object({
+  user_id: z.union([z.number(), z.string()]).optional(),
+  username: z.string().optional(),
+  projects: z.array(ProjectEntrySchema),
+});
+export type UserProjects = z.infer<typeof UserProjectsSchema>;
+
 // ============ Project Status ============
 
 export const ProjectStatusSchema = z.object({
