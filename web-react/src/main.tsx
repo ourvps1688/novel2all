@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * React 入口：挂载根组件、注入 Provider、初始化 React Query
  */

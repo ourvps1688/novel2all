@@ -34,7 +34,7 @@ const LoginSchema = z.object({
     .string()
     .min(1, '用户名不能为空')
     .max(64, '用户名过长')
-    .regex(/^[a-zA-Z0-9_\-]+$/, '用户名仅允许字母/数字/下划线/连字符'),
+    .regex(/^[a-zA-Z0-9_-]+$/, '用户名仅允许字母/数字/下划线/连字符'),
   password: z.string().min(1, '密码不能为空').max(128, '密码过长'),
 });
 
