@@ -32,6 +32,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../auth/useAuth';
 import { useThemeStore } from '../../store/themeStore';
+import { ProjectSwitcher } from './ProjectSwitcher';
 
 interface HeaderProps {
   drawerWidth: number;
@@ -108,6 +109,17 @@ export function Header({ drawerWidth, onMobileMenuToggle }: HeaderProps) {
             novel2all
           </Typography>
           <Chip size="small" label="V1.5" variant="outlined" sx={{ ml: 1, display: { xs: 'none', sm: 'inline-flex' } }} />
+        </Box>
+
+        {/* 项目切换器（Sprint 5 第 2 批） */}
+        <Box
+          sx={{
+            flex: 1,
+            display: { xs: 'none', sm: 'flex' },
+            justifyContent: 'center',
+          }}
+        >
+          <ProjectSwitcher />
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
