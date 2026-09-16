@@ -41,6 +41,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useExecuteSkill } from '../api/skills';
 import { useSkillStream } from '../hooks/useSkillStream';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { useCurrentProject } from '../store/projectContext';
 
 const STEPS = ['输入路径', '解析章节', '预览结果', '开始续写'] as const;
 type StepIndex = 0 | 1 | 2 | 3;
@@ -50,13 +51,23 @@ export function ImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeStep, setActiveStep] = useState<StepIndex>(0);
-  const [projectPath, setProjectPath] = useState('');
+  const currentProject = useCurrentProject();
+  // 默认填当前 project path（Sprint 5 第 3 批）
+  const [projectPath, setProjectPath] = useState(currentProject.path);
   const [parsedText, setParsedText] = useState('');
   const [chunkBuffer, setChunkBuffer] = useState('');
   const [taskId, setTaskId] = useState<string | null>(null);
 
   const executeSkill = useExecuteSkill('story-import');
   const stream = useSkillStream();
+
+  // 跟随 currentProject 变化：未手动改过 projectPath 时，自动同步
+  useEffect(() => {
+    if (projectPath === '' || projectPath === '.') {
+      setProjectPath(currentProject.path);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject.path]);
 
   // 订阅 SSE 流：taskId 一旦确定，立即开始 stream
   useEffect(() => {

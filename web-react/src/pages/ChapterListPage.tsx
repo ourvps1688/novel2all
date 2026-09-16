@@ -27,12 +27,14 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { ChapterList } from '../components/chapter/ChapterList';
 import { useChapters } from '../api/chapters';
 import { useProjectStatus } from '../api/projects';
+import { useCurrentProject } from '../store/projectContext';
 import { formatNumber } from '../utils/format';
 
 export function ChapterListPage() {
   const navigate = useNavigate();
-  const { data: chapters, isLoading, error } = useChapters();
-  const { data: status } = useProjectStatus();
+  const currentProject = useCurrentProject();
+  const { data: chapters, isLoading, error } = useChapters(currentProject.path);
+  const { data: status } = useProjectStatus(currentProject.path);
 
   // 从 status 推断当前激活章节 (last_updated_chapter)
   const activeChapter = status?.last_updated_chapter ?? null;

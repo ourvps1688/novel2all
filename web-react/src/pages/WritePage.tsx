@@ -39,6 +39,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 
 import { useChapters, useRewriteChapter, useInsertChapter } from '../api/chapters';
 import { useProjectStatus } from '../api/projects';
+import { useCurrentProject } from '../store/projectContext';
 import { useCurrentModel } from '../api/models';
 import { useSnackbar } from '../hooks/useSnackbar';
 import { useQueryClient } from '@tanstack/react-query';
@@ -63,9 +64,10 @@ export function WritePage() {
   const qc = useQueryClient();
   const snackbar = useSnackbar();
 
-  // 数据
-  const { data: chapters, isLoading: chaptersLoading } = useChapters();
-  const { data: status } = useProjectStatus();
+  // 数据（Sprint 5 第 3 批：跟随 currentProject 自动 invalidate）
+  const currentProject = useCurrentProject();
+  const { data: chapters, isLoading: chaptersLoading } = useChapters(currentProject.path);
+  const { data: status } = useProjectStatus(currentProject.path);
   const { data: currentModel } = useCurrentModel();
 
   // 当前章节号 (URL 解析)
@@ -178,7 +180,7 @@ export function WritePage() {
     stream.start({
       chapter: currentChapter,
       minChars: 2000,
-      projectRoot: '.',
+      projectRoot: currentProject.path,
     });
   }, [stream, currentChapter]);
 

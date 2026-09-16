@@ -38,11 +38,11 @@ import BookIcon from '@mui/icons-material/Book';
 
 import { useChapters } from '../api/chapters';
 import { useSnackbar } from '../hooks/useSnackbar';
+import { useCurrentProject } from '../store/projectContext';
 import { EmptyState } from '../components/common/EmptyState';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 
 type ExportFormat = 'md' | 'txt' | 'epub';
-const DEFAULT_PROJECT_ROOT = '.';
 const EXT_MAP: Record<ExportFormat, string> = { md: 'md', txt: 'txt', epub: 'epub' };
 
 /** 触发浏览器下载一个 blob */
@@ -60,7 +60,8 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export function ExportPage() {
   const { show, error } = useSnackbar();
-  const { data: chapters, isLoading: chaptersLoading } = useChapters(DEFAULT_PROJECT_ROOT);
+  const currentProject = useCurrentProject();
+  const { data: chapters, isLoading: chaptersLoading } = useChapters(currentProject.path);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [chapterFormat, setChapterFormat] = useState<ExportFormat>('md');
   const [bookFormat, setBookFormat] = useState<ExportFormat>('epub');
@@ -78,7 +79,7 @@ export function ExportPage() {
     setDownloadingChapter(true);
     try {
       const res = await axios.get(`/api/chapter/${activeChapter}/export`, {
-        params: { format: chapterFormat, project_root: DEFAULT_PROJECT_ROOT },
+        params: { format: chapterFormat, project_root: currentProject.path },
         responseType: 'blob',
       });
       const filename = `chapter_${activeChapter}.${EXT_MAP[chapterFormat]}`;
@@ -107,7 +108,7 @@ export function ExportPage() {
       const res = await axios.get('/api/export', {
         params: {
           format: bookFormat,
-          project_root: DEFAULT_PROJECT_ROOT,
+          project_root: currentProject.path,
           title: bookTitle,
           author: bookAuthor || '未知作者',
         },

@@ -26,6 +26,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 import { useProjectStatus } from '../api/projects';
 import { useSkills } from '../api/skills';
+import { useCurrentProject } from '../store/projectContext';
 import { CurrentChapterCard } from '../components/dashboard/CurrentChapterCard';
 import { ProjectProgressCard } from '../components/dashboard/ProjectProgressCard';
 import { CacheStatusCard } from '../components/dashboard/CacheStatusCard';
@@ -34,7 +35,8 @@ import { OnboardingWizard } from '../components/dashboard/OnboardingWizard';
 import { QUICK_START_SKILLS } from '../data/skillCategories';
 
 export function DashboardPage() {
-  const { data: status, isLoading } = useProjectStatus();
+  const currentProject = useCurrentProject();
+  const { data: status, isLoading } = useProjectStatus(currentProject.path);
   const navigate = useNavigate();
   const { data: skills } = useSkills();
 
