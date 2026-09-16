@@ -49,6 +49,7 @@ import {
 } from '../components/write/ChapterEditor';
 import { AIRewriteModal } from '../components/write/AIRewriteModal';
 import { AIInsertModal } from '../components/write/AIInsertModal';
+import { AIDeslopModal } from '../components/write/AIDeslopModal';
 import { WriteProgress } from '../components/write/WriteProgress';
 import { useWriteStream } from '../hooks/useSSE';
 import { formatNumber } from '../utils/format';
@@ -88,6 +89,8 @@ export function WritePage() {
 
   // AI 重写状态
   const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [deslopOpen, setDeslopOpen] = useState(false);
+  const [deslopOriginal, setDeslopOriginal] = useState('');
   const [rewriteInstruction, setRewriteInstruction] = useState('改写得更生动自然');
   const rewriteMutation = useRewriteChapter();
 
@@ -141,6 +144,13 @@ export function WritePage() {
     setInsertOpen(true);
     setInsertInstruction('自然衔接上下文的过渡段落');
   }, [selection, snackbar]);
+
+  // 打开"去 AI 味" modal：取编辑器全文，调 story-deslop skill
+  const handleOpenDeslop = useCallback(() => {
+    const fullText = editorRef.current?.getPlainText() ?? '';
+    setDeslopOriginal(fullText);
+    setDeslopOpen(true);
+  }, []);
 
   // AI 插入确认应用
   const handleApplyInsert = useCallback(() => {
@@ -292,6 +302,15 @@ export function WritePage() {
             >
               {stream.streaming ? '续写中...' : 'AI 续写 (8 阶段)'}
             </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="secondary"
+              onClick={handleOpenDeslop}
+              data-testid="write-page-deslop-button"
+            >
+              去 AI 味 (全文)
+            </Button>
           </Stack>
         </Grid>
 
@@ -407,6 +426,19 @@ export function WritePage() {
         onReject={() => {
           setInsertOpen(false);
           insertMutation.reset();
+        }}
+      />
+
+      {/* 去 AI 味 Modal (Sprint 3) */}
+      <AIDeslopModal
+        open={deslopOpen}
+        onClose={() => setDeslopOpen(false)}
+        chapter={currentChapter ?? 0}
+        original={deslopOriginal}
+        onApply={(deslopped) => {
+          editorRef.current?.replaceSelection(deslopped);
+          setDeslopOpen(false);
+          snackbar.success(`已应用去 AI 味改写（${deslopped.length} 字）`);
         }}
       />
     </Box>

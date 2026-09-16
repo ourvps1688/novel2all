@@ -35,6 +35,7 @@ const ManagementPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
+const CoverPage = lazy(() => import('./pages/CoverPage').then((m) => ({ default: m.CoverPage })));
 const NotFoundPage = lazy(() =>
   import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })),
 );
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="/review" element={<ReviewQueuePage />} />
           <Route path="/export" element={<ExportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/cover" element={<CoverPage />} />
 
           {/* Admin 专属 */}
           <Route

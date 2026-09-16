@@ -78,7 +78,7 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
   const [isDirty, setIsDirty] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const [aiLoading, setAiLoading] = useState<'rewrite' | 'insert' | null>(null);
+  const [aiLoading, setAiLoading] = useState<'rewrite' | 'insert' | 'deslop' | null>(null);
 
   // 用 ref 跟踪待保存的内容 (debounce 用)
   const autosaveTimerRef = useRef<number | null>(null);
@@ -354,6 +354,7 @@ export const ChapterEditor = forwardRef<ChapterEditorHandle, ChapterEditorProps>
               break;
             case 'rewrite':
             case 'insert':
+            case 'deslop':
               // 父组件 (WritePage) 通过 ref 调用 replaceSelection / insertAtPosition
               // 这里用 aiLoading state 表示正在执行 AI 操作
               setAiLoading(action.type);

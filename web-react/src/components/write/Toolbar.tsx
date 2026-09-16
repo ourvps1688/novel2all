@@ -22,6 +22,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import EditIcon from '@mui/icons-material/Edit';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 
 import type { TextSelection, AIOperationType } from '../../types/chapters';
 
@@ -31,7 +32,8 @@ export type ToolbarAction =
   | { type: 'redo' }
   | { type: 'continue' }
   | { type: 'rewrite'; selection: TextSelection }
-  | { type: 'insert'; selection: TextSelection };
+  | { type: 'insert'; selection: TextSelection }
+  | { type: 'deslop' };
 
 export interface ToolbarProps {
   chapter: number;
@@ -196,6 +198,28 @@ export function Toolbar({
             data-testid="toolbar-insert"
           >
             AI 插入
+          </Button>
+        </span>
+      </Tooltip>
+
+      <Tooltip title="去 AI 味 (story-deslop)">
+        <span>
+          <Button
+            size="small"
+            variant="outlined"
+            color="secondary"
+            startIcon={
+              aiLoading === 'deslop' ? (
+                <CircularProgress size={14} color="inherit" />
+              ) : (
+                <AutoFixHighIcon fontSize="small" />
+              )
+            }
+            onClick={() => onAction({ type: 'deslop' })}
+            disabled={aiBusy}
+            data-testid="toolbar-deslop"
+          >
+            去 AI 味
           </Button>
         </span>
       </Tooltip>
