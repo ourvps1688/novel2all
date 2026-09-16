@@ -1,0 +1,375 @@
+# novel2all V1.5.x 核心时序图集合
+# 文档: docs/frontend-development-playbook.md §7
+
+# =========================================================================
+# 时序图 1: 用户登录 → 选 skill → 执行 → 看结果 → 导出
+# =========================================================================
+sequenceDiagram
+    actor User as 新用户
+    participant LoginPage
+    participant Dashboard
+    participant SkillsPage
+    participant SkillDetail as SkillDetailPage
+    participant SkillRunner
+    participant useSkillStream
+    participant ApiClient
+    participant Backend
+    participant sessionStore
+
+    User->>LoginPage: 访问 /login, 输入 admin/admin
+    LoginPage->>ApiClient: POST /api/auth/login (Form)
+    ApiClient->>Backend: 200 + Set-Cookie n2a_session
+    Backend-->>LoginPage: { user: { role: 'admin' } }
+    LoginPage->>Dashboard: navigate('/')
+    Dashboard->>ApiClient: GET /api/status?project_root='.'
+    ApiClient->>Backend: → { initialized: false }
+    Dashboard->>User: 显示空状态 + Onboarding CTA
+
+    User->>SkillsPage: 点击 Sidebar "Skills"
+    SkillsPage->>ApiClient: GET /api/skills
+    ApiClient->>Backend: → 13 skill 元信息
+    Backend-->>SkillsPage: SkillInfo[]
+
+    User->>SkillDetail: 点击 'story-long-write' 卡片
+    SkillDetail->>SkillRunner: 渲染执行器 (DynamicForm)
+    User->>SkillRunner: 填章节大纲/字数目标
+    User->>SkillRunner: 点击 "执行"
+
+    SkillRunner->>ApiClient: POST /api/skills/story-long-write/execute (Form)
+    ApiClient->>Backend: → 启动 task
+    Backend-->>ApiClient: { task_id: 't-write', status: 'queued' }
+
+    SkillRunner->>useSkillStream: start({taskId, onChunk, onProgress})
+    useSkillStream->>ApiClient: new EventSource('/api/skills/story-long-write/status?task_id=t-write')
+    ApiClient->>Backend: GET (SSE upgrade)
+
+    loop 流式消费 (8 阶段)
+        Backend-->>useSkillStream: event: chunk { text: "..." }
+        useSkillStream->>SkillRunner: appendChunk → 渲染流式文本
+        Backend-->>useSkillStream: event: progress { phase: 'writing', chars: 245 }
+        useSkillStream->>SkillRunner: updateProgress (LinearProgress 60%)
+        Backend-->>useSkillStream: event: progress { phase: 'save' }
+        useSkillStream->>SkillRunner: updateProgress (75%)
+        Backend-->>useSkillStream: event: progress { phase: 'extract' }
+        useSkillStream->>SkillRunner: updateProgress (85%)
+    end
+
+    Backend-->>useSkillStream: event: done { output_path, content_chars }
+    useSkillStream->>SkillRunner: phase = 'success'
+    SkillRunner->>sessionStore: completeExecution (存 zustand history)
+    SkillRunner->>ApiClient: invalidateQueries(['skills'])
+    SkillRunner->>User: 显示 [复制] [下载] 按钮
+
+    User->>SkillRunner: 点击 "下载"
+    SkillRunner->>User: 浏览器下载 chapter_{N}.txt
+
+# =========================================================================
+# 时序图 2: 写章节 → SSE 8 阶段 → 自动审稿 → 修改 → 重审
+# =========================================================================
+sequenceDiagram
+    actor Writer as 长篇作者
+    participant WritePage
+    participant Editor as ChapterEditor
+    participant Toolbar as AIToolbar
+    participant SSE as useSSE
+    participant ApiClient
+    participant Backend
+    participant Pipeline as WritingPipeline
+    participant Reviewer as MultiAgentReviewer
+    participant Modal as ReviewModal
+
+    Writer->>WritePage: 进入 /write/3
+    WritePage->>ApiClient: GET /api/chapter/3/content
+    ApiClient->>Backend: → ChapterContent { content: "..." }
+    Backend-->>Editor: setContent(html)
+
+    Writer->>Toolbar: 点击 "AI 续写"
+    Toolbar->>Writer: 弹 PromptInputDialog
+    Writer->>Toolbar: 提交 (大纲 + 字数 2000)
+    Toolbar->>ApiClient: POST /api/write/stream/model (Form)
+
+    ApiClient->>Backend: → SSE upgrade
+    Backend->>Pipeline: write_chapter(ch=3, resume_from_chars=0)
+
+    Pipeline-->>SSE: event: started { task_id: 't-3' }
+    Pipeline->>Pipeline: init phase
+    Pipeline-->>SSE: event: progress { phase: 'init', chars: 0 }
+
+    Pipeline->>Pipeline: pre_write_check (LLM)
+    Pipeline-->>SSE: event: progress { phase: 'pre_write_check', chars: 0 }
+    Pipeline-->>SSE: event: pre_write_check { issues: [] }
+
+    Pipeline->>Pipeline: writing (LLM stream)
+    loop 多个 chunk (每秒 5-10 个)
+        Pipeline-->>SSE: event: chunk { text: "..." }
+        SSE->>Editor: editor.commands.insertContent(text) (流式填充)
+        Pipeline-->>SSE: event: progress { phase: 'writing', chars: 245 }
+        SSE->>Toolbar: updateProgressBar (60% + charsPerSecond)
+    end
+
+    Pipeline->>Pipeline: save phase
+    Pipeline-->>SSE: event: progress { phase: 'save', message: '已写文件' }
+
+    Pipeline->>Pipeline: extract (LLM 提取人物/伏笔/时间线)
+    Pipeline-->>SSE: event: progress { phase: 'extract', message: '提取角色/伏笔/时间线' }
+
+    Pipeline->>Pipeline: merge (更新 _tracking-state.json)
+    Pipeline-->>SSE: event: progress { phase: 'merge', message: '合并到 tracking state' }
+
+    Pipeline->>Pipeline: post_write_check (LLM)
+    Pipeline-->>SSE: event: progress { phase: 'post_write_check', chars: 1850 }
+    Pipeline-->>SSE: event: post_write_check { issues: [...] }
+
+    Pipeline-->>SSE: event: done { output_path, content_chars: 1850 }
+    SSE->>ApiClient: invalidateQueries(['chapters', '.'])
+    SSE->>ApiClient: invalidateQueries(['status', '.'])
+
+    Toolbar->>Writer: toast "完成 1850 字"
+
+    Toolbar->>ApiClient: POST /api/chapter/3/review (Header: Idempotency-Key: uuid-001)
+    ApiClient->>Backend: → 4-agent review
+
+    Backend->>Reviewer: review(state, content, ch=3)
+
+    par 4 个 agent 并行
+        Reviewer->>Backend: 架构审查 (LLM)
+        Reviewer->>Backend: 可读性审查 (LLM)
+        Reviewer->>Backend: 一致性审查 (LLM)
+        Reviewer->>Backend: 爽点审查 (LLM)
+    end
+
+    Reviewer->>Backend: aggregate → ReviewReport
+    Backend-->>ApiClient: { critical: 0, major: 1, minor: 3, quality: 72, verdict: 'warn', elapsed_seconds: 28 }
+
+    ApiClient-->>Toolbar: 弹 ReviewModal (4 tab)
+    Toolbar->>Modal: 渲染报告 (QualityScoreRadar + Issue 列表)
+
+    Writer->>Modal: 查看 Issue, 点 anchor "章节 3, offset 120"
+    Modal->>Editor: editor.commands.focus(120) + 高亮段落
+
+    Writer->>Editor: 修改 "林雷" → "林远"
+    Editor->>Toolbar: trigger auto-save
+    Toolbar->>ApiClient: POST /api/chapter/3/save (content)
+
+    Writer->>Toolbar: 点击 "重审" (新 Idempotency-Key)
+    Toolbar->>ApiClient: POST /api/chapter/3/review (Header: Idempotency-Key: uuid-002)
+    Backend-->>ApiClient: 重新 4-agent
+    ApiClient-->>Modal: 更新 ReviewModal (verdict: 'pass')
+
+    Writer->>Toolbar: 点击 "导出"
+    Toolbar->>ApiClient: GET /api/chapter/3/export?format=md
+    ApiClient->>Backend: → file stream
+    Backend-->>Writer: 下载 chapter_003.md
+
+# =========================================================================
+# 时序图 3: Admin 流程 - 登录 → 管用户 → 分配项目 → 看审计
+# =========================================================================
+sequenceDiagram
+    actor Admin
+    participant LoginPage
+    participant UsersPage as AdminUsersPage
+    participant ProjectsPage as AdminProjectsPage
+    participant AuditPage as AdminAuditPage
+    participant ApiClient
+    participant Backend
+    participant AuthStore
+
+    Admin->>LoginPage: 登录 admin/admin
+    LoginPage->>ApiClient: POST /api/auth/login (Form)
+    Backend-->>LoginPage: { user: { id: 1, role: 'admin' } }
+    LoginPage->>AuthStore: setCurrentUser({ id: 1, role: 'admin' })
+    LoginPage->>Admin: navigate('/')
+
+    Admin->>UsersPage: 点 Sidebar "用户管理" (admin 角色显示)
+    UsersPage->>ApiClient: GET /api/auth/users
+    ApiClient->>Backend: → admin guard check (200)
+    Backend-->>UsersPage: { users: [admin, alice, bob] }
+
+    Admin->>UsersPage: 点击 "新建用户"
+    UsersPage->>Admin: 弹 CreateUserDialog (username/password/role)
+    Admin->>UsersPage: 填 (alice / xxx / editor) → 提交
+    UsersPage->>ApiClient: POST /api/auth/users (Form)
+    ApiClient->>Backend: → create_user
+    Backend-->>UsersPage: { user: alice }
+    UsersPage->>ApiClient: invalidateQueries(['users'])
+    UsersPage->>Admin: toast "已创建 alice"
+
+    Admin->>ProjectsPage: 点 "项目授权" → 选 alice
+    ProjectsPage->>ApiClient: GET /api/auth/users/2/projects
+    ApiClient->>Backend: → memberships[]
+
+    Admin->>ProjectsPage: 输 project_root=./my-novel + role=editor → 提交
+    ProjectsPage->>ApiClient: POST /api/auth/projects/./my-novel/share (Form: user_id=2, role=editor)
+    ApiClient->>Backend: → grant (admin 自身必须有 owner)
+    Backend-->>ProjectsPage: { membership }
+    ProjectsPage->>Admin: toast "已分享"
+
+    Admin->>AuditPage: 点 "审计日志"
+    AuditPage->>ApiClient: GET /api/auth/audit?limit=100
+    ApiClient->>Backend: → 100 events
+
+    Admin->>AuditPage: 选时间范围 (2025-01-01 → 2025-01-31)
+    AuditPage->>ApiClient: GET /api/auth/audit?from=2025-01-01&to=2025-01-31
+    Backend-->>AuditPage: filtered events
+
+    Admin->>AuditPage: 点 "导出 CSV"
+    AuditPage->>Admin: 客户端序列化 → 下载 audit.csv (papaparse)
+
+# =========================================================================
+# 时序图 4: 错误恢复 - 网络中断 → 重连 → 降级 polling
+# =========================================================================
+sequenceDiagram
+    actor User
+    participant SkillRunner
+    participant ES as EventSource
+    participant ApiClient
+    participant Backend
+    participant Polling as PollingFallback
+
+    User->>SkillRunner: 提交 → execute → { task_id: 't-1' }
+    SkillRunner->>ES: new EventSource('/api/skills/x/status?task_id=t-1', { withCredentials: true })
+    ES->>ApiClient: GET (SSE upgrade)
+    ApiClient->>Backend: HTTP/1.1 upgrade
+
+    loop 流式消费
+        Backend-->>ES: event: chunk { text: "..." }
+        ES->>SkillRunner: onChunk → appendChunk
+    end
+
+    Note over ES,Backend: 网络中断 (WiFi 断开 5s)
+    Backend--xES: TCP 连接断开
+    ES->>ES: error event fired
+    SkillRunner->>SkillRunner: 尝试 1: setTimeout(1000) → new EventSource
+    SkillRunner->>ES: reconnect attempt 1
+    ES->>ApiClient: reconnect GET
+    ApiClient->>Backend: → 426 (resumable) or new stream from 0
+
+    Note over ES,Backend: 仍失败
+    SkillRunner->>SkillRunner: 尝试 2: setTimeout(2000) → retry
+    SkillRunner->>SkillRunner: 尝试 3: setTimeout(4000) → retry
+
+    Note over SkillRunner: 3 次失败
+    SkillRunner->>User: Snackbar "网络不稳定, 已切换 polling"
+    SkillRunner->>Polling: 启动 setInterval(2000ms)
+
+    loop Polling 循环
+        Polling->>ApiClient: GET /api/skills/x/status?task_id=t-1
+        ApiClient->>Backend: → { status: 'running', chunk: '...', progress: {...} }
+        Polling->>SkillRunner: onChunk + onProgress
+    end
+
+    Backend-->>ApiClient: { status: 'done', output: '...' }
+    Polling->>SkillRunner: onDone
+    SkillRunner->>User: 渲染完整输出 + [复制] [下载]
+
+    Note over SkillRunner: 清理 polling interval
+    SkillRunner->>Polling: clearInterval
+
+# =========================================================================
+# 时序图 5: 上下文状态流转 - 用户输入 → React state → API → 后端 → 回到 UI
+# =========================================================================
+sequenceDiagram
+    actor User
+    participant Editor as ChapterEditor (Tiptap)
+    participant LS as localStorage (debounce 1s)
+    participant WriteToolbar
+    participant sessionStore as sessionStore (zustand)
+    participant RQ as React Query
+    participant ApiClient
+    participant Backend
+    participant Memory as 5 层 Memory (Tracker)
+    participant QueryClient as queryClient
+
+    User->>Editor: 输入 "林远遇到了反派"
+    Editor->>Editor: Tiptap onUpdate → state.tr.docChanged
+    Note over Editor: Editor 状态变更 (React state)
+    Editor->>LS: localStorage.setItem('draft-ch3', html) [1s 防抖]
+    LS-->>Editor: ack
+    Editor->>WriteToolbar: trigger auto-save
+
+    WriteToolbar->>ApiClient: POST /api/chapter/3/save (Form: content)
+    ApiClient->>Backend: → 写文件 第003章.md
+    Backend->>Memory: 触发 Character/Timeline 提取
+    Memory-->>Backend: 更新 state.characters + state.timeline
+    Backend-->>ApiClient: 200 { chapter: 3, char_count: 1845, output_path: '...' }
+
+    ApiClient->>QueryClient: invalidateQueries(['chapters', '.'])
+    ApiClient->>QueryClient: invalidateQueries(['status', '.'])
+
+    QueryClient->>RQ: refetch (silent background)
+    RQ-->>Editor: 更新 ChapterStatus 显示
+
+    User->>WriteToolbar: 点击 "AI 续写"
+    WriteToolbar->>sessionStore: 读 currentProject.projectRoot ('.')
+    sessionStore-->>WriteToolbar: '.'
+
+    WriteToolbar->>ApiClient: POST /api/write/stream/model (chapter=3, project_root='.', prompt='继续写', model='deepseek-v3')
+    ApiClient->>Backend: SSE stream upgrade
+    Backend->>Memory: load 5 layer context
+    Note over Memory: 5 层 Memory:<br/>1. Tracker<br/>2. Characters<br/>3. Foreshadowing<br/>4. Timeline<br/>5. Recent Summaries
+    Memory-->>Backend: full context (用于 LLM prompt)
+    Backend-->>ApiClient: event: chunk × N
+
+    ApiClient-->>Editor: editor.insertContent (流式填充 Tiptap)
+
+    Note over Editor: 用户可继续编辑 → 冲突检测
+    Editor->>Editor: isFocused && docChanged → 检测冲突
+    Editor->>User: 弹 ConflictResolveModal "AI 已生成, 选 [覆盖 AI] / [保留我的] / [对比 diff]"
+
+    User->>Editor: 选 [保留我的]
+    Editor->>WriteToolbar: emit cancel → POST /api/write/cancel/t-3
+    ApiClient->>Backend: → cancel task
+    Backend-->>ApiClient: { status: 'cancelling', partial_chars: 245 }
+    ApiClient-->>Editor: 关闭 streaming mode
+
+# =========================================================================
+# 时序图 6: Onboarding 流程 - 新用户首登 → 4 步引导 → 创建项目 → 跳章节
+# =========================================================================
+sequenceDiagram
+    actor User as 新用户
+    participant Dashboard
+    participant Wizard as OnboardingWizard
+    participant SetupSkill as story-setup skill
+    participant SSE as useSkillStream
+    participant ChaptersPage
+    participant ApiClient
+    participant Backend
+
+    User->>Dashboard: 首登 / (localStorage 无 onboarded)
+    Dashboard->>ApiClient: GET /api/status?project_root='.'
+    ApiClient->>Backend: → { initialized: false }
+    Dashboard->>User: 显示空状态 "🎉 欢迎使用 novel2all, 创建第一个项目"
+    User->>Dashboard: 点击 "创建项目" CTA
+    Dashboard->>Wizard: open=true (从 dashboard 浮层)
+
+    Wizard->>User: Step 1 - 项目基础 (项目名/笔名/题材)
+    User->>Wizard: 填 (我的小说 / 墨白 / 玄幻) → 下一步
+    Wizard->>Wizard: zod 校验 → 切 Step 2
+    Wizard->>User: Step 2 - 写作类型 (长篇/短篇/不确定)
+    User->>Wizard: 选 长篇 → 下一步
+    Wizard->>User: Step 3 - 平台 (起点/番茄/...)
+    User->>Wizard: 选 起点 → 下一步
+    Wizard->>User: Step 4 - 创作设定 (可跳过)
+    User->>Wizard: 填 "古龙风, 300 章目标" → 完成
+
+    Wizard->>ApiClient: POST /api/skills/story-setup/execute (Form: project_name=我的小说, pen_name=墨白, genre=玄幻, platform=起点, style_anchor='古龙风', total_chapters=300)
+    ApiClient->>Backend: → { task_id: 't-setup' }
+
+    Wizard->>SSE: stream(t-setup)
+
+    loop SSE 流
+        Backend-->>SSE: event: chunk (创建项目结构: 正文/ 细纲/ 设定/ + _tracking-state.json)
+        SSE->>Wizard: appendChunk + progress
+        Backend-->>SSE: event: done { output_path: '我的小说/_tracking-state.json' }
+    end
+
+    SSE->>Wizard: phase = success
+    Wizard->>ApiClient: invalidateQueries(['status', '.'])
+    Wizard->>ApiClient: localStorage.setItem('onboarded', 'true')
+    Wizard->>ChaptersPage: navigate('/chapters')
+
+    ChaptersPage->>ApiClient: GET /api/chapters
+    ApiClient->>Backend: → [] (空)
+    ChaptersPage->>User: 空状态 "开始写第一章"
+    User->>ChaptersPage: 点击 [开始写第一章]
+    ChaptersPage->>ApiClient: navigate('/write/1')

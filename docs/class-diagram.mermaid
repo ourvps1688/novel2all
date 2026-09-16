@@ -1,0 +1,854 @@
+# novel2all V1.5.x 类图
+# 文档: docs/frontend-development-playbook.md §3
+
+# =========================================================================
+# 数据模型层 (Zustand Stores)
+# =========================================================================
+classDiagram
+    direction TB
+
+    class AuthStore {
+        +User | null currentUser
+        +boolean isLoggingIn
+        +Error | null loginError
+        +login(username, password) Promise~void~
+        +logout() Promise~void~
+        +setCurrentUser(User) void
+        +checkAuth() Promise~void~
+    }
+
+    class ThemeStore {
+        +'light' | 'dark' mode
+        +boolean sidebarCollapsed
+        +toggle() void
+        +setMode(mode) void
+        +toggleSidebar() void
+    }
+
+    class SnackbarStore {
+        +SnackbarMessage[] queue
+        +success(msg) void
+        +error(msg) void
+        +warning(msg) void
+        +info(msg) void
+    }
+
+    class SessionStore {
+        +User | null currentUser
+        +ProjectMembership | null currentProject
+        +ProjectMembership[] availableProjects
+        +string | null currentModel
+        +setCurrentProject(Project) void
+        +loadProjects() Promise~void~
+        +toggleSidebar() void
+        +setCurrentModel(model) void
+    }
+
+    class SkillExecutionStore {
+        +CurrentExecution | null currentExecution
+        +Record~string, HistoryEntry[]~ history
+        +startExecution(skillName, taskId) void
+        +completeExecution(skillName, entry) void
+        +cancelExecution() Promise~void~
+    }
+
+    class User {
+        +number id
+        +string username
+        +'admin' | 'editor' | 'viewer' role
+        +string created_at
+        +string | null last_login
+    }
+
+    class ProjectMembership {
+        +string project_root
+        +string project_name
+        +'owner' | 'editor' | 'viewer' role
+        +number granted_by
+        +string granted_at
+    }
+
+    AuthStore --> User : currentUser
+    SessionStore --> User : currentUser
+    SessionStore --> ProjectMembership : manages
+
+# =========================================================================
+# 类型层 (TypeScript Types / Interfaces)
+# =========================================================================
+classDiagram
+    direction TB
+
+    class SkillInfo {
+        +string name
+        +string description
+        +boolean user_invocable
+        +boolean model_invocable
+        +SkillCategory category
+        +string icon
+        +JSONSchema | null inputSchema
+        +Record~string, unknown~ | null exampleParams
+    }
+
+    class SkillCategory {
+        <<enumeration>>
+        创作类
+        分析类
+        工具类
+        入口类
+        内部
+    }
+
+    class SkillOutput {
+        +string text
+        +SkillOutputChunk[] chunks
+        +number duration_ms
+        +string task_id
+        +Record~string, unknown~ metadata
+    }
+
+    class SkillOutputChunk {
+        +'text' | 'json' | 'file' | 'progress' type
+        +string | null text
+        +unknown data
+        +string | null fileUrl
+    }
+
+    class ExecuteSkillRequest {
+        +Record~string, unknown~ params
+        +string | null idempotencyKey
+    }
+
+    class ExecuteSkillResponse {
+        +string task_id
+        +'queued' | 'running' | 'completed' | 'failed' status
+        +number started_at
+    }
+
+    class JSONSchema {
+        +'object' type
+        +Record~string, Field~ properties
+        +string[] | null required
+    }
+
+    class JSONSchemaField {
+        +'string' | 'number' | 'boolean' | 'array' | 'object' type
+        +string | null title
+        +string | null description
+        +unknown[] | null enum
+        +unknown default
+    }
+
+    class Chapter {
+        +number chapter
+        +string filename
+        +number charCount
+        +string firstLine
+        +string | null content
+        +string | null outline
+        +string | null updatedAt
+    }
+
+    class ChapterContent {
+        +number chapter
+        +string content
+        +string | null outline
+        +number word_count
+    }
+
+    class WriteProgress {
+        +WritePhase phase
+        +number charsWritten
+        +number | null charsPerSecond
+        +number | null etaSeconds
+        +string | null taskId
+        +string | null message
+    }
+
+    class WritePhase {
+        <<enumeration>>
+        init
+        pre_write_check
+        writing
+        save
+        extract
+        merge
+        post_write_check
+        done
+    }
+
+    class ReviewReport {
+        +number chapter
+        +ReviewIssue[] criticalIssues
+        +ReviewIssue[] majorIssues
+        +ReviewIssue[] minorIssues
+        +number qualityScore
+        +'pass' | 'warn' | 'fail' overallVerdict
+        +number elapsedSeconds
+        +string timestamp
+    }
+
+    class ReviewIssue {
+        +'critical' | 'major' | 'minor' severity
+        +string category
+        +string description
+        +string | null suggestion
+        +Anchor | null anchor
+    }
+
+    class Anchor {
+        +number chapter
+        +number offset
+    }
+
+    class ProjectStatus {
+        +boolean initialized
+        +string project_root
+        +string | null project_name
+        +string | null genre
+        +string | null style_anchor
+        +number | null total_chapters_target
+        +number | null total_word_count_target
+        +number | null last_updated_chapter
+        +number character_count
+        +number active_foreshadowing_count
+        +number timeline_count
+        +number summary_count
+    }
+
+    class TextSelection {
+        +number from
+        +number to
+        +string text
+    }
+
+    SkillInfo --> SkillCategory
+    SkillOutput --> SkillOutputChunk : contains
+    JSONSchema --> JSONSchemaField : properties
+    WriteProgress --> WritePhase
+    ReviewReport --> ReviewIssue : contains
+    ReviewIssue --> Anchor : optional
+
+# =========================================================================
+# Hooks 层
+# =========================================================================
+classDiagram
+    direction TB
+
+    class useSkillStream {
+        +stream(opts: StreamOptions) Promise~void~
+        +cancel(taskId: string) Promise~void~
+        -EventSource eventSourceRef
+        -number heartbeatTimerRef
+        -number reconnectAttemptsRef
+        -startSSE(opts) void
+        -handleReconnect(opts) void
+        -startPolling(opts) void
+        -cleanup() void
+    }
+
+    class StreamOptions {
+        +string taskId
+        +string skillName
+        +onChunk(text: string) void
+        +onProgress(progress: WriteProgress) void
+        +onReconnect(attempts: number) void
+        +onError(err: ApiError) void
+        +onDone(output: SkillOutput) void
+    }
+
+    class useSSE {
+        +start(opts: SSEOptions) Promise~void~
+        +cancel(taskId: string) Promise~void~
+        +EventSource eventSource
+    }
+
+    class useDebouncedCallback~T~ {
+        +callback: (T) void
+        +delay: number
+        +debouncedCallback(args: T) void
+        +cancel() void
+    }
+
+    class useResponsive {
+        +boolean isMobile
+        +boolean isTablet
+        +boolean isDesktop
+    }
+
+    class useSkill {
+        +SkillInfo | undefined data
+        +boolean isLoading
+        +Error | null error
+    }
+
+    class useSkills {
+        +SkillInfo[] | undefined data
+        +boolean isLoading
+    }
+
+    class useExecuteSkill {
+        +mutate(req: ExecuteSkillRequest) void
+        +mutateAsync(req) Promise~ExecuteSkillResponse~
+        +boolean isPending
+    }
+
+    class useChapters {
+        +Chapter[] | undefined data
+        +boolean isLoading
+    }
+
+    class useChapterContent {
+        +ChapterContent | undefined data
+        +boolean isLoading
+    }
+
+    class useSaveChapter {
+        +mutate({chapter, content}) void
+        +boolean isPending
+    }
+
+    class useRewriteChapter {
+        +mutate({chapter, start, end, instruction}) void
+    }
+
+    class useInsertChapter {
+        +mutate({chapter, position, instruction}) void
+    }
+
+    class useReview {
+        +mutate({chapter, idempotencyKey}) Promise~ReviewReport~
+    }
+
+    useSkillStream --> StreamOptions : accepts
+    StreamOptions --> WriteProgress : callback
+    StreamOptions --> ApiError : callback
+
+# =========================================================================
+# API 客户端层
+# =========================================================================
+classDiagram
+    direction TB
+
+    class ApiClient {
+        +AxiosInstance axios
+        +interceptors.request
+        +interceptors.response
+        +listSkills() Promise~SkillInfo[]~
+        +executeSkill(name, req) Promise~ExecuteSkillResponse~
+        +getSkillStatus(name, taskId) EventSource
+        +listChapters(projectRoot) Promise~Chapter[]~
+        +getChapterContent(chapter, projectRoot) Promise~ChapterContent~
+        +saveChapter(chapter, content, projectRoot) Promise~SaveResult~
+        +rewriteChapter(chapter, start, end, instruction, model) Promise~RewriteResult~
+        +insertChapter(chapter, position, instruction, model) Promise~InsertResult~
+        +reviewChapter(chapter, idempotencyKey) Promise~ReviewReport~
+        +cancelWrite(taskId) Promise~void~
+        +getProjectStatus(projectRoot) Promise~ProjectStatus~
+        +getCurrentModel() Promise~string~
+        +switchModel(model) Promise~void~
+        +getCacheStats() Promise~CacheStats~
+    }
+
+    class ApiError {
+        +number status
+        +string message
+        +string | null request_id
+        +number | null retry_after_seconds
+        +number | null used
+        +number | null limit
+    }
+
+    class AuthInterceptor {
+        +onRequest(config) config
+        +onResponseError(err) Promise.reject
+        -on401: clear auth + redirect /login
+        -on429: snackbar retry countdown
+        -on500: snackbar error
+    }
+
+    ApiClient --> ApiError : throws
+    ApiClient --> AuthInterceptor : uses
+
+# =========================================================================
+# 组件层 (Sprint 1 - Skills)
+# =========================================================================
+classDiagram
+    direction TB
+
+    class SkillRunner {
+        +SkillInfo skill
+        +string | null projectRoot
+        +Record~string, unknown~ | null defaultParams
+        +JSONSchema | null inputSchema
+        +onSuccess(output: SkillOutput) void
+        -SkillExecutionPhase phase
+        -string | null taskId
+        -SkillOutputChunk[] output
+        -WriteProgress | null progress
+        -string | null errorMsg
+        -number | null startedAt
+        -number elapsedSec
+        -number reconnectAttempts
+        -Record~string, unknown~ formData
+        -boolean isCancelling
+        +handleStart(params) Promise~void~
+        +handleCancel() Promise~void~
+        +handleDownload() void
+        +handleCopy() Promise~void~
+    }
+
+    class SkillCard {
+        +SkillInfo skill
+        +SkillCategory category
+        +string icon
+        +LastRun | null lastRun
+        +onClick() void
+        -boolean hover
+    }
+
+    class SkillOutput {
+        +SkillOutputChunk[] chunks
+        +SkillExecutionPhase phase
+        +render() JSX
+    }
+
+    class DynamicForm {
+        +JSONSchema schema
+        +Record~string, unknown~ | null defaultValues
+        +onChange(data) void
+        +onSubmit(data) void
+        +boolean disabled
+        +boolean loading
+        +boolean showReset
+        -Record~string, unknown~ values
+        -Record~string, string~ errors
+        -Record~string, boolean~ touched
+        +validateField(name) boolean
+        +handleSubmit() void
+    }
+
+    class SkillsPage {
+        -string search
+        -SkillCategory | '全部' filter
+        -Record~string, SkillInfo[]~ grouped
+        +render() JSX
+    }
+
+    class SkillDetailPage {
+        +render() JSX
+        -SkillInfo | null skill
+        -SkillHistoryEntry[] history
+    }
+
+    class LastRun {
+        +number timestamp
+        +'success' | 'error' status
+    }
+
+    SkillRunner --> SkillOutput : renders
+    SkillRunner --> DynamicForm : contains
+    SkillRunner --> useSkillStream : uses
+    SkillRunner --> useExecuteSkill : uses
+    SkillCard --> LastRun : optional
+
+# =========================================================================
+# 组件层 (Sprint 2 - Chapter + Write)
+# =========================================================================
+classDiagram
+    direction TB
+
+    class ChapterList {
+        +Chapter[] chapters
+        +number activeChapter
+        +onSelect(chapter: number) void
+        +render() JSX
+    }
+
+    class ChapterCard {
+        +Chapter chapter
+        +boolean active
+        +onClick() void
+    }
+
+    class ChapterEditor {
+        +number chapter
+        +string | null projectRoot
+        +onSaved(charCount: number) void
+        +onSelectionChange(sel: TextSelection | null) void
+        -Editor | null editor
+        -string content
+        -number charCount
+        -number readTimeSec
+        -boolean isDirty
+        -boolean isAutoSaving
+        -Date | null lastSavedAt
+        -TextSelection | null selection
+        +handleAutoSave() Promise~void~
+    }
+
+    class ChapterStatus {
+        +string | null projectName
+        +string | null styleAnchor
+        +string | null currentModel
+        +render() JSX
+    }
+
+    class WriteProgress {
+        +WriteProgress | null progress
+        +boolean detailed
+        +onPhaseClick(phase: WritePhase) void
+        +render() JSX
+    }
+
+    class AIToolbar {
+        +number chapter
+        +TextSelection | null selection
+        +SkillExecutionPhase | null ssePhase
+        +onAction(action: AIToolbarAction) void
+        -number selectionLength
+        -number estimatedCost
+        -string | null loadingAction
+    }
+
+    class AIRewriteModal {
+        +boolean open
+        +string original
+        +string rewritten
+        +string | null diff
+        +string instruction
+        +boolean loading
+        +onApply() void
+        +onReject() void
+    }
+
+    class AIInsertModal {
+        +boolean open
+        +string before
+        +string after
+        +string inserted
+        +string instruction
+        +boolean loading
+        +onApply() void
+        +onReject() void
+    }
+
+    class ConflictResolveModal {
+        +boolean open
+        +string userEdits
+        +string aiOutput
+        +string | null diff
+        +onResolve(strategy: 'overwrite' | 'keep' | 'merge') void
+    }
+
+    class PromptInputDialog {
+        +boolean open
+        +onSubmit(params: PromptParams) void
+        +onCancel() void
+    }
+
+    class WritePage {
+        +render() JSX
+        -Chapter[] | null chapters
+        -ProjectStatus | null status
+        -number currentChapter
+    }
+
+    class ChaptersPage {
+        +render() JSX
+        -Chapter[] | null chapters
+        -string search
+    }
+
+    class AIToolbarAction {
+        <<type>>
+        continue
+        rewrite
+        insert
+        deslop
+        review
+        export
+    }
+
+    WritePage --> ChapterList
+    WritePage --> ChapterEditor
+    WritePage --> ChapterStatus
+    WritePage --> WriteProgress
+    WritePage --> AIToolbar
+    WritePage --> PromptInputDialog
+    WritePage --> ConflictResolveModal
+    AIToolbar --> AIRewriteModal : triggers
+    AIToolbar --> AIInsertModal : triggers
+
+# =========================================================================
+# 组件层 (Sprint 3 - Review / Short / Cover / Settings)
+# =========================================================================
+classDiagram
+    direction TB
+
+    class ReviewQueue {
+        +ReviewReport[] reports
+        +onReportClick(report) void
+        +onRollback(chapter) void
+    }
+
+    class ReviewReport {
+        +ReviewReport report
+        +number activeTab
+        +onIssueClick(issue: ReviewIssue) void
+    }
+
+    class QualityScoreRadar {
+        +number architecture
+        +number readability
+        +number consistency
+        +number enjoyment
+        +number overall
+    }
+
+    class CoverGenerator {
+        +string bookTitle
+        +string genre
+        +string styleKeywords
+        +string | null generatedPrompt
+        +boolean loading
+        +onGenerate() Promise~void~
+        +onCopy() Promise~void~
+        +onSave() Promise~void~
+    }
+
+    class ModelTab {
+        +ModelInfo[] models
+        +string currentModel
+        +onSwitch(model: string) Promise~void~
+    }
+
+    class CacheTab {
+        +CacheStats stats
+        +onReset() Promise~void~
+    }
+
+    class PreferencesTab {
+        +ProjectStatus status
+        +onUpdate(preferences) Promise~void~
+    }
+
+    class ShortWriteTabs {
+        +ShortSection[] sections
+        +number activeSection
+        +onSectionChange(idx) void
+        +onSectionUpdate(idx, content) void
+    }
+
+    class ShortSectionEditor {
+        +ShortSection section
+        +onChange(content) void
+        +onAIRequest(action) void
+    }
+
+    class ShortSection {
+        +number idx
+        +string title
+        +string content
+        +'draft' | 'generating' | 'done' status
+    }
+
+    class ReviewQueuePage {
+        +render() JSX
+    }
+
+    class CoverPage {
+        +render() JSX
+    }
+
+    class ShortWritePage {
+        +render() JSX
+    }
+
+    class SettingsPage {
+        +render() JSX
+        +number activeTab
+    }
+
+    ReviewQueue --> ReviewReport : renders
+    ReviewReport --> QualityScoreRadar
+    ShortWriteTabs --> ShortSectionEditor : contains
+    ShortSectionEditor --> ShortSection
+
+# =========================================================================
+# 组件层 (Sprint 4 - Admin / Import / Onboarding / Layout)
+# =========================================================================
+classDiagram
+    direction TB
+
+    class AdminUsersPage {
+        +UserRow[] users
+        +CreateUserDialogState dialog
+        +handleCreate(data) Promise~void~
+        +handleDelete(id) Promise~void~
+        +handleDisable(id) Promise~void~
+    }
+
+    class AdminProjectsPage {
+        +UserRow selectedUser
+        +ProjectMembership[] projects
+        +ShareProjectDialogState dialog
+        +handleShare(path, role) Promise~void~
+        +handleRevoke(userId, path) Promise~void~
+    }
+
+    class AdminAuditPage {
+        +AuditEvent[] events
+        +AuditFilters filters
+        +handleFilterChange(filters) void
+        +handleExportCSV() void
+    }
+
+    class ImportPage {
+        +number currentStep
+        +ImportData data
+        +handleFileSelect(file) void
+        +handleConfirm() Promise~void~
+    }
+
+    class OnboardingWizard {
+        +boolean open
+        +OnboardingData data
+        +number currentStep
+        +onComplete() void
+        +onSkip() void
+        +handleNext() void
+        +handleBack() void
+    }
+
+    class EmptyState {
+        +JSX.Element icon
+        +string title
+        +string description
+        +JSX.Element | null action
+    }
+
+    class LoadingSkeleton {
+        +'text' | 'card' | 'table' variant
+        +number count
+    }
+
+    class CsvExportButton {
+        +Record[] data
+        +string filename
+        +string[] columns
+        +onClick() void
+    }
+
+    class AppShell {
+        +JSX.Element children
+        +boolean sidebarCollapsed
+        -useResponsive responsive
+    }
+
+    class Sidebar {
+        +MenuItem[] items
+        +boolean collapsed
+        +onItemClick(path) void
+    }
+
+    class Header {
+        +User currentUser
+        +ModelInfo[] models
+        +string currentModel
+        +onModelSwitch(model) void
+        +onLogout() void
+    }
+
+    class UserRow {
+        +number id
+        +string username
+        +'admin' | 'editor' | 'viewer' role
+        +string created_at
+        +string | null last_login
+        +'active' | 'disabled' status
+    }
+
+    class AuditEvent {
+        +string timestamp
+        +string user
+        +string action
+        +string resource
+        +boolean success
+    }
+
+    class AuditFilters {
+        +Date | null from
+        +Date | null to
+        +number | null user_id
+        +string | null event_type
+    }
+
+    AppShell --> Sidebar
+    AppShell --> Header
+    AppShell --> OnboardingWizard : optional
+
+# =========================================================================
+# 路由层
+# =========================================================================
+classDiagram
+    direction TB
+
+    class AppRoutes {
+        +Routes
+        +ProtectedRoute
+        +AdminGuard
+        +render() JSX
+    }
+
+    class ProtectedRoute {
+        +JSX.Element children
+        +boolean isAuthenticated
+        +navigate('/login') void
+    }
+
+    class AdminGuard {
+        +JSX.Element children
+        +boolean isAdmin
+        +navigate('/') void
+    }
+
+    AppRoutes --> ProtectedRoute : uses
+    AppRoutes --> AdminGuard : uses
+
+# =========================================================================
+# 配置层
+# =========================================================================
+classDiagram
+    direction TB
+
+    class skillCategories {
+        <<module>>
+        +CATEGORY_MAP: Record~string, SkillMeta~
+    }
+
+    class SkillMeta {
+        +SkillCategory category
+        +string icon
+        +'primary' | 'secondary' | 'success' | 'warning' | 'error' color
+        +JSONSchema | null inputSchema
+    }
+
+    class queryKeys {
+        <<module>>
+        +QUERY_KEYS
+        +skills: ['skills']
+        +chapters: ['chapters', projectRoot]
+        +chapter: ['chapter', n, projectRoot]
+    }
+
+    class ApiConstants {
+        <<module>>
+        +MAX_RECONNECT_ATTEMPTS: 3
+        +RECONNECT_DELAYS_MS: number[]
+        +HEARTBEAT_TIMEOUT_MS: 30000
+        +POLLING_INTERVAL_MS: 2000
+        +AUTOSAVE_DEBOUNCE_MS: 3000
+        +BREAKPOINTS: object
+    }
+
+    skillCategories --> SkillMeta
