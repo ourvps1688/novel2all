@@ -10,7 +10,8 @@
  *  6. 所有非 2xx 响应自动转换为 ApiError（不再需要 .catch 写一遍）
  */
 
-import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios';
+import type { AxiosError} from 'axios';
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 
 import { type ApiErrorBody, toApiError } from '../utils/errors';
 
