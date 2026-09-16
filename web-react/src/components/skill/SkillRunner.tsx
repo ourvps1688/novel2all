@@ -47,6 +47,37 @@ import type {
   WriteProgress,
 } from '../../types/skills';
 import { phaseProgressPercent } from '../../types/skills';
+
+/** Issue #2 修复：写作中按 charsWritten / targetChars 真实计算进度 */
+const DEFAULT_TARGET_CHARS = 3000;
+
+const WRITING_PHASE_BASE = 60; // 与 types/skills.ts PHASE_WEIGHTS.writing 对齐
+const WRITING_PHASE_TOP = 75;   // 与 PHASE_WEIGHTS.save 对齐
+const KNOWN_PHASES = new Set([
+  'init',
+  'pre_write_check',
+  'writing',
+  'save',
+  'extract',
+  'merge',
+  'post_write_check',
+  'done',
+]);
+
+/**
+ * 综合进度：writing 阶段按字符数插值 (60%~75%)，其他阶段用 phaseProgressPercent
+ *
+ * 之前只用 phaseProgressPercent(progress.phase)，写作时 phase 卡在 'writing' → 进度条固定 60% 不动
+ * 现在用前端累计的 charsWritten 在 writing 阶段内做插值，写作中能真实看到进度推进
+ */
+function computeCombinedProgress(phase: string, charsWritten: number): number {
+  if (phase === 'writing' && charsWritten > 0) {
+    const ratio = Math.min(1, charsWritten / DEFAULT_TARGET_CHARS);
+    return WRITING_PHASE_BASE + ratio * (WRITING_PHASE_TOP - WRITING_PHASE_BASE);
+  }
+  if (!KNOWN_PHASES.has(phase)) return 0;
+  return phaseProgressPercent(phase as Parameters<typeof phaseProgressPercent>[0]);
+}
 import { newIdempotencyKey } from '../../utils/idem';
 
 const MAX_RECONNECT_ATTEMPTS = 3;
@@ -386,11 +417,12 @@ export function SkillRunner({
               <Box sx={{ mb: 1 }}>
                 <LinearProgress
                   variant="determinate"
-                  value={phaseProgressPercent(progress.phase)}
+                  value={computeCombinedProgress(progress.phase, progress.charsWritten)}
                 />
                 <Typography variant="caption" color="text.secondary">
-                  {progress.phase} · {progress.charsWritten} 字
+                  {progress.phase} · {progress.charsWritten.toLocaleString()} 字
                   {progress.charsPerSecond !== undefined && ` · ${progress.charsPerSecond.toFixed(1)} 字/秒`}
+                  {progress.etaSeconds !== undefined && progress.etaSeconds > 0 && ` · 剩余 ${Math.round(progress.etaSeconds)}s`}
                 </Typography>
               </Box>
             )}

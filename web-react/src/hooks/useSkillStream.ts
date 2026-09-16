@@ -54,6 +54,70 @@ function toError(err: unknown): Error {
 }
 
 /**
+ * Issue #2 修复 (Sprint 5 后续)：
+ *   后端 SSE progress event 没有 chars_written/chars_per_second/eta_seconds
+ *   前端 fallback：累计 chunk 长度 + 计算时间衍生指标
+ *
+ * 策略：
+ *   1) 后端发 progress event 时，优先用后端的 charsWritten/charsPerSecond/etaSeconds
+ *   2) 后端没发 → 用累计的 chars + 计时器算 cps + 基于 target 算 eta
+ *   3) chunk 事件也触发一次 onProgress（即使没收到 progress event）
+ */
+const DEFAULT_TARGET_CHARS = 3000; // 估算用（前端 fallback）
+
+interface FallbackState {
+  startTime: number;
+  accumulatedChars: number;
+  currentPhase: string;
+}
+
+function makeFallbackState(): FallbackState {
+  return {
+    startTime: Date.now(),
+    accumulatedChars: 0,
+    currentPhase: 'init',
+  };
+}
+
+function computeFallbackProgress(
+  state: FallbackState,
+  phase?: string,
+  message?: string,
+  backendCharsWritten?: number,
+  targetChars: number = DEFAULT_TARGET_CHARS,
+): {
+  phase?: string;
+  charsWritten: number;
+  charsPerSecond?: number;
+  etaSeconds?: number;
+  message?: string;
+} {
+  const nextPhase = phase ?? state.currentPhase;
+  // 用后端发的 charsWritten（如果 > 0）；否则用前端累计
+  const charsWritten =
+    typeof backendCharsWritten === 'number' && backendCharsWritten > 0
+      ? backendCharsWritten
+      : state.accumulatedChars;
+
+  const elapsedSec = Math.max(0.001, (Date.now() - state.startTime) / 1000);
+  const charsPerSecond = charsWritten > 0 ? charsWritten / elapsedSec : undefined;
+
+  // eta: 基于 targetChars 估算剩余时间
+  let etaSeconds: number | undefined;
+  if (charsPerSecond && charsPerSecond > 0 && charsWritten < targetChars) {
+    etaSeconds = (targetChars - charsWritten) / charsPerSecond;
+  }
+
+  return {
+    phase: nextPhase,
+    charsWritten,
+    charsPerSecond,
+    etaSeconds,
+    message,
+  };
+}
+
+/**
  * useSkillStream: 返回 { stream, cancel } 控制函数
  *
  * 注意：所有内部 timer / EventSource / polling interval 都存在 ref 中，
@@ -159,13 +223,25 @@ export function useSkillStream(): StreamControls {
       eventSourceRef.current = es;
       currentOptsRef.current = opts;
 
-      // chunk 事件
+      // Issue #2 修复：每个 task 独立的累计状态
+      const fb = makeFallbackState();
+
+      // chunk 事件 — 累计字符 + 触发 fallback progress
       es.addEventListener('chunk', (e: Event) => {
         try {
           const me = e as MessageEvent;
-          const data = me.data ? (JSON.parse(me.data) as { text?: string }) : {};
+          const data = me.data ? (JSON.parse(me.data) as { text?: string; task_id?: string }) : {};
           if (typeof data.text === 'string') {
+            fb.accumulatedChars += data.text.length;
+            fb.currentPhase = 'writing';
             opts.onChunk?.(data.text);
+            // 每次 chunk 触发一次 fallback onProgress（让进度条持续移动）
+            const fbProgress = computeFallbackProgress(
+              fb,
+              'writing',
+              `已生成 ${fb.accumulatedChars} 字`,
+            );
+            opts.onProgress?.(fbProgress);
           }
           resetHeartbeat(opts);
         } catch (err) {
@@ -173,19 +249,18 @@ export function useSkillStream(): StreamControls {
         }
       });
 
-      // progress 事件
+      // progress 事件 — 优先用后端字段，fallback 到前端累计
       es.addEventListener('progress', (e: Event) => {
         try {
           const me = e as MessageEvent;
           const data = me.data ? (JSON.parse(me.data) as Record<string, unknown>) : {};
-          opts.onProgress?.({
-            phase: typeof data.phase === 'string' ? data.phase : undefined,
-            charsWritten: typeof data.chars_written === 'number' ? data.chars_written : 0,
-            charsPerSecond:
-              typeof data.chars_per_second === 'number' ? data.chars_per_second : undefined,
-            etaSeconds: typeof data.eta_seconds === 'number' ? data.eta_seconds : undefined,
-            message: typeof data.message === 'string' ? data.message : undefined,
-          });
+          const phase = typeof data.phase === 'string' ? data.phase : undefined;
+          const message = typeof data.message === 'string' ? data.message : undefined;
+          fb.currentPhase = phase ?? fb.currentPhase;
+          // 后端发了 chars_written 用后端；否则用前端累计
+          const backendChars = typeof data.chars_written === 'number' ? data.chars_written : 0;
+          const fbProgress = computeFallbackProgress(fb, phase, message, backendChars);
+          opts.onProgress?.(fbProgress);
           resetHeartbeat(opts);
         } catch {
           // 忽略 progress 解析错误 (不致命)
