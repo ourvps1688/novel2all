@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 # === SSE 工具函数 ===
 
+
 # === V1.5.1：skill task 延迟清理辅助函数 ===
 async def _delayed_cleanup_skill_task(
     app_state: Any, task_id: str, delay_seconds: float = 60.0
@@ -998,6 +999,7 @@ def create_app() -> FastAPI:
             _run_skill_task(request.app.state, task_id, name, params_dict, project_root)
         )
         task_state["task"] = bg_task
+
         # V1.5.1 修复（race condition）：延迟移除 task_state，避免 bg_task 完成后
         # 立即从 skill_tasks 删除，导致客户端晚到的 /status 请求查不到 task。
         # 改为：bg_task 完成后保留 60s，期间客户端可重连 /status 拿完整 SSE 流；
@@ -1008,9 +1010,7 @@ def create_app() -> FastAPI:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     asyncio.create_task(
-                        _delayed_cleanup_skill_task(
-                            request.app.state, task_id, delay_seconds=60.0
-                        )
+                        _delayed_cleanup_skill_task(request.app.state, task_id, delay_seconds=60.0)
                     )
             except RuntimeError:
                 # 没 event loop（应用关闭中），跳过清理
@@ -1072,9 +1072,7 @@ def create_app() -> FastAPI:
             project = ProjectStructure(root=root)
             if not project.exists():
                 msg = f"项目未初始化: {root}. 请先跑 novel2all setup."
-                event_queue.put_nowait(
-                    sse_event("error", {"message": msg, "task_id": task_id})
-                )
+                event_queue.put_nowait(sse_event("error", {"message": msg, "task_id": task_id}))
                 task_state["status"] = "failed"
                 task_state["error"] = msg
                 task_state["finished_at"] = time.time()
@@ -1126,9 +1124,7 @@ def create_app() -> FastAPI:
                 所以 on_chunk 实际运行在主线程，没有跨线程问题）。
                 """
                 collected.append(text)
-                event_queue.put_nowait(
-                    sse_event("chunk", {"text": text, "task_id": task_id})
-                )
+                event_queue.put_nowait(sse_event("chunk", {"text": text, "task_id": task_id}))
 
             # 不在 run_pipeline 的 finally 里 put None，避免 background task 还没写
             # progress/done 事件时 SSE consumer 先读到 None 提前关闭。
@@ -1339,6 +1335,7 @@ def create_app() -> FastAPI:
 
         # 验证 skill_name 匹配（防止 task_id 张冠李戴）
         if task_state["skill_name"] != name:
+
             async def mismatch_stream() -> AsyncIterator[str]:
                 yield sse_event(
                     "error",

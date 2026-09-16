@@ -80,9 +80,7 @@ def initialized_project(tmp_path: Path) -> Path:
 class TestExecuteEndpoint:
     """V1.5.1：POST /api/skills/{name}/execute 端点基础行为。"""
 
-    def test_execute_returns_task_id_immediately(
-        self, initialized_project: Path
-    ) -> None:
+    def test_execute_returns_task_id_immediately(self, initialized_project: Path) -> None:
         """POST /execute 立即返回 task_id + status=started（不等 pipeline 完成）。"""
         app = create_app()
         with TestClient(app) as client:
@@ -201,9 +199,7 @@ class TestExecuteStatusIntegration:
             complete_structured(list[ConsistencyIssue])。
             """
             if response_model is ExtractedChapterInfo:
-                return ExtractedChapterInfo.model_validate(
-                    {"chapter": 1, "character_updates": []}
-                )
+                return ExtractedChapterInfo.model_validate({"chapter": 1, "character_updates": []})
             # verifier.post_write_check → list[ConsistencyIssue]
             return []
 
@@ -216,9 +212,7 @@ class TestExecuteStatusIntegration:
             exec_resp = client.post(
                 "/api/skills/story-long-write/execute",
                 data={
-                    "params": json.dumps(
-                        {"chapter": 1, "skip_pre_write": True, "min_chars": 0}
-                    ),
+                    "params": json.dumps({"chapter": 1, "skip_pre_write": True, "min_chars": 0}),
                     "project_root": str(initialized_project),
                 },
             )
@@ -301,9 +295,7 @@ class TestExecuteStatusIntegration:
 class TestSkillExecuteEdgeCases:
     """V1.5.1：skill execute 边界情况。"""
 
-    def test_execute_project_uninitialized_returns_error(
-        self, tmp_path: Path
-    ) -> None:
+    def test_execute_project_uninitialized_returns_error(self, tmp_path: Path) -> None:
         """POST /execute 项目未初始化 → 200（task 启动）+ status SSE 含 error 事件。"""
         # 注意：execute 端点不预校验（异步启动），错误通过 SSE 流返回
         empty_dir = tmp_path / "empty"
