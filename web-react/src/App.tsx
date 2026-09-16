@@ -19,6 +19,10 @@ const WritePage = lazy(() => import('./pages/WritePage').then((m) => ({ default:
 const ChapterListPage = lazy(() =>
   import('./pages/ChapterListPage').then((m) => ({ default: m.ChapterListPage })),
 );
+const SkillsPage = lazy(() => import('./pages/SkillsPage').then((m) => ({ default: m.SkillsPage })));
+const SkillDetailPage = lazy(() =>
+  import('./pages/SkillDetailPage').then((m) => ({ default: m.SkillDetailPage })),
+);
 const ReviewQueuePage = lazy(() =>
   import('./pages/ReviewQueuePage').then((m) => ({ default: m.ReviewQueuePage })),
 );
@@ -70,6 +74,8 @@ export default function App() {
           <Route path="/write" element={<WritePage />} />
           <Route path="/write/:chapter" element={<WritePage />} />
           <Route path="/chapters" element={<ChapterListPage />} />
+          <Route path="/skills" element={<SkillsPage />} />
+          <Route path="/skills/:name" element={<SkillDetailPage />} />
           <Route path="/review" element={<ReviewQueuePage />} />
           <Route path="/export" element={<ExportPage />} />
           <Route path="/settings" element={<SettingsPage />} />

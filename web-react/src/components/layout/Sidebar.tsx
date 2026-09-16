@@ -16,6 +16,7 @@ import RateReviewIcon from '@mui/icons-material/RateReview';
 import DownloadIcon from '@mui/icons-material/Download';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../auth/useAuth';
@@ -34,6 +35,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: '主页', path: '/', icon: <DashboardIcon />, group: 'main', exact: true },
+  { label: 'Skills', path: '/skills', icon: <AutoFixHighIcon />, group: 'main' },
   { label: '写作', path: '/write', icon: <EditNoteIcon />, group: 'main' },
   { label: '章节', path: '/chapters', icon: <MenuBookIcon />, group: 'main' },
   { label: '审查', path: '/review', icon: <RateReviewIcon />, group: 'main' },
