@@ -1649,6 +1649,18 @@ def create_app() -> FastAPI:
                 )
             except Exception as e:
                 yield sse_event("error", {"message": f"Pipeline 初始化失败: {e}"})
+                # V1.5.2 兜底：保证 SSE 流终有 progress + done，前端 useSkillStream 才能
+                # 区分 "进行中" vs "已完成"，避免永远停在 loading state
+                yield sse_event("progress", {"phase": "init_failed", "message": str(e)})
+                yield sse_event(
+                    "done",
+                    {
+                        "status": "failed",
+                        "task_id": task_id,
+                        "phase": "init_failed",
+                        "error": str(e),
+                    },
+                )
                 return
 
             chunk_queue: asyncio.Queue[str | None] = asyncio.Queue()
@@ -2505,6 +2517,17 @@ def create_app() -> FastAPI:
                 )
             except Exception as e:
                 yield sse_event("error", {"message": f"Pipeline 初始化失败: {e}"})
+                # V1.5.2 兜底：保证 SSE 流终有 progress + done，前端 useSkillStream 才能
+                # 区分 "进行中" vs "已完成"，避免永远停在 loading state
+                yield sse_event("progress", {"phase": "init_failed", "message": str(e)})
+                yield sse_event(
+                    "done",
+                    {
+                        "status": "failed",
+                        "phase": "init_failed",
+                        "error": str(e),
+                    },
+                )
                 return
 
             # 用 asyncio.Queue 桥接 sync stream_callback → async generator
