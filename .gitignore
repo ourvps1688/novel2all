@@ -96,3 +96,12 @@ _*.py
 
 # 临时暂存区（_clean.py 移出根目录临时文件到这里，确认无问题后可删）
 .junk/
+
+# web-react 前端构建产物（2026-09-16 cleanup：避免 TS incremental build cache 与编译产物污染仓库）
+# vite.config.ts 才是源；vite.config.js 是 tsx/typescript 编译产物
+/web-react/vite.config.js
+/web-react/vite.config.ts.timestamp-*.mjs
+# TypeScript incremental build cache
+/web-react/*.tsbuildinfo
+# web-react 根目录下的临时测试/build 输出（_*.txt 已在根规则覆盖，但 web-react/ 下需要独立路径）
+/web-react/*.txt
