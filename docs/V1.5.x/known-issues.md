@@ -23,13 +23,23 @@
 ### Issue #1: 修复 Sprint 2 已知问题时"无限中断"
 - **报告时间**：2026-09-16
 - **报告人**：用户
-- **症状**：开发 Sprint 2 修复时遇到"无限中断"（具体描述待补 — terminal 输出 / Vite HMR 卡死 / SSE 死循环 / React 无限重渲染？）
-- **可能源头**：
-  - [ ] 自动保存 404 retry loop（已有 da00b94 修复跳过未初始化）
-  - [ ] SSE EventSource 死循环（已加 3 次重连 + 30s 心跳 + polling 降级）
-  - [ ] Vite dev server 启动卡（依赖装错 / TS 编译错）
-  - [ ] useEffect 缺 cleanup → state update on unmounted component
-- **临时方案**：每次 dev 启动前 `git status` 检查 + 改完后立即 commit（避免大改动累积）
+- **症状 1**（首次报告）：开发 Sprint 2 修复时遇到"无限中断"（具体描述待补）
+- **症状 2**（澄清，2026-09-16 20:30）：**"每次下了命令，agent 都自己中断工作，说是 bug 导致了任务中断"**（频率高 / 是 agent 行为中断）
+- **AI 实测（2026-09-16 20:30）**：
+  - 当前 Bash 工具运行良好，所有基本命令（git / python -c / heredoc / rmtree）正常通过
+  - 唯一观察到 `⚠️ Sandbox bypassed (escalation-approved)` 警告（不阻塞但有警告）
+- **7 类可能原因**：
+  - A. Sandbox 拦截 + 越权请求（最可能，频率高，警告类）
+  - B. Bash 工具 timeout（默认 120s）
+  - C. 网络中断（curl / git push）
+  - D. EPERM 文件权限（DACL 拒绝）
+  - E. safe-delete-common.sh 钩子破坏 .git（低频但严重）
+  - F. Bash shim 损坏（dirname not found）— memory 已记录修复，不再触发
+  - G. 多步任务 context 超限 → AI 响应截断（高频，长任务）
+- **下一步**：
+  - [ ] 用户复现一次完整中断并贴 error message + 终端输出
+  - [ ] 写 hook 监控 sandbox 拦截事件
+  - [ ] 主动拆分长任务为多个 turn
 - **归属**：Sprint 2 补丁 / V1.5.5 i18n 同步修复
 
 ### Issue #2: progress event payload schema 不匹配
@@ -39,6 +49,11 @@
 - **影响**：`chars_written` 永远是 0 → 进度条永远 0%
 - **临时方案**：前端 fallback — `charsWritten = 累计 chunk 长度`
 - **归属**：Sprint 3 实施时同步修复
+- **修复**（commit 07d683c）：
+  - useSkillStream.ts 加 FallbackState 累计 chunk 长度 + 计算 charsPerSecond/etaSeconds
+  - SkillRunner.tsx 加 computeCombinedProgress — writing 阶段按字符数在 60%~75% 间插值
+  - 进度条 + 字符数 + 字/秒 + 剩余秒 全部可见
+  - 验证：TS 0 errors / Vite 11.92s / 11 tests passed
 
 ### Issue #3: V0.30.5 E2E playwright 测试 disabled
 - **报告时间**：2026-09-16
@@ -54,6 +69,7 @@
 | # | 问题 | 修复 commit | 修复方式 |
 |---|------|------------|---------|
 | R1 | 后端 SSE 流在 error/cancel 路径不 emit `done`，前端 `useSkillStream` 永远 loading | `22537ab` + `5e09bdf` + `68af8a7` | 在 `_run_skill_task` + execute endpoint + write_chapter_stream 4 条 except 路径（cancel / OutlineNotFound / BlockingIssues / generic Exception）都 emit `progress + done` |
+| R8 | progress event 缺 chars_written/chars_per_second/eta_seconds → 进度条卡 60% | `07d683c` | 前端 fallback：useSkillStream 累计 chunk 长度 + 计时器算 cps/eta；SkillRunner 加 computeCombinedProgress 在 writing 阶段按字符数在 60%~75% 间插值 |
 | R2 | ruff format 不合规导致 CI lint 失败 | `ca2ec69` | `ruff format` 自动修复 `src/novel2all/web/app.py` + `tests/unit/test_skills_execute_v151.py` |
 | R3 | Sprint 2 自动保存 404 误报 | `da00b94` | project 未初始化时跳过 save + UX 提示 |
 | R4 | V1.5 React CSP script-src 阻挡内联 FOUC 脚本 | `16b8ab7` | CSP 加 `'unsafe-inline'` |
