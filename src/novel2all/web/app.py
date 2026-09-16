@@ -1234,6 +1234,18 @@ def create_app() -> FastAPI:
                         },
                     )
                 )
+                # V1.5.2 兜底：cancelled 后也 emit done，前端 useSkillStream 能识别 "已完成"
+                event_queue.put_nowait(
+                    sse_event(
+                        "done",
+                        {
+                            "task_id": task_id,
+                            "status": "cancelled",
+                            "output_path": str(cancel_exc.output_path),
+                            "partial_chars": cancel_exc.partial_chars,
+                        },
+                    )
+                )
                 task_state["status"] = "cancelled"
                 task_state["finished_at"] = time.time()
             except OutlineNotFoundError as e:
@@ -1241,6 +1253,18 @@ def create_app() -> FastAPI:
                     sse_event(
                         "error",
                         {"message": str(e), "code": "outline_not_found", "task_id": task_id},
+                    )
+                )
+                # V1.5.2 兜底：失败也 emit progress + done，前端 useSkillStream 能识别 "已完成"
+                event_queue.put_nowait(
+                    sse_event(
+                        "done",
+                        {
+                            "task_id": task_id,
+                            "status": "failed",
+                            "code": "outline_not_found",
+                            "error": str(e),
+                        },
                     )
                 )
                 task_state["status"] = "failed"
@@ -1258,6 +1282,18 @@ def create_app() -> FastAPI:
                         },
                     )
                 )
+                # V1.5.2 兜底
+                event_queue.put_nowait(
+                    sse_event(
+                        "done",
+                        {
+                            "task_id": task_id,
+                            "status": "failed",
+                            "code": "blocking_issues",
+                            "error": f"pre-write blocking: {len(e.issues)}",
+                        },
+                    )
+                )
                 task_state["status"] = "failed"
                 task_state["error"] = f"pre-write blocking: {len(e.issues)}"
                 task_state["finished_at"] = time.time()
@@ -1268,6 +1304,18 @@ def create_app() -> FastAPI:
                         {
                             "message": f"Pipeline 失败: {type(e).__name__}: {e}",
                             "task_id": task_id,
+                        },
+                    )
+                )
+                # V1.5.2 兜底
+                event_queue.put_nowait(
+                    sse_event(
+                        "done",
+                        {
+                            "task_id": task_id,
+                            "status": "failed",
+                            "code": "pipeline_error",
+                            "error": f"{type(e).__name__}: {e}",
                         },
                     )
                 )
