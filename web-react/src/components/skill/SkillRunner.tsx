@@ -12,7 +12,7 @@
  * 不关心 skill 业务, 只负责 execute + stream + cancel
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -92,6 +92,14 @@ export function SkillRunner({
   const [isCancelling, setIsCancelling] = useState(false);
   const [pollingMode, setPollingMode] = useState(false);
 
+  // V1.5.1 修复（已知问题 #2）：用 ref 跟踪当前 taskId，避免卸载 cleanup
+  // 捕获首次渲染时的 null（旧实现 bug），确保 in-flight task 被正确取消。
+  // 设计：state 变化通过 useEffect 同步到 ref；卸载时读 ref 的最新值。
+  const taskIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    taskIdRef.current = taskId;
+  }, [taskId]);
+
   // 计时器
   useEffect(() => {
     if (phase !== 'running' || startedAt == null) return;
@@ -101,18 +109,21 @@ export function SkillRunner({
     return () => window.clearInterval(interval);
   }, [phase, startedAt]);
 
-  // 卸载时取消 (避免泄漏)
+  // V1.5.1 修复（已知问题 #2）：卸载时取消 in-flight task，避免 backend pipeline orphan。
+  // 用 ref 读最新 taskId（不是闭包捕获的旧值），并在依赖里加 cancel 以满足 exhaustive-deps。
   useEffect(() => {
     return () => {
-      if (taskId && (phase === 'running' || phase === 'preparing')) {
-        cancel(taskId).catch(() => {
-          /* ignore */
+      const currentTaskId = taskIdRef.current;
+      if (currentTaskId && (phase === 'running' || phase === 'preparing')) {
+        // cancel() 内部会调 /api/write/cancel/{taskId} → 后端 pipeline_task.cancel()
+        cancel(currentTaskId).catch(() => {
+          /* ignore - unmount 时静默失败 */
         });
       }
     };
-    // 仅在卸载时触发
+    // phase 在卸载时也是稳定值（不再变化），cancel 函数引用稳定
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [phase, cancel]);
 
   // 把 executeError 反映到 errorMsg
   useEffect(() => {

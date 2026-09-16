@@ -37,6 +37,7 @@ from novel2all.core.pipeline import (
     BlockingIssuesError,
     OutlineNotFoundError,
     PipelineCancelledError,
+    WriteResult,
     WritingPipeline,
 )
 from novel2all.core.project import ProjectStructure
@@ -46,6 +47,31 @@ from novel2all.core.skill import SkillRegistry
 logger = logging.getLogger(__name__)
 
 # === SSE 工具函数 ===
+
+# === V1.5.1：skill task 延迟清理辅助函数 ===
+async def _delayed_cleanup_skill_task(
+    app_state: Any, task_id: str, delay_seconds: float = 60.0
+) -> None:
+    """V1.5.1：延迟从 skill_tasks 注册表移除 task。
+
+    背景：bg_task 完成后立即移除 task_state 会导致晚到的 /status 请求
+    查不到 task（race condition）。保留 60s 让客户端有充足时间重连 / 拉取
+    完整 SSE 流。
+
+    Args:
+        app_state: FastAPI app.state
+        task_id: 待清理的 task_id
+        delay_seconds: 延迟秒数（默认 60s）
+    """
+    try:
+        await asyncio.sleep(delay_seconds)
+        app_state.skill_tasks.pop(task_id, None)
+        logger.debug("V1.5.1 skill task cleanup: task_id=%s 已从注册表移除", task_id)
+    except asyncio.CancelledError:
+        # 应用关闭时可能被取消，忽略即可
+        pass
+    except Exception as e:
+        logger.warning("V1.5.1 skill task cleanup failed: task_id=%s err=%s", task_id, e)
 
 
 def sse_event(event: str, data: dict[str, Any]) -> str:
@@ -286,6 +312,9 @@ def create_app() -> FastAPI:
         # V0.31：活跃 pipeline task 注册表（用于 /api/write/cancel/{task_id} 取消正在运行的写作任务）
         # key = task_id (uuid4 hex[:8])，value = asyncio.Task
         app.state.active_pipelines = {}
+        # V1.5.1：skill execute task 注册表（用于 /api/skills/{name}/status SSE 订阅）
+        # value = dict{task, queue, skill_name, status, started_at, finished_at, params, project_root}
+        app.state.skill_tasks = {}
 
         # V0.30.6 B5 收尾：auth + session + rate limiter
         from novel2all.core.auth import AuthStore, RateLimiter
@@ -833,10 +862,20 @@ def create_app() -> FastAPI:
         load_dotenv(".env", override=False)
         app.state.provider = LLMProvider(LLMConfig())
 
+    # V0.31：测试 fallback 初始化 active_pipelines（让 cancel 端点在 TestClient
+    # 模式下也能工作；之前只 lifespan 初始化，测试用会 KeyError）。
+    if not hasattr(app.state, "active_pipelines"):
+        app.state.active_pipelines = {}
+
     # V1.0.1 B8：测试 fallback 也初始化 idempotency_store（让 TestClient 测试
     # 访问 review 端点时不会因 app.state 缺失而 crash）。
     if not hasattr(app.state, "idempotency_store"):
         app.state.idempotency_store = InMemoryIdempotencyStore(ttl_seconds=300)
+
+    # V1.5.1：测试 fallback 也初始化 skill_tasks（让 TestClient 测试
+    # /api/skills/{name}/execute 时不会因 app.state 缺失而 crash）。
+    if not hasattr(app.state, "skill_tasks"):
+        app.state.skill_tasks = {}
 
     @app.get("/api/status")
     async def status(project_root: str = ".") -> dict:
@@ -876,6 +915,465 @@ def create_app() -> FastAPI:
             }
             for s in registry.list()
         ]
+
+    # V1.5.1：skill execute + status SSE 端点（Sprint 1 已知问题 #1 修复）。
+    # 设计要点（playbook §13）：
+    #   - POST /api/skills/{name}/execute 立即返回 task_id，后台跑 skill
+    #   - GET /api/skills/{name}/status?task_id=... 返回 SSE 流（chunk/progress/done/error）
+    #   - 复用现有 pipeline.write_chapter（skill_name=...）；不重新发明轮子
+    #   - 通过 asyncio.Queue 桥接同步 stream_callback → 异步 SSE 消费
+    #   - task 注册到 app.state.skill_tasks；cancel 通过现有 /api/write/cancel/{task_id}
+
+    @app.post("/api/skills/{name}/execute")
+    async def execute_skill_endpoint(
+        request: Request,
+        name: str,
+        params: str = Form("{}"),
+        project_root: str = Form("."),
+        idempotency_key: str = Form(""),
+    ) -> dict[str, Any]:
+        """V1.5.1：启动 skill task，立即返回 task_id + status=started。
+
+        Body（multipart/form-data）：
+          - params: JSON 字符串（skill 调用参数，如 chapter/input）
+          - project_root: 项目根目录（默认 "."）
+          - idempotency_key: 可选幂等键（V1.5.1 暂未实际使用，留待后续接 idempotency_store）
+
+        Returns:
+          200 + {"task_id": "...", "status": "started", "started_at": <unix_ts>,
+                 "skill": name, "project_root": "..."}
+          404 + {"detail": "skill 'xxx' 未注册"}  未知 skill
+          400 + {"detail": "params 必须是合法 JSON 字符串"}  解析失败
+
+        Side effects:
+          - 注册 task 到 app.state.skill_tasks[task_id]
+          - 后台 spawn asyncio.Task 跑 pipeline（用 chunk/progress 事件 yield 到 queue）
+        """
+        # 1. 验证 skill 存在
+        skills_dir = Path(__file__).parent.parent / "skills"
+        skill_registry = SkillRegistry(skills_dir)
+        skill_registry.discover()
+        if skill_registry.get(name) is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"skill '{name}' 未注册。可用: {', '.join(skill_registry.names())}",
+            )
+
+        # 2. 解析 params JSON 字符串
+        try:
+            params_dict: dict[str, Any] = json.loads(params) if params else {}
+            if not isinstance(params_dict, dict):
+                params_dict = {"input": str(params_dict)}
+        except (json.JSONDecodeError, TypeError) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"params 必须是合法 JSON 字符串: {e}",
+            ) from e
+
+        # 3. 生成 task_id（与现有 /api/write/stream/model 同一格式，保持一致）
+        task_id = uuid.uuid4().hex[:8]
+        started_at = time.time()
+
+        # 4. 创建 asyncio.Queue（producer = 同步 stream_callback；consumer = SSE generator）
+        event_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+        # 5. 注册 task 元数据（status SSE 端点会查这个）
+        task_state: dict[str, Any] = {
+            "task_id": task_id,
+            "skill_name": name,
+            "params": params_dict,
+            "project_root": project_root,
+            "started_at": started_at,
+            "finished_at": None,
+            "status": "running",  # running / done / failed / cancelled
+            "queue": event_queue,
+            "task": None,  # 后面填
+            "result": None,
+            "error": None,
+        }
+        request.app.state.skill_tasks[task_id] = task_state
+
+        # 6. Spawn 后台 coroutine 跑 skill（复用 pipeline.write_chapter）
+        bg_task = asyncio.create_task(
+            _run_skill_task(request.app.state, task_id, name, params_dict, project_root)
+        )
+        task_state["task"] = bg_task
+        # V1.5.1 修复（race condition）：延迟移除 task_state，避免 bg_task 完成后
+        # 立即从 skill_tasks 删除，导致客户端晚到的 /status 请求查不到 task。
+        # 改为：bg_task 完成后保留 60s，期间客户端可重连 /status 拿完整 SSE 流；
+        # 60s 后由 add_done_callback 调度清理（add_done_callback 是 sync 的，
+        # 用 asyncio.create_task 包一下避免 "coroutine never awaited" 警告）。
+        def _schedule_cleanup(t: asyncio.Task) -> None:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(
+                        _delayed_cleanup_skill_task(
+                            request.app.state, task_id, delay_seconds=60.0
+                        )
+                    )
+            except RuntimeError:
+                # 没 event loop（应用关闭中），跳过清理
+                pass
+
+        bg_task.add_done_callback(_schedule_cleanup)
+
+        logger.info(
+            "V1.5.1 skill execute: task_id=%s skill=%s project_root=%s",
+            task_id,
+            name,
+            project_root,
+        )
+        return {
+            "task_id": task_id,
+            "status": "started",
+            "started_at": started_at,
+            "skill": name,
+            "project_root": project_root,
+        }
+
+    async def _run_skill_task(
+        app_state: Any,
+        task_id: str,
+        skill_name: str,
+        params: dict[str, Any],
+        project_root: str,
+    ) -> None:
+        """V1.5.1：后台跑 skill task → 把事件 push 到 task_state['queue']。
+
+        复用现有 ``pipeline.write_chapter(skill_name=...)``。
+        同步 ``stream_callback`` 通过 ``queue.put_nowait`` 桥接到异步 SSE 消费者。
+
+        事件序列（与 /api/write/stream/model 一致，参考 playbook §13）：
+          - started → chunk* → progress(save/extract/merge) → done
+          - 失败：error（detail: {message, code?}）
+          - 取消：cancelled（partial_chars + output_path）
+        """
+        task_state = app_state.skill_tasks.get(task_id)
+        if task_state is None:
+            logger.warning("V1.5.1 _run_skill_task: task_id=%s 不在注册表，跳过", task_id)
+            return
+        event_queue: asyncio.Queue[str | None] = task_state["queue"]
+
+        # 把 params.chapter 提取出来；默认 1（向后兼容 story-long-write 默认章节）
+        try:
+            chapter = int(params.get("chapter", 1))
+        except (TypeError, ValueError):
+            chapter = 1
+
+        # 也兼容 min_chars / skip_pre_write / resume_from_chars（与 write/stream/model 一致）
+        min_chars = int(params.get("min_chars", 2000))
+        skip_pre_write = bool(params.get("skip_pre_write", False))
+
+        # 把 LLM 单例取出来
+        try:
+            llm: LLMProvider = app_state.provider
+            root = Path(project_root).resolve()
+            project = ProjectStructure(root=root)
+            if not project.exists():
+                msg = f"项目未初始化: {root}. 请先跑 novel2all setup."
+                event_queue.put_nowait(
+                    sse_event("error", {"message": msg, "task_id": task_id})
+                )
+                task_state["status"] = "failed"
+                task_state["error"] = msg
+                task_state["finished_at"] = time.time()
+                event_queue.put_nowait(None)  # sentinel
+                return
+
+            event_queue.put_nowait(
+                sse_event(
+                    "started",
+                    {
+                        "task_id": task_id,
+                        "skill": skill_name,
+                        "chapter": chapter,
+                        "params": params,
+                        "project_root": str(root),
+                    },
+                )
+            )
+
+            try:
+                manager = MemoryManager(project_root=root, llm=llm)
+                skills_dir = Path(__file__).parent.parent / "skills"
+                skill_registry = SkillRegistry(skills_dir)
+                skill_registry.discover()
+                pipeline = WritingPipeline(
+                    manager=manager,
+                    skill_registry=skill_registry,
+                    llm=llm,
+                    project=project,
+                )
+            except Exception as e:
+                msg = f"Pipeline 初始化失败: {e}"
+                event_queue.put_nowait(sse_event("error", {"message": msg, "task_id": task_id}))
+                task_state["status"] = "failed"
+                task_state["error"] = msg
+                task_state["finished_at"] = time.time()
+                event_queue.put_nowait(None)
+                return
+
+            collected: list[str] = []
+
+            def on_chunk(text: str) -> None:
+                """同步 stream_callback → 直接产出 SSE 格式化事件进 queue。
+
+                设计：避免 background task 自己再读 queue 转发（race condition）。
+                on_chunk 是同步函数，queue.put_nowait 是线程安全的（asyncio.Queue 内部
+                用 threading.Lock + loop.call_soon_threadsafe；run_in_executor 场景下
+                也安全——pipeline.write_chapter 在同一 event loop 内调 LLM.stream，
+                所以 on_chunk 实际运行在主线程，没有跨线程问题）。
+                """
+                collected.append(text)
+                event_queue.put_nowait(
+                    sse_event("chunk", {"text": text, "task_id": task_id})
+                )
+
+            # 不在 run_pipeline 的 finally 里 put None，避免 background task 还没写
+            # progress/done 事件时 SSE consumer 先读到 None 提前关闭。
+            # 改为：run_pipeline 仅承载 pipeline.write_chapter；background task
+            # 在 await pipeline_task 后再统一发 progress/done + 终末 sentinel。
+            async def run_pipeline() -> WriteResult:
+                return await pipeline.write_chapter(
+                    chapter=chapter,
+                    outline_path=project.chapter_outline(chapter),
+                    skill_name=skill_name,
+                    stream_callback=on_chunk,
+                    min_chars=min_chars,
+                    skip_pre_write_check=skip_pre_write,
+                )
+
+            pipeline_task = asyncio.create_task(run_pipeline())
+            app_state.active_pipelines[task_id] = pipeline_task  # 复用现有 cancel 机制
+
+            try:
+                # 等 pipeline 跑完（on_chunk 已把 chunk event 写进 queue）
+                result = await pipeline_task
+
+                # pre_write_check 事件
+                if result.pre_write_issues:
+                    event_queue.put_nowait(
+                        sse_event(
+                            "pre_write_check",
+                            {
+                                "task_id": task_id,
+                                "issues": [issue.model_dump() for issue in result.pre_write_issues],
+                            },
+                        )
+                    )
+
+                # progress 三阶段
+                event_queue.put_nowait(
+                    sse_event(
+                        "progress",
+                        {
+                            "phase": "save",
+                            "message": f"已写文件: {result.output_path}",
+                            "task_id": task_id,
+                        },
+                    )
+                )
+                event_queue.put_nowait(
+                    sse_event(
+                        "progress",
+                        {"phase": "extract", "message": "提取角色/伏笔/时间线", "task_id": task_id},
+                    )
+                )
+                event_queue.put_nowait(
+                    sse_event(
+                        "progress",
+                        {"phase": "merge", "message": "合并到 tracking state", "task_id": task_id},
+                    )
+                )
+
+                # post_write_check
+                if result.post_write_issues:
+                    event_queue.put_nowait(
+                        sse_event(
+                            "post_write_check",
+                            {
+                                "task_id": task_id,
+                                "issues": [
+                                    issue.model_dump() for issue in result.post_write_issues
+                                ],
+                            },
+                        )
+                    )
+
+                # done
+                event_queue.put_nowait(
+                    sse_event(
+                        "done",
+                        {
+                            "task_id": task_id,
+                            "output_path": str(result.output_path),
+                            "content_chars": result.content_chars,
+                            "post_issue_count": len(result.post_write_issues),
+                            "pre_issue_count": len(result.pre_write_issues),
+                        },
+                    )
+                )
+                task_state["status"] = "done"
+                task_state["result"] = {
+                    "output_path": str(result.output_path),
+                    "content_chars": result.content_chars,
+                    "collected": "".join(collected),
+                }
+                task_state["finished_at"] = time.time()
+
+            except PipelineCancelledError as cancel_exc:
+                event_queue.put_nowait(
+                    sse_event(
+                        "cancelled",
+                        {
+                            "task_id": task_id,
+                            "chapter": cancel_exc.chapter,
+                            "partial_chars": cancel_exc.partial_chars,
+                            "output_path": str(cancel_exc.output_path),
+                            "message": (
+                                f"已在 {cancel_exc.partial_chars} 字处取消，"
+                                f"内容已保存到 {cancel_exc.output_path.name}"
+                            ),
+                        },
+                    )
+                )
+                task_state["status"] = "cancelled"
+                task_state["finished_at"] = time.time()
+            except OutlineNotFoundError as e:
+                event_queue.put_nowait(
+                    sse_event(
+                        "error",
+                        {"message": str(e), "code": "outline_not_found", "task_id": task_id},
+                    )
+                )
+                task_state["status"] = "failed"
+                task_state["error"] = str(e)
+                task_state["finished_at"] = time.time()
+            except BlockingIssuesError as e:
+                event_queue.put_nowait(
+                    sse_event(
+                        "error",
+                        {
+                            "message": f"pre-write check 发现 {len(e.issues)} 个 critical 问题",
+                            "code": "blocking_issues",
+                            "task_id": task_id,
+                            "issues": [issue.model_dump() for issue in e.issues],
+                        },
+                    )
+                )
+                task_state["status"] = "failed"
+                task_state["error"] = f"pre-write blocking: {len(e.issues)}"
+                task_state["finished_at"] = time.time()
+            except Exception as e:
+                event_queue.put_nowait(
+                    sse_event(
+                        "error",
+                        {
+                            "message": f"Pipeline 失败: {type(e).__name__}: {e}",
+                            "task_id": task_id,
+                        },
+                    )
+                )
+                task_state["status"] = "failed"
+                task_state["error"] = str(e)
+                task_state["finished_at"] = time.time()
+            finally:
+                # 从 active_pipelines 注册表移除（不管成败）
+                app_state.active_pipelines.pop(task_id, None)
+                # 放最终 sentinel 让 SSE consumer 知道流结束
+                event_queue.put_nowait(None)
+        except Exception as outer_e:
+            # 极端 case：整个 background task 在初始化阶段就 crash
+            logger.exception("V1.5.1 _run_skill_task outer crash: task_id=%s", task_id)
+            try:
+                event_queue.put_nowait(
+                    sse_event(
+                        "error",
+                        {
+                            "message": f"Skill task 内部错误: {type(outer_e).__name__}: {outer_e}",
+                            "task_id": task_id,
+                        },
+                    )
+                )
+                task_state["status"] = "failed"
+                task_state["error"] = str(outer_e)
+                task_state["finished_at"] = time.time()
+            finally:
+                event_queue.put_nowait(None)
+
+    @app.get("/api/skills/{name}/status")
+    async def skill_status_endpoint(
+        request: Request,
+        name: str,
+        task_id: str = Query(..., description="execute 返回的 task_id"),
+    ) -> StreamingResponse:
+        """V1.5.1：订阅 skill task 的 SSE 流。
+
+        URL：``GET /api/skills/{name}/status?task_id=...``
+
+        返回 ``text/event-stream``，事件类型与 /api/write/stream/model 对齐：
+          - ``started`` / ``chunk`` / ``progress`` / ``done`` / ``error`` / ``cancelled``
+          - ``pre_write_check`` / ``post_write_check``（如有）
+
+        取消：复用 /api/write/cancel/{task_id}（同一 active_pipelines 注册表）。
+
+        错误：
+          - task_id 不存在 → SSE error 事件 + 立即关闭（不发后续事件）
+          - skill_name 与 execute 时不匹配 → SSE error 事件（task_id 存在但 skill 不符）
+        """
+        task_state = request.app.state.skill_tasks.get(task_id)
+        if task_state is None:
+            # task_id 不存在或已完成（被 done_callback 清理）→ 立即 error + 关流
+            async def not_found_stream() -> AsyncIterator[str]:
+                yield sse_event(
+                    "error",
+                    {"message": f"task {task_id} 不存在或已完成", "task_id": task_id},
+                )
+
+            return StreamingResponse(
+                not_found_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
+        # 验证 skill_name 匹配（防止 task_id 张冠李戴）
+        if task_state["skill_name"] != name:
+            async def mismatch_stream() -> AsyncIterator[str]:
+                yield sse_event(
+                    "error",
+                    {
+                        "message": (
+                            f"task {task_id} 属于 skill '{task_state['skill_name']}', "
+                            f"与请求的 '{name}' 不匹配"
+                        ),
+                        "task_id": task_id,
+                    },
+                )
+
+            return StreamingResponse(
+                mismatch_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
+        event_queue: asyncio.Queue[str | None] = task_state["queue"]
+
+        async def event_stream() -> AsyncIterator[str]:
+            # 持续从 queue 读取，直到收到 sentinel (None) 标记流结束
+            while True:
+                # 用 get() 而不是 get_nowait() 让客户端断开时优雅退出
+                event = await event_queue.get()
+                if event is None:
+                    # 流结束
+                    break
+                yield event
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @app.get("/api/roles")
     async def list_roles() -> list[dict]:

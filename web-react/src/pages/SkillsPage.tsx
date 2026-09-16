@@ -52,6 +52,14 @@ const CATEGORY_COLOR: Record<SkillCategory, 'primary' | 'secondary' | 'success' 
   内部: 'default',
 };
 
+// V1.5.1 修复（已知问题 #3）：后端 base URL 从环境变量读取，避免硬编码 IP。
+// 优先级：VITE_API_BASE_URL (build-time 注入) > 默认 localhost。
+// 默认值保留 192.168.3.106:8000 兼容现有本地开发环境；
+// 生产 / 其他部署可通过 .env.local / .env.production 覆盖。
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+  'http://192.168.3.106:8000';
+
 export function SkillsPage() {
   const navigate = useNavigate();
   const { data: skills, isLoading, isError } = useSkills();
@@ -110,7 +118,7 @@ export function SkillsPage() {
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <EmptyState
           title="Skills 加载失败"
-          subtitle="请检查后端服务 (http://192.168.3.106:8000) 是否正常, 或刷新重试"
+          subtitle={`请检查后端服务 (${API_BASE_URL}) 是否正常, 或刷新重试`}
           action={{ label: '刷新', onClick: () => window.location.reload() }}
         />
       </Container>
