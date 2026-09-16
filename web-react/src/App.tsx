@@ -45,6 +45,7 @@ const SettingsPage = lazy(() =>
   import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
 const CoverPage = lazy(() => import('./pages/CoverPage').then((m) => ({ default: m.CoverPage })));
+const ImportPage = lazy(() => import('./pages/ImportPage').then((m) => ({ default: m.ImportPage })));
 const NotFoundPage = lazy(() =>
   import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })),
 );
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="/export" element={<ExportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/cover" element={<CoverPage />} />
+          <Route path="/import" element={<ImportPage />} />
 
           {/* Admin 专属（嵌套路由：/admin → /admin/users） */}
           <Route

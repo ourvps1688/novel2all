@@ -1,5 +1,10 @@
 /**
- * Header：顶栏 logo + 用户菜单 + 主题切换 + 注销
+ * Header：顶栏
+ *
+ * 包含:
+ *   - hamburger menu 按钮 (mobile only < sm)
+ *   - logo + 项目名 + 版本 chip
+ *   - 主题切换 + 用户菜单 + 注销
  */
 
 import { useState } from 'react';
@@ -17,6 +22,7 @@ import {
   ListItemIcon,
   Chip,
 } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -29,9 +35,11 @@ import { useThemeStore } from '../../store/themeStore';
 
 interface HeaderProps {
   drawerWidth: number;
+  /** 移动端菜单按钮回调（< sm 显示汉堡按钮触发） */
+  onMobileMenuToggle?: () => void;
 }
 
-export function Header({ drawerWidth }: HeaderProps) {
+export function Header({ drawerWidth, onMobileMenuToggle }: HeaderProps) {
   const navigate = useNavigate();
   const { user, username, role, logout } = useAuth();
   const themeMode = useThemeStore((s) => s.mode);
@@ -68,6 +76,18 @@ export function Header({ drawerWidth }: HeaderProps) {
     >
       <Toolbar sx={{ justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {/* 移动端 hamburger menu */}
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={onMobileMenuToggle}
+            sx={{ display: { sm: 'none' }, mr: 1 }}
+            data-testid="header-hamburger"
+          >
+            <MenuIcon />
+          </IconButton>
+
           <Box
             sx={{
               width: 32,
@@ -84,10 +104,10 @@ export function Header({ drawerWidth }: HeaderProps) {
           >
             n2a
           </Box>
-          <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+          <Typography variant="h6" component="div" sx={{ fontWeight: 600, display: { xs: 'none', sm: 'block' } }}>
             novel2all
           </Typography>
-          <Chip size="small" label="V1.5" variant="outlined" sx={{ ml: 1 }} />
+          <Chip size="small" label="V1.5" variant="outlined" sx={{ ml: 1, display: { xs: 'none', sm: 'inline-flex' } }} />
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
