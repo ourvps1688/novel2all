@@ -2,10 +2,14 @@
  * SkillsPage 单元测试
  *
  * 验证：
- *   - 13 skill 卡片分组展示
+ *   - 13 skill 卡片分组展示（含内部 skill, 加 "内部工具" badge）
  *   - 分类筛选 chip 工作
  *   - 搜索框工作
- *   - 内部 skill 不展示
+ *   - 内部 skill 现在展示（带 badge），不再隐藏
+ *
+ * V1.5.1 Sprint 1.1 修复（已知问题 #5）：
+ *   - "hides internal" → 改为 "shows internal with badge"
+ *   - "shows 12 cards" → 改为 "shows 13 cards (12 user + 1 internal)"
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -60,39 +64,56 @@ describe('SkillsPage', () => {
     (get as ReturnType<typeof vi.fn>).mockResolvedValue(MOCK_SKILLS);
   });
 
-  it('renders header with skill count', async () => {
+  it('renders header with skill count (含 1 个内部工具)', async () => {
     renderSkillsPage();
     await waitFor(() => {
       expect(screen.getByText(/共 13 个能力/)).toBeInTheDocument();
+      expect(screen.getByText(/含 1 个内部工具/)).toBeInTheDocument();
     });
   });
 
-  it('groups skills by category', async () => {
+  it('groups skills by category (含 内部 分类)', async () => {
     renderSkillsPage();
     await waitFor(() => {
       expect(screen.getByTestId('skill-group-创作类')).toBeInTheDocument();
       expect(screen.getByTestId('skill-group-分析类')).toBeInTheDocument();
       expect(screen.getByTestId('skill-group-工具类')).toBeInTheDocument();
       expect(screen.getByTestId('skill-group-入口类')).toBeInTheDocument();
+      // V1.5.1 Sprint 1.1 修复（已知问题 #5）：新增「内部」分类
+      expect(screen.getByTestId('skill-group-内部')).toBeInTheDocument();
     });
   });
 
-  it('hides internal skills (browser-cdp)', async () => {
+  it('shows internal skill (browser-cdp) with 内部工具 badge', async () => {
+    // V1.5.1 Sprint 1.1 修复（已知问题 #5）：内部 skill 现在展示，不再隐藏
     renderSkillsPage();
     await waitFor(() => {
-      expect(screen.queryByTestId('skill-card-browser-cdp')).not.toBeInTheDocument();
+      // 卡片存在
+      expect(screen.getByTestId('skill-card-browser-cdp')).toBeInTheDocument();
+      // badge 存在（通过 testid 查找）
+      expect(screen.getByTestId('skill-internal-badge-browser-cdp')).toBeInTheDocument();
     });
   });
 
-  it('shows 12 visible cards (13 - 1 internal)', async () => {
+  it('shows 13 cards total (12 user + 1 internal)', async () => {
+    // V1.5.1 Sprint 1.1 修复（已知问题 #5）：从 12 改为 13
     renderSkillsPage();
     await waitFor(() => {
       const cards = document.querySelectorAll('[data-testid^="skill-card-"]');
-      expect(cards.length).toBe(12);
+      expect(cards.length).toBe(13);
     });
   });
 
-  it('filters by category chip', async () => {
+  it('non-internal skills do NOT show internal badge', async () => {
+    renderSkillsPage();
+    await waitFor(() => {
+      expect(screen.getByTestId('skill-card-story-setup')).toBeInTheDocument();
+      expect(screen.queryByTestId('skill-internal-badge-story-setup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('skill-internal-badge-story-long-write')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters by category chip (工具类 = 3 cards, 不含 browser-cdp)', async () => {
     renderSkillsPage();
     await waitFor(() => screen.getByTestId('skill-group-工具类'));
     // 工具类只在 chip 上 click, 这里直接通过按钮 (role=button + name=工具类)
@@ -104,6 +125,20 @@ describe('SkillsPage', () => {
       // 工具类只有 3 个 (deslop / review / import)
       const cards = screen.getByTestId('skill-group-工具类').querySelectorAll('[data-testid^="skill-card-"]');
       expect(cards.length).toBe(3);
+    });
+  });
+
+  it('filters by 内部 category chip (只显示 browser-cdp)', async () => {
+    // V1.5.1 Sprint 1.1 修复（已知问题 #5）：新功能 - 可按内部分类筛选
+    renderSkillsPage();
+    await waitFor(() => screen.getByTestId('skill-group-内部'));
+    const buttons = screen.getAllByRole('button', { name: '内部' });
+    fireEvent.click(buttons[0]!);
+    await waitFor(() => {
+      const cards = document.querySelectorAll('[data-testid^="skill-card-"]');
+      // 只显示 browser-cdp (1 张卡片)
+      expect(cards.length).toBe(1);
+      expect(screen.getByTestId('skill-card-browser-cdp')).toBeInTheDocument();
     });
   });
 

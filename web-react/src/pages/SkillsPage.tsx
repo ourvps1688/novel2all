@@ -24,12 +24,9 @@ import {
   Stack,
   TextField,
   Typography,
-  Card,
-  CardActionArea,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import HistoryIcon from '@mui/icons-material/History';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
 import { useSkills } from '../api/skills';
 import { useSkillExecutionStore } from '../store/skillExecutionStore';
@@ -39,6 +36,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import type { SkillCategory, SkillInfo } from '../types/skills';
 import { SKILL_CATEGORY_LIST } from '../types/skills';
 import type { SkillExecutionHistoryEntry } from '../types/skills';
+import { CATEGORY_MAP } from '../data/skillCategories';
 
 type CategoryFilter = SkillCategory | '全部';
 
@@ -71,9 +69,16 @@ export function SkillsPage() {
   const grouped = useMemo(() => {
     const list = skills ?? [];
     const filtered = list.filter((s) => {
-      // 排除内部 skill (browser-cdp)
-      if (s.category === '内部' || !s.userInvocable) return false;
-      // 分类
+      // V1.5.1 Sprint 1.1 修复（已知问题 #5）：不再按 category 过滤掉内部 skill。
+      // 改为：UI 展示全部 13 个，内部 skill 加 "内部工具" badge。
+      // 排除条件改为：后端声明不可用户调用且非内部（如：将来某天加只模型调用的 skill）
+      // 这里保留一个最小的 userInvocable 检查 + 内部 skill 走另一条规则：
+      //   - isInternal=true → 仍展示，但受 isInternal 分组显示在「内部」类别
+      //   - userInvocable=false 且 isInternal=undefined → 隐藏（防御性）
+      const meta = CATEGORY_MAP[s.name];
+      const isInternal = meta?.isInternal === true;
+      if (!s.userInvocable && !isInternal) return false;
+      // 分类筛选
       if (filter !== '全部' && s.category !== filter) return false;
       // 搜索 (name + description)
       if (search) {
@@ -93,11 +98,16 @@ export function SkillsPage() {
     return groups;
   }, [skills, filter, search]);
 
-  // 最近使用 (取所有 skill 中最近一次的, 最多 4 个)
+  // 最近使用 (取所有用户可调用 skill 中最近一次的, 最多 4 个)
+  // V1.5.1 Sprint 1.1 修复（已知问题 #5）：内部 skill 不再进入"最近使用"区（避免误导用户去点）
   const recentSkills = useMemo<SkillInfo[]>(() => {
     const list = skills ?? [];
     const withRun = list
-      .filter((s) => s.category !== '内部' && s.userInvocable && history[s.name]?.[0])
+      .filter((s) => {
+        const meta = CATEGORY_MAP[s.name];
+        const isInternal = meta?.isInternal === true;
+        return !isInternal && s.userInvocable && history[s.name]?.[0];
+      })
       .map((s) => ({ skill: s, last: history[s.name]?.[0] }))
       .sort((a, b) => (b.last?.startedAt ?? 0) - (a.last?.startedAt ?? 0))
       .slice(0, 4);
@@ -132,7 +142,7 @@ export function SkillsPage() {
         <Box>
           <Typography variant="h4">Skills</Typography>
           <Typography variant="body2" color="text.secondary">
-            共 {skills?.length ?? 0} 个能力, 覆盖创作 / 分析 / 工具 / 入口
+            共 {skills?.length ?? 0} 个能力 (含 1 个内部工具), 覆盖创作 / 分析 / 工具 / 入口
           </Typography>
         </Box>
         <TextField
@@ -207,15 +217,19 @@ export function SkillsPage() {
               </Typography>
             </Stack>
             <Grid container spacing={2}>
-              {list.map((skill) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={skill.name}>
-                  <SkillCard
-                    skill={skill}
-                    lastRun={(history[skill.name]?.[0] as SkillExecutionHistoryEntry | undefined) ?? null}
-                    onClick={() => navigate(`/skills/${skill.name}`)}
-                  />
-                </Grid>
-              ))}
+              {list.map((skill) => {
+                const isInternal = CATEGORY_MAP[skill.name]?.isInternal === true;
+                return (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={skill.name}>
+                    <SkillCard
+                      skill={skill}
+                      lastRun={(history[skill.name]?.[0] as SkillExecutionHistoryEntry | undefined) ?? null}
+                      onClick={() => navigate(`/skills/${skill.name}`)}
+                      isInternal={isInternal}
+                    />
+                  </Grid>
+                );
+              })}
             </Grid>
           </Box>
         );
@@ -234,28 +248,8 @@ export function SkillsPage() {
         />
       )}
 
-      {/* 内部 skill 提示 (折叠在底部) */}
-      {filter === '全部' && !search && (
-        <Box sx={{ mt: 4 }}>
-          <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
-            <CardActionArea
-              onClick={() => navigate('/admin')}
-              sx={{ p: 2 }}
-              aria-label="查看内部 skill"
-            >
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="subtitle2">内部能力</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    浏览器自动化等底层 skill 仅供模型自动调用, 不对用户展示
-                  </Typography>
-                </Box>
-                <ArrowForwardIcon color="action" />
-              </Stack>
-            </CardActionArea>
-          </Card>
-        </Box>
-      )}
+      {/* V1.5.1 Sprint 1.1 修复（已知问题 #5）：原"内部能力"折叠提示卡已删除。
+          内部 skill 现在直接显示在「内部」分类下，带 "内部工具" chip。 */}
     </Container>
   );
 }

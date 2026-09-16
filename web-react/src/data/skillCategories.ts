@@ -30,6 +30,16 @@ export interface SkillMeta {
   inputSchema?: JSONSchema;
   /** 版本 */
   version: string;
+  /**
+   * V1.5.1 Sprint 1.1 修复（已知问题 #5）：内部 skill 标记
+   *
+   * - true → 该 skill 仅供模型调用（如 browser-cdp），UI 仍展示但加 "内部工具" badge
+   * - false/undefined → 正常用户可用 skill
+   *
+   * 注意：分类 ``category === '内部'`` 是分类维度；本 flag 是行为维度。
+   * 后端目前只有 ``browser-cdp`` 是内部 skill；将来若有更多内部 tool，统一在此处标记。
+   */
+  isInternal?: boolean;
 }
 
 /**
@@ -297,7 +307,8 @@ export const SKILL_CATEGORIES: SkillMeta[] = [
     label: '浏览器能力',
     defaultInput: 'URL',
     version: '1.0',
-    // 内部 skill: 不展示给用户
+    // V1.5.1 Sprint 1.1 修复（已知问题 #5）：UI 仍展示此 skill 但加 "内部工具" badge
+    isInternal: true,
   },
 ];
 
@@ -306,8 +317,26 @@ export const CATEGORY_MAP: Record<string, SkillMeta> = Object.fromEntries(
   SKILL_CATEGORIES.map((m) => [m.skill, m]),
 );
 
-/** 给用户展示的 skill (排除内部) */
-export const VISIBLE_SKILLS: SkillMeta[] = SKILL_CATEGORIES.filter((m) => m.category !== '内部');
+/**
+ * V1.5.1 Sprint 1.1 修复（已知问题 #5）：UI 现在展示全部 13 个 skill。
+ * 内部 skill (browser-cdp) 加 "内部工具" badge 提示用户。
+ *
+ * 为了向后兼容，保留 VISIBLE_SKILLS 导出，含义改为「用户可直接手动调用的 skill」
+ * (即 isInternal !== true 的 skill)；外部代码若依赖 VISIBLE_SKILLS.length === 12，
+ * 请改用 ``INTERNAL_SKILLS`` 或 ``USER_INVOCABLE_SKILLS``。
+ */
+export const USER_INVOCABLE_SKILLS: SkillMeta[] = SKILL_CATEGORIES.filter(
+  (m) => m.isInternal !== true,
+);
+
+/** V1.5.1 已弃用：旧定义（排除 category==='内部'），保留以避免破坏依赖方。
+ *  实际行为同 USER_INVOCABLE_SKILLS（browser-cdp 同时是 category==='内部' + isInternal===true）。 */
+export const VISIBLE_SKILLS: SkillMeta[] = USER_INVOCABLE_SKILLS;
+
+/** 仅内部 skill (目前只有 browser-cdp) — 用于调试 / Admin 视图 */
+export const INTERNAL_SKILLS: SkillMeta[] = SKILL_CATEGORIES.filter(
+  (m) => m.isInternal === true,
+);
 
 /** 默认展示给 Dashboard 快速启动的 4 个高频 skill */
 export const QUICK_START_SKILLS: string[] = ['story-setup', 'story-long-write', 'story-long-scan', 'story-cover'];

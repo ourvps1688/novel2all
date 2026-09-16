@@ -18,7 +18,16 @@ import { z } from 'zod';
 /** Skill 分类 (前端 UI 分组用) */
 export type SkillCategory = '创作类' | '分析类' | '工具类' | '入口类' | '内部';
 
-export const SKILL_CATEGORY_LIST: SkillCategory[] = ['创作类', '分析类', '工具类', '入口类'];
+/** V1.5.1 Sprint 1.1 修复（已知问题 #5）：UI 现在展示全部 13 个 skill，
+ *  内部 skill 加 "内部工具" badge 提示用户。
+ *  SKILL_CATEGORY_LIST 包含全部 5 个分类（含 '内部'），让用户能按内部分类筛选/查看。 */
+export const SKILL_CATEGORY_LIST: SkillCategory[] = [
+  '创作类',
+  '分析类',
+  '工具类',
+  '入口类',
+  '内部',
+];
 
 // ============ JSON Schema (子集) ============
 
@@ -135,6 +144,35 @@ export interface SkillOutput {
 
 // ============ API 请求 / 响应 Zod Schema ============
 
+/**
+ * Skill 任务状态枚举 (后端实际返回的所有 status 值)
+ *
+ * V1.5.1 Sprint 1.1 修复（已知问题 #4）：后端 /api/skills/{name}/execute
+ * 立即返回 ``status: "started"``（参见 app.py:1029），旧版本 enum 只含
+ * ['queued','running','done','failed','cancelled']，导致前端 zod parse
+ * 失败 + SSE 链路整个断掉。补全为后端真实可能返回的 7 个状态：
+ *
+ *   - ``started``   POST /execute 立即返回（任务已入队，尚未跑）
+ *   - ``queued``    异步队列等待（若后端未来加 LLM 限流会用到）
+ *   - ``running``   正在执行
+ *   - ``done``      成功完成
+ *   - ``failed``    失败
+ *   - ``cancelled`` 用户取消
+ *   - ``timeout``   超时（防御性，未来可加）
+ *
+ * 任何后端新增状态都应同步加入此 enum，避免 zod parse 失败。
+ */
+export const SkillStatusEnum = z.enum([
+  'started',
+  'queued',
+  'running',
+  'done',
+  'failed',
+  'cancelled',
+  'timeout',
+]);
+export type SkillStatus = z.infer<typeof SkillStatusEnum>;
+
 /** 执行请求 (POST /api/skills/{name}/execute) */
 export const SkillExecuteRequestSchema = z.object({
   /** Skill 调用参数 (skill inputSchema 校验) */
@@ -146,18 +184,29 @@ export const SkillExecuteRequestSchema = z.object({
 });
 export type SkillExecuteRequest = z.infer<typeof SkillExecuteRequestSchema>;
 
-/** 执行响应 (POST /api/skills/{name}/execute 返回) */
+/**
+ * 执行响应 (POST /api/skills/{name}/execute 返回)
+ *
+ * V1.5.1 Sprint 1.1 修复（已知问题 #4）：status enum 已扩展为 SkillStatusEnum
+ * （含 ``started``）。后端立即返回 ``{"status": "started", ...}``。
+ */
 export const SkillExecuteResponseSchema = z.object({
   task_id: z.string(),
-  status: z.enum(['queued', 'running', 'done', 'failed', 'cancelled']),
+  status: SkillStatusEnum,
   started_at: z.number().optional(),
 });
 export type SkillExecuteResponse = z.infer<typeof SkillExecuteResponseSchema>;
 
-/** 状态查询响应 (GET /api/skills/{name}/status?task_id=...) */
+/**
+ * 状态查询响应 (GET /api/skills/{name}/status?task_id=...)
+ *
+ * V1.5.1 Sprint 1.1 修复（已知问题 #4）：status enum 已扩展为 SkillStatusEnum。
+ * SSE 流首批事件可能为 ``started``，之后是 ``running`` → ``done`` / ``failed`` /
+ * ``cancelled``。
+ */
 export const SkillStatusResponseSchema = z.object({
   task_id: z.string(),
-  status: z.enum(['queued', 'running', 'done', 'failed', 'cancelled']),
+  status: SkillStatusEnum,
   phase: z
     .enum(['init', 'pre_write_check', 'writing', 'save', 'extract', 'merge', 'post_write_check', 'done'])
     .optional(),

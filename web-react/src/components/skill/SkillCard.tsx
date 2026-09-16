@@ -6,6 +6,10 @@
  *   - 中部描述 (2 行截断)
  *   - 底部分类 chip + 最近运行状态 (如有)
  *   - 整体可点击 → 跳 /skills/:name
+ *
+ * V1.5.1 Sprint 1.1 修复（已知问题 #5）：
+ *   - 新增 ``isInternal`` prop：内部 skill 卡片额外加 "内部工具" chip 提示
+ *   - 仍允许点击查看详情（SkillDetailPage 会展示说明 + 禁止手动执行）
  */
 
 import { useMemo } from 'react';
@@ -42,6 +46,15 @@ export interface SkillCardProps {
   skill: SkillInfo;
   lastRun?: SkillExecutionHistoryEntry | null;
   onClick: () => void;
+  /**
+   * V1.5.1 Sprint 1.1 修复（已知问题 #5）：标记内部 skill
+   *
+   * - true → 卡片额外显示 "内部工具" chip
+   * - false/undefined → 不显示
+   *
+   * 调用方（SkillsPage）从 ``CATEGORY_MAP[skill.name]?.isInternal`` 取值。
+   */
+  isInternal?: boolean;
 }
 
 /** MUI icon 名称 → 组件 (有限白名单, 防止 XSS) */
@@ -76,7 +89,7 @@ const STATUS_LABEL: Record<string, string> = {
   running: '运行中',
 };
 
-export function SkillCard({ skill, lastRun, onClick }: SkillCardProps) {
+export function SkillCard({ skill, lastRun, onClick, isInternal = false }: SkillCardProps) {
   const IconComponent = useMemo<ComponentType>(() => ICON_MAP[skill.icon] ?? ExtensionIcon, [skill.icon]);
 
   return (
@@ -121,6 +134,16 @@ export function SkillCard({ skill, lastRun, onClick }: SkillCardProps) {
                 v{skill.version}
               </Typography>
             </Box>
+            {isInternal && (
+              <Chip
+                size="small"
+                label="内部工具"
+                color="warning"
+                variant="outlined"
+                data-testid={`skill-internal-badge-${skill.name}`}
+                sx={{ flexShrink: 0 }}
+              />
+            )}
           </Stack>
 
           {/* Description */}
