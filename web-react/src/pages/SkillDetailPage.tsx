@@ -1,5 +1,5 @@
 /**
- * SkillDetailPage: 单个 Skill 的执行页 (S1 核心)
+ * SkillDetailPage: 单个 Skill 的执行页 (Sprint 1 核心 + Sprint 5 扩展)
  *
  * 布局 (playbook §2.2.4):
  *   ┌─────────────────────────────────────────────────┐
@@ -17,10 +17,9 @@
  *   │  └──────────────────────────────────────────┘  │
  *   └─────────────────────────────────────────────────┘
  *
- * 数据：
- *   - useSkill(name) 取 SkillInfo
- *   - SkillRunner 执行
- *   - SkillHistory 本地历史 (zustand)
+ * Sprint 5 扩展: scan + analyze skill 专用布局（Recharts 可视化）
+ *   - story-long-scan / story-short-scan → ScanReportView
+ *   - story-long-analyze / story-short-analyze → AnalyzeReportView
  */
 
 import { useMemo } from 'react';
@@ -41,7 +40,19 @@ import { SkillRunner } from '../components/skill/SkillRunner';
 import { SkillHistory } from '../components/skill/SkillHistory';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
+import { ScanReportView, AnalyzeReportView } from '../components/skill/SkillReportView';
 import type { SkillInfo } from '../types/skills';
+
+/** 4 个 Sprint 5 专用 skill 名（带 -scan 或 -analyze 后缀） */
+const SCAN_SKILLS = new Set(['story-long-scan', 'story-short-scan']);
+const ANALYZE_SKILLS = new Set(['story-long-analyze', 'story-short-analyze']);
+
+function isScanSkill(skillName: string): boolean {
+  return SCAN_SKILLS.has(skillName);
+}
+function isAnalyzeSkill(skillName: string): boolean {
+  return ANALYZE_SKILLS.has(skillName);
+}
 
 export function SkillDetailPage() {
   const { name = '' } = useParams<{ name: string }>();
@@ -109,6 +120,59 @@ export function SkillDetailPage() {
     );
   }
 
+  // Sprint 5: scan skill 专用布局
+  if (isScanSkill(skill.name)) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Button component={Link} to="/skills" startIcon={<ArrowBackIcon />} sx={{ mb: 2 }}>
+          返回 Skills
+        </Button>
+        <Box sx={{ mb: 3 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+            <Typography variant="h4">{skill.name}</Typography>
+            <Chip size="small" label={`v${skill.version}`} variant="outlined" />
+            <Chip size="small" label={skill.category} color="primary" variant="outlined" />
+            <Chip size="small" label="扫榜" color="secondary" />
+          </Stack>
+          <Typography variant="body1" color="text.secondary">
+            {skill.description}
+          </Typography>
+        </Box>
+        <ScanReportView skill={skill} />
+        <Box sx={{ mt: 3 }}>
+          <SkillHistory skillName={skill.name} />
+        </Box>
+      </Container>
+    );
+  }
+
+  // Sprint 5: analyze skill 专用布局
+  if (isAnalyzeSkill(skill.name)) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 3 }}>
+        <Button component={Link} to="/skills" startIcon={<ArrowBackIcon />} sx={{ mb: 2 }}>
+          返回 Skills
+        </Button>
+        <Box sx={{ mb: 3 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+            <Typography variant="h4">{skill.name}</Typography>
+            <Chip size="small" label={`v${skill.version}`} variant="outlined" />
+            <Chip size="small" label={skill.category} color="primary" variant="outlined" />
+            <Chip size="small" label="拆文" color="secondary" />
+          </Stack>
+          <Typography variant="body1" color="text.secondary">
+            {skill.description}
+          </Typography>
+        </Box>
+        <AnalyzeReportView skill={skill} />
+        <Box sx={{ mt: 3 }}>
+          <SkillHistory skillName={skill.name} />
+        </Box>
+      </Container>
+    );
+  }
+
+  // 默认：通用 SkillRunner (Sprint 1)
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* 返回 */}
@@ -141,7 +205,7 @@ export function SkillDetailPage() {
       </Box>
 
       {/* 历史 */}
-      <SkillHistory skillName={skill.name} defaultCollapsed={false} limit={5} />
+      <SkillHistory skillName={skill.name} />
     </Container>
   );
 }
