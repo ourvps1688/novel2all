@@ -16,8 +16,6 @@ import type {
 } from "@ai-novel/shared/types/novelDirector";
 import type { NovelWorkflowCheckpoint } from "@ai-novel/shared/types/novelWorkflow";
 
-const WEB_SOURCES = new Set(["web", "follow_up_action", "batch_action", "takeover", "continue", "retry"]);
-const CHANNEL_SOURCES = new Set(["dingtalk", "wecom", "channel_callback"]);
 const AUTO_DIRECTOR_FOLLOW_UP_SECTION_RANK: Record<AutoDirectorFollowUpSection, number> = {
   needs_validation: 0,
   exception: 1,
@@ -401,12 +399,6 @@ export function validateAutoDirectorAction(input: AutoDirectorActionValidationIn
   if (input.task.pendingManualRecovery && input.actionCode !== "continue_generic") {
     blockingReasons.push("任务处于人工恢复状态，请先恢复任务再继续其他操作。");
   }
-  if (CHANNEL_SOURCES.has(input.source) && input.actionCode !== "continue_auto_execution" && input.actionCode !== "retry_with_task_model") {
-    blockingReasons.push("消息端只支持低风险动作，请回到站内确认后继续。");
-  }
-  if (CHANNEL_SOURCES.has(input.source) && input.actionCode === "retry_with_route_model") {
-    blockingReasons.push("按路由模型重试需要站内确认，请打开跟进中心处理。");
-  }
   if (input.actionCode === "continue_auto_execution" && input.task.status !== "waiting_approval") {
     blockingReasons.push("当前任务不在等待继续状态，请先重新校验任务状态。");
   }
@@ -443,9 +435,7 @@ export function validateAutoDirectorAction(input: AutoDirectorActionValidationIn
             }),
           ]
         : [],
-    nextAction: blockingReasons.length > 0
-      ? (WEB_SOURCES.has(input.source) ? "revalidate" : "open_follow_up_center")
-      : input.actionCode,
+    nextAction: blockingReasons.length > 0 ? "revalidate" : input.actionCode,
   });
 }
 

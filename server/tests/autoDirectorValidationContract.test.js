@@ -457,33 +457,6 @@ test("validateAutoDirectorTakeoverRequest accepts full-book scope from any entry
   });
 });
 
-test("validateAutoDirectorAction blocks channel callbacks for high-risk rewrite actions", () => {
-  const result = validateAutoDirectorAction({
-    source: "wecom",
-    actionCode: "retry_with_route_model",
-    task: {
-      id: "task-1",
-      lane: "auto_director",
-      status: "failed",
-      checkpointType: "chapter_batch_ready",
-      pendingManualRecovery: false,
-      novelId: "novel-1",
-      seedPayload: {
-        autoExecution: {
-          enabled: true,
-          scopeLabel: "第 11-20 章",
-          startOrder: 11,
-          endOrder: 20,
-        },
-      },
-    },
-  });
-
-  assert.equal(result.allowed, false);
-  assert.match(result.blockingReasons.join("\n"), /站内|确认/);
-  assert.equal(result.nextAction, "open_follow_up_center");
-});
-
 test("validateAutoDirectorAction marks safe follow-up continue with required checkpoint cleanup", () => {
   const result = validateAutoDirectorAction({
     source: "web",

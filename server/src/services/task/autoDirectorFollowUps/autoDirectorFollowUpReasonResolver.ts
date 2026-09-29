@@ -38,7 +38,7 @@ function mutationAction(input: {
 }
 
 function navigationAction(input: {
-  code: Extract<AutoDirectorActionCode, "go_replan" | "go_candidate_selection" | "open_detail" | "open_follow_up_center">;
+  code: Extract<AutoDirectorActionCode, "go_replan" | "go_candidate_selection" | "open_detail">;
   label: string;
   riskLevel?: AutoDirectorAction["riskLevel"];
   requiresConfirm?: boolean;
