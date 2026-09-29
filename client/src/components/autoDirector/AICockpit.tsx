@@ -239,15 +239,15 @@ function workerStateLabel(
   state: NonNullable<DirectorBookAutomationProjection["workerHealth"]>["derivedState"],
 ): string {
   const labels: Record<NonNullable<DirectorBookAutomationProjection["workerHealth"]>["derivedState"], string> = {
-    idle: "未运行",
-    queued_waiting_worker: "等待接手",
-    leased_starting: "正在接手",
-    running_step: "自动推进中",
-    waiting_gate: "等待确认",
-    auto_recovering: "恢复中",
-    cancelled: "已停止",
-    failed_recoverable: "等待恢复",
-    failed_hard: "需要处理",
+    idle: "还没开始自动写作",
+    queued_waiting_worker: "马上接着写",
+    leased_starting: "正在开始写",
+    running_step: "正在自动写作",
+    waiting_gate: "等你确认后继续",
+    auto_recovering: "正在接着上次没写完的写",
+    cancelled: "已停止自动写作",
+    failed_recoverable: "遇到问题，会自己重试",
+    failed_hard: "需要你处理一下",
     succeeded: "已完成",
   };
   return labels[state] ?? state;
@@ -258,15 +258,15 @@ function workerStateDetail(health: NonNullable<DirectorBookAutomationProjection[
     return health.message.trim();
   }
   if (health.queuedCommandCount > 0) {
-    return "任务已排队，后台执行接手后会继续推进。";
+    return "前面还有几步，轮到这本书会继续写。";
   }
   if (health.runningCommandCount > 0 || health.leasedCommandCount > 0) {
-    return "后台执行正在处理当前任务。";
+    return "正在写当前内容，写完会自动往下推进。";
   }
   if (health.staleCommandCount > 0) {
-    return "后台执行中断后会从最近进度尝试恢复。";
+    return "中途断掉的内容会从上次写到的地方接着写。";
   }
-  return "当前没有正在排队或执行的后台动作。";
+  return "当前没有正在自动写作的内容。";
 }
 
 function SummaryMetric(props: {
@@ -330,7 +330,7 @@ export default function AICockpit(props: AICockpitProps) {
           <div className="flex min-w-0 items-start gap-2">
             <span className="mt-0.5 shrink-0 text-muted-foreground">{stateIcon("idle")}</span>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-foreground">AI 驾驶舱</div>
+              <div className="text-sm font-semibold text-foreground">AI 推进状态</div>
               <div className="mt-1 text-xs leading-5 text-muted-foreground">{fallbackProjectionReason(props)}</div>
             </div>
           </div>
@@ -414,7 +414,7 @@ export default function AICockpit(props: AICockpitProps) {
           <div className="flex min-w-0 items-start gap-2">
             <span className="mt-0.5 shrink-0 text-foreground">{stateIcon(focusProjection.displayState)}</span>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-foreground">AI 驾驶舱</div>
+              <div className="text-sm font-semibold text-foreground">AI 推进状态</div>
               <div className="mt-1 line-clamp-1 text-xs leading-5 text-muted-foreground">
                 {focusProjection.userHeadline || focusProjection.headline || reason}
               </div>
@@ -499,20 +499,18 @@ export default function AICockpit(props: AICockpitProps) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Database className="h-4 w-4 text-muted-foreground" />
-              后台执行
+              自动写作状态
             </div>
             <span className="text-xs text-muted-foreground">{workerStateLabel(workerHealth.derivedState)}</span>
           </div>
           <div className="mt-1 text-xs leading-5 text-muted-foreground">{workerStateDetail(workerHealth)}</div>
-          <div className="mt-3 grid grid-cols-4 gap-3">
-            <SummaryMetric label="排队" value={workerHealth.queuedCommandCount} />
-            <SummaryMetric label="接手" value={workerHealth.leasedCommandCount} />
-            <SummaryMetric label="执行" value={workerHealth.runningCommandCount} />
-            <SummaryMetric label="恢复" value={workerHealth.staleCommandCount} />
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <SummaryMetric label="待写内容" value={workerHealth.queuedCommandCount} />
+            <SummaryMetric label="正在写" value={workerHealth.runningCommandCount + workerHealth.leasedCommandCount} />
           </div>
           {workerHealth.oldestQueuedWaitMs ? (
             <div className="mt-2 text-[11px] text-muted-foreground">
-              等待接手 {formatDuration(workerHealth.oldestQueuedWaitMs) ?? "<1 秒"}
+              已等待 {formatDuration(workerHealth.oldestQueuedWaitMs) ?? "<1 秒"}
             </div>
           ) : null}
         </section>

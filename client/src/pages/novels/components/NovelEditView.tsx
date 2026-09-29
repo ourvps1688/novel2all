@@ -285,8 +285,6 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
               </DialogContent>
             </Dialog>
 
-            <DirectorFactDebugDialog novelId={id} taskId={taskDrawer?.task?.id ?? null} />
-
             <Dialog open={isProjectToolsOpen} onOpenChange={setIsProjectToolsOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">项目工具</Button>
@@ -295,7 +293,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
                 <DialogHeader>
                   <DialogTitle>项目工具</DialogTitle>
                   <DialogDescription>
-                    这里收纳次级信息。首屏只保留当前步骤和恢复接管入口，避免主工作区被项目辅助信息挤满。
+                    这里可以查看这本书写到哪一步、有哪些章节待修复、当前用的是哪个模型。
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -362,6 +360,14 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
                     </CardContent>
                   </Card>
                 ) : null}
+
+                <div className="space-y-2 border-t border-border/70 pt-4">
+                  <p className="text-sm font-medium">调试检查</p>
+                  <p className="text-xs text-muted-foreground">
+                    这本书推进卡住时，可以在这里查看每一步是否已经有产出。
+                  </p>
+                  <DirectorFactDebugDialog novelId={id} taskId={taskDrawer?.task?.id ?? null} />
+                </div>
               </DialogContent>
             </Dialog>
 

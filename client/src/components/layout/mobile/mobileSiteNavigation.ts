@@ -21,7 +21,6 @@ export interface MobileRoutePattern {
 
 export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "home", pattern: /^\/$/, title: "首页", group: "home" },
-  { key: "help", pattern: /^\/help\/?$/, title: "创作向导", group: "more" },
   { key: "novels", pattern: /^\/novels\/?$/, title: "小说", group: "novels" },
   { key: "novel-create", pattern: /^\/novels\/create\/?$/, title: "创建小说", group: "novels" },
   { key: "novel-preview", pattern: /^\/novels\/[^/]+\/preview\/?$/, title: "小说预览", group: "novels" },
@@ -31,7 +30,7 @@ export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "chat-legacy", pattern: /^\/chat-legacy\/?$/, title: "旧版聊天", group: "creation" },
   { key: "book-analysis", pattern: /^\/book-analysis\/?$/, title: "拆书", group: "creation" },
   { key: "market-radar", pattern: /^\/market-radar\/?$/, title: "热门题材雷达", group: "creation" },
-  { key: "tasks", pattern: /^\/tasks\/?$/, title: "任务", group: "tasks" },
+  { key: "tasks", pattern: /^\/tasks\/?$/, title: "运行记录", group: "tasks" },
   { key: "knowledge", pattern: /^\/knowledge\/?$/, title: "知识库", group: "more" },
   { key: "genres", pattern: /^\/genres\/?$/, title: "题材基底", group: "more" },
   { key: "story-modes", pattern: /^\/story-modes\/?$/, title: "推进模式", group: "more" },
@@ -40,10 +39,9 @@ export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "model-routes", pattern: /^\/settings\/model-routes\/?$/, title: "模型路由管理", group: "more" },
   { key: "settings-director", pattern: /^\/settings\/director\/?$/, title: "自动导演设置", group: "more" },
   { key: "settings-knowledge", pattern: /^\/settings\/knowledge\/?$/, title: "知识库与写法", group: "more" },
-  { key: "settings-maintenance", pattern: /^\/settings\/maintenance\/?$/, title: "桌面与维护", group: "more" },
+  { key: "settings-maintenance", pattern: /^\/settings\/maintenance\/?$/, title: "数据与备份", group: "more" },
   { key: "settings", pattern: /^\/settings\/?$/, title: "系统设置", group: "more" },
   { key: "worlds", pattern: /^\/worlds\/?$/, title: "世界样本库", group: "more" },
-  { key: "world-generator", pattern: /^\/worlds\/generator\/?$/, title: "创建世界样本", group: "more" },
   { key: "world-workspace", pattern: /^\/worlds\/[^/]+\/workspace\/?$/, title: "世界手册", group: "more" },
   { key: "style-engine", pattern: /^\/style-engine\/?$/, title: "写法引擎", group: "more" },
   { key: "anti-ai-rules", pattern: /^\/anti-ai-rules\/?$/, title: "反 AI 规则", group: "more" },
@@ -54,7 +52,7 @@ const primaryNavItems: MobileNavItem[] = [
   { key: "home", label: "首页", to: "/", group: "home" },
   { key: "novels", label: "小说", to: "/novels", group: "novels" },
   { key: "creation", label: "创作", to: "/creative-hub", group: "creation" },
-  { key: "tasks", label: "任务", to: "/tasks", group: "more" },
+  { key: "tasks", label: "运行记录", to: "/tasks", group: "more" },
   { key: "more", label: "更多", to: "", group: "more" },
 ];
 
@@ -62,7 +60,6 @@ const moreNavGroups: MobileNavGroup[] = [
   {
     title: "创作辅助",
     items: [
-      { key: "help", label: "创作向导", to: "/help", group: "more" },
       { key: "book-analysis", label: "拆书", to: "/book-analysis", group: "creation" },
       { key: "market-radar", label: "热门题材雷达", to: "/market-radar", group: "creation" },
       { key: "chat-legacy", label: "旧版聊天", to: "/chat-legacy", group: "creation" },
@@ -83,9 +80,7 @@ const moreNavGroups: MobileNavGroup[] = [
   {
     title: "世界与系统",
     items: [
-      { key: "tasks", label: "运行记录", to: "/tasks", group: "more" },
       { key: "worlds", label: "世界样本库", to: "/worlds", group: "more" },
-      { key: "world-generator", label: "创建世界样本", to: "/worlds/generator", group: "more" },
       { key: "settings", label: "系统设置", to: "/settings", group: "more" },
     ],
   },

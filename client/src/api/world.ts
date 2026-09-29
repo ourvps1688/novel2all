@@ -115,18 +115,6 @@ export async function getWorldDetail(id: string) {
   return data;
 }
 
-export async function createWorld(
-  payload: Partial<World> & {
-    name: string;
-    knowledgeDocumentIds?: string[];
-    structure?: WorldStructuredData;
-    bindingSupport?: WorldBindingSupport;
-  },
-) {
-  const { data } = await apiClient.post<ApiResponse<World>>("/worlds", payload);
-  return data;
-}
-
 export async function updateWorld(
   id: string,
   payload: Partial<World> & { structure?: WorldStructuredData; bindingSupport?: WorldBindingSupport },

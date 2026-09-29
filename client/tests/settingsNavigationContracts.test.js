@@ -20,7 +20,7 @@ test("系统导航只保留设置入口，设置页提供稳定二级导航", as
     read("src/pages/settings/components/SettingsShell.tsx"),
   ]);
   assert.doesNotMatch(sidebar, /label: "模型路由"/);
-  for (const label of ["设置总览", "模型与厂商", "自动导演", "知识库与写法", "桌面与维护"]) {
+  for (const label of ["设置总览", "模型与厂商", "自动导演", "知识库与写法", "数据与备份"]) {
     assert.match(shell, new RegExp(label));
   }
 });

@@ -331,10 +331,10 @@ export default function NovelExistingProjectTakeoverDialog({
       setOpen(false);
       toast.success(
         effectiveRunMode === "full_book_autopilot"
-          ? "自动导演接管任务已提交，可在 AI 驾驶舱查看全书执行进度。"
+          ? "自动导演接管任务已提交，可在 AI 推进状态查看全书执行进度。"
           : effectiveRunMode === "auto_to_execution"
-          ? `自动导演接管任务已提交，可在 AI 驾驶舱查看 ${buildDirectorAutoExecutionPlanLabel(autoExecutionPlan)} 的执行进度。`
-          : "自动导演接管任务已提交，可在 AI 驾驶舱查看排队和执行进度。",
+          ? `自动导演接管任务已提交，可在 AI 推进状态查看 ${buildDirectorAutoExecutionPlanLabel(autoExecutionPlan)} 的执行进度。`
+          : "自动导演接管任务已提交，可在 AI 推进状态查看排队和执行进度。",
       );
       navigate(buildEditRoute({
         novelId,

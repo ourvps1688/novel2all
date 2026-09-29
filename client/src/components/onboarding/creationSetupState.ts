@@ -3,7 +3,6 @@ const GATED_ROUTE_PREFIXES = [
   "/creative-hub",
   "/book-analysis",
   "/style-engine",
-  "/worlds/generator",
 ];
 
 interface AutomaticSetupPromptInput {

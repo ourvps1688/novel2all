@@ -5,7 +5,6 @@ import AppLayout from "@/components/layout/AppLayout";
 import { featureFlags } from "@/config/featureFlags";
 
 const Home = lazy(() => import("@/pages/Home"));
-const HelpPage = lazy(() => import("@/pages/help/HelpPage"));
 const NovelList = lazy(() => import("@/pages/novels/NovelList"));
 const NovelCreate = lazy(() => import("@/pages/novels/NovelCreate"));
 const CreationStudioPage = lazy(() => import("@/pages/creationStudio/CreationStudioPage"));
@@ -33,7 +32,6 @@ const KnowledgeSettingsPage = lazy(() => import("@/pages/settings/views/Knowledg
 const MaintenanceSettingsPage = lazy(() => import("@/pages/settings/views/MaintenanceSettingsPage"));
 const AppearanceSettingsPage = lazy(() => import("@/pages/settings/views/AppearanceSettingsPage"));
 const WorldList = lazy(() => import("@/pages/worlds/WorldList"));
-const WorldGenerator = lazy(() => import("@/pages/worlds/WorldGenerator"));
 const WorldWorkspace = lazy(() => import("@/pages/worlds/WorldWorkspace"));
 const WritingFormulaPage = lazy(() => import("@/pages/writingFormula/WritingFormulaPage"));
 const CharacterLibrary = lazy(() => import("@/pages/characters/CharacterLibrary"));
@@ -44,7 +42,6 @@ const routes: RouteObject[] = [
     element: <AppLayout />,
     children: [
       { index: true, element: <Home /> },
-      { path: "help", element: <HelpPage /> },
       { path: "novels", element: <NovelList /> },
       { path: "create", element: <CreationStudioPage /> },
       { path: "novels/create", element: <NovelCreate /> },
@@ -74,12 +71,8 @@ const routes: RouteObject[] = [
       { path: "settings", element: <SettingsOverviewPage /> },
       { path: "worlds", element: <WorldList /> },
       {
-        path: "worlds/generator",
-        element: featureFlags.worldWizardEnabled ? <WorldGenerator /> : <Navigate to="/worlds" replace />,
-      },
-      {
         path: "worlds/:id/workspace",
-        element: featureFlags.worldWizardEnabled ? <WorldWorkspace /> : <Navigate to="/worlds" replace />,
+        element: featureFlags.worldWorkspaceEnabled ? <WorldWorkspace /> : <Navigate to="/worlds" replace />,
       },
       { path: "style-engine", element: <WritingFormulaPage /> },
       { path: "writing-formula", element: <Navigate to="/style-engine" replace /> },

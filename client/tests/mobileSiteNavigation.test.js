@@ -11,7 +11,6 @@ import {
 
 const routedPaths = [
   "/",
-  "/help",
   "/novels",
   "/novels/create",
   "/novels/demo/preview",
@@ -20,18 +19,19 @@ const routedPaths = [
   "/creative-hub",
   "/chat-legacy",
   "/book-analysis",
+  "/market-radar",
   "/tasks",
   "/knowledge",
   "/genres",
   "/story-modes",
   "/titles",
+  "/settings/model-routes",
   "/settings/models",
   "/settings/director",
   "/settings/knowledge",
   "/settings/maintenance",
   "/settings",
   "/worlds",
-  "/worlds/generator",
   "/worlds/world-1/workspace",
   "/style-engine",
   "/anti-ai-rules",
@@ -55,7 +55,7 @@ test("mobile primary nav keeps core beginner actions visible", () => {
       ["home", "/", "首页"],
       ["novels", "/novels", "小说"],
       ["creation", "/creative-hub", "创作"],
-      ["tasks", "/tasks", "任务"],
+      ["tasks", "/tasks", "运行记录"],
       ["more", "", "更多"],
     ],
   );
@@ -67,8 +67,8 @@ test("mobile more menu contains all non-primary registered pages", () => {
   assert.deepEqual(
     morePaths,
     [
-      "/help",
       "/book-analysis",
+      "/market-radar",
       "/chat-legacy",
       "/knowledge",
       "/genres",
@@ -78,7 +78,6 @@ test("mobile more menu contains all non-primary registered pages", () => {
       "/anti-ai-rules",
       "/base-characters",
       "/worlds",
-      "/worlds/generator",
       "/settings",
     ],
   );

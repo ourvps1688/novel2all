@@ -239,10 +239,7 @@ export default function QuickSetupDialog(props: QuickSetupDialogProps) {
           ? (
               showFirstNovelHandoff
                 ? (
-                    <>
-                      <Button variant="outline" asChild><Link to="/help">查看创作向导</Link></Button>
-                      <Button asChild><Link to="/novels/auto-director">用一句话开始第一本小说 <ArrowRight className="h-4 w-4" /></Link></Button>
-                    </>
+                    <Button asChild><Link to="/novels/auto-director">用一句话开始第一本小说 <ArrowRight className="h-4 w-4" /></Link></Button>
                   )
                 : (
                     <>

@@ -161,26 +161,20 @@ export function NovelProjectCard(props: {
                 type="button"
                 size="sm"
                 variant="secondary"
-                className="h-8 w-8 px-0 opacity-70 transition group-hover:opacity-100 focus-visible:opacity-100"
+                className="h-8 gap-1 px-2 opacity-70 transition group-hover:opacity-100 focus-visible:opacity-100"
                 onClick={(event) => {
                   stopCardClick(event);
                   props.onOpenCockpit(props.novel.id);
                 }}
-                title="打开 AI 驾驶舱"
-                aria-label="打开 AI 驾驶舱"
+                title="AI 推进状态"
+                aria-label="AI 推进状态"
               >
                 <Gauge className="h-4 w-4" aria-hidden="true" />
+                <span className="text-xs">AI 推进状态</span>
               </Button>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 opacity-70 transition group-hover:opacity-100 focus-within:opacity-100">
-            {task && props.novel.narrativeForm !== "short_story" ? (
-              <Button asChild size="sm" variant="ghost" className="h-8 w-8 px-0" title="查看执行详情" aria-label="查看执行详情">
-                <Link to={`/novels/${props.novel.id}/edit?directorTaskId=${task.id}&taskPanel=1`} onClick={stopCardClick}>
-                  <Gauge className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              </Button>
-            ) : null}
+          <div className="flex flex-wrap items-center gap-1 opacity-70 transition group-hover:opacity-100 focus-within:opacity-100">
             {props.novel.narrativeForm !== "short_story" ? (
               <Button asChild size="sm" variant="ghost" className="h-8 w-8 px-0" title="阅读预览" aria-label="阅读预览">
                 <Link to={`/novels/${props.novel.id}/preview`} onClick={stopCardClick}>

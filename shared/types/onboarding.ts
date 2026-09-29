@@ -75,7 +75,7 @@ export interface FirstNovelOnboardingProjection {
   reason: string;
   primaryAction: {
     label: string;
-    route: string;
+    route?: string;
     kind: "navigate" | "open_quick_setup" | "resume";
   };
   novel: {

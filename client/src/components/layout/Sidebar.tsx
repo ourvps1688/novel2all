@@ -4,7 +4,6 @@ import {
   BookOpenText,
   ChevronLeft,
   ChevronRight,
-  CircleHelp,
   Database,
   Globe2,
   House,
@@ -49,7 +48,6 @@ const navGroups: NavGroup[] = [
     title: "创作",
     items: [
       { to: "/", label: "首页", icon: House },
-      { to: "/help", label: "创作向导", icon: CircleHelp },
       { to: "/market-radar", label: "热门题材雷达", icon: Radar },
       { to: "/novels", label: "小说列表", icon: BookOpenText },
       { to: "/creative-hub", label: "创作中枢", icon: LayoutDashboard },

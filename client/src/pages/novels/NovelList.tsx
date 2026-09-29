@@ -404,7 +404,7 @@ export default function NovelList() {
       >
         <AppDialogContent
           className="max-w-2xl"
-          title="AI 驾驶舱"
+          title="AI 推进状态"
           description={
             selectedCockpitNovel?.title
               ? `查看《${selectedCockpitNovel.title}》的 AI 推进状态和下一步动作。`
