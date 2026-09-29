@@ -162,82 +162,6 @@
   color: hsl(var(--warning));
 }
 
-/* Prompt Workbench predates the shared theme tokens and carries a dense set of
-   light-only surface colors. Keep its existing information hierarchy while
-   mapping those legacy colors to the active theme in dark mode. */
-.dark .prompt-workbench-theme [class*="border-[#"] {
-  border-color: hsl(var(--border));
-}
-
-.dark .prompt-workbench-theme [class*="bg-white"],
-.dark .prompt-workbench-theme [class*="bg-[#f2"],
-.dark .prompt-workbench-theme [class*="bg-[#f3"],
-.dark .prompt-workbench-theme [class*="bg-[#f5"],
-.dark .prompt-workbench-theme [class*="bg-[#f6"],
-.dark .prompt-workbench-theme [class*="bg-[#f7"],
-.dark .prompt-workbench-theme [class*="bg-[#f8"],
-.dark .prompt-workbench-theme [class*="bg-[#fb"] {
-  background-color: hsl(var(--card));
-}
-
-.dark .prompt-workbench-theme [class*="bg-[#e7"],
-.dark .prompt-workbench-theme [class*="bg-[#e8"],
-.dark .prompt-workbench-theme [class*="bg-[#ea"],
-.dark .prompt-workbench-theme [class*="bg-[#ee"] {
-  background-color: hsl(var(--success) / 0.14);
-}
-
-.dark .prompt-workbench-theme [class*="bg-[#ed"] {
-  background-color: hsl(var(--muted));
-}
-
-.dark .prompt-workbench-theme [class*="bg-[#f4f7ff"],
-.dark .prompt-workbench-theme [class*="bg-[#eef3"],
-.dark .prompt-workbench-theme [class*="bg-[#eef4"] {
-  background-color: hsl(var(--info) / 0.14);
-}
-
-.dark .prompt-workbench-theme [class*="bg-[#fff"] {
-  background-color: hsl(var(--warning) / 0.14);
-}
-
-.dark .prompt-workbench-theme [class*="bg-[#0f"],
-.dark .prompt-workbench-theme [class*="bg-[#62"] {
-  background-color: hsl(var(--success));
-}
-
-.dark .prompt-workbench-theme [class*="bg-[#173"] {
-  background-color: hsl(var(--info));
-}
-
-.dark .prompt-workbench-theme [class*="text-[#254"],
-.dark .prompt-workbench-theme [class*="text-[#1f"] {
-  color: hsl(var(--foreground));
-}
-
-.dark .prompt-workbench-theme [class*="text-[#526"],
-.dark .prompt-workbench-theme [class*="text-[#647"],
-.dark .prompt-workbench-theme [class*="text-[#6f"],
-.dark .prompt-workbench-theme [class*="text-[#5f"] {
-  color: hsl(var(--muted-foreground));
-}
-
-.dark .prompt-workbench-theme [class*="text-[#0f"],
-.dark .prompt-workbench-theme [class*="text-[#315"] {
-  color: hsl(var(--success));
-}
-
-.dark .prompt-workbench-theme [class*="text-[#344"],
-.dark .prompt-workbench-theme [class*="text-[#385"],
-.dark .prompt-workbench-theme [class*="text-[#3b"] {
-  color: hsl(var(--info));
-}
-
-.dark .prompt-workbench-theme [class*="text-[#7a"],
-.dark .prompt-workbench-theme [class*="text-[#775"] {
-  color: hsl(var(--warning));
-}
-
 .dark[data-theme="night"] {
   --background: 222 47% 8%;
   --foreground: 210 40% 96%;
@@ -259,20 +183,6 @@
   --success: 155 70% 48%;
   --warning: 42 92% 58%;
   --info: 190 80% 58%;
-}
-
-/* Dense editing tools need a neutral canvas even when the surrounding app
-   uses the warmer Paper palette. The page keeps Paper's text and status colors. */
-:root.dark[data-theme="paper"] .prompt-workbench-theme {
-  --background: 222.2 47.4% 11.2%;
-  --card: 222.2 47.4% 13.5%;
-  --popover: 222.2 47.4% 13.5%;
-  --secondary: 217.2 32.6% 20%;
-  --muted: 217.2 32.6% 20%;
-  --accent: 217.2 32.6% 23%;
-  --border: 217.2 32.6% 26%;
-  --input: 217.2 32.6% 26%;
-  --ring: 212.7 26.8% 83.9%;
 }
 
 * {
@@ -545,7 +455,6 @@ body {
   .mobile-route-novels,
   .mobile-route-novel-create,
   .mobile-route-novel-preview,
-  .mobile-route-drama,
   .mobile-route-creative-hub,
   .mobile-route-chat-legacy,
   .mobile-route-book-analysis,
@@ -555,7 +464,6 @@ body {
   .mobile-route-genres,
   .mobile-route-story-modes,
   .mobile-route-titles,
-  .mobile-route-prompt-workbench,
   .mobile-route-model-routes,
   .mobile-route-settings,
   .mobile-route-worlds,
@@ -574,7 +482,6 @@ body {
   .mobile-route-novels,
   .mobile-route-novel-create,
   .mobile-route-novel-preview,
-  .mobile-route-drama,
   .mobile-route-creative-hub,
   .mobile-route-chat-legacy,
   .mobile-route-book-analysis,
@@ -584,7 +491,6 @@ body {
   .mobile-route-genres,
   .mobile-route-story-modes,
   .mobile-route-titles,
-  .mobile-route-prompt-workbench,
   .mobile-route-model-routes,
   .mobile-route-settings,
   .mobile-route-worlds,
@@ -770,7 +676,6 @@ body {
   }
 
   .mobile-route-creative-hub > .grid,
-  .mobile-route-drama > .grid,
   .mobile-route-chat-legacy,
   .mobile-route-book-analysis > .grid,
   .mobile-route-tasks > .grid,
@@ -784,7 +689,6 @@ body {
   }
 
   .mobile-route-chat-legacy > .rounded-xl:first-child,
-  .mobile-route-drama > .grid > div:first-child,
   .mobile-route-creative-hub > .grid > div:first-child,
   .mobile-route-book-analysis > .grid > :first-child,
   .mobile-route-tasks > .grid > :first-child,
@@ -793,7 +697,6 @@ body {
   }
 
   .mobile-route-chat-legacy > .rounded-xl:nth-child(2),
-  .mobile-route-drama > .grid > div:nth-child(2),
   .mobile-route-creative-hub > .grid > div:nth-child(2),
   .mobile-route-book-analysis > .grid > :nth-child(2),
   .mobile-route-tasks > .grid > :nth-child(2),
@@ -802,14 +705,12 @@ body {
   }
 
   .mobile-route-chat-legacy > :nth-child(3),
-  .mobile-route-drama > .grid > div:nth-child(3),
   .mobile-route-creative-hub > .grid > div:nth-child(3),
   .mobile-route-tasks > .grid > :nth-child(3) {
     order: 3;
   }
 
   .mobile-route-chat-legacy > .rounded-xl,
-  .mobile-route-drama > .grid > .rounded-xl,
   .mobile-route-tasks > .grid > .rounded-xl,
   .mobile-route-auto-director-follow-ups > .grid > .rounded-xl {
     box-shadow: none;
@@ -851,7 +752,6 @@ body {
   }
 
   .mobile-route-creative-hub .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
-  .mobile-route-drama .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-book-analysis .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-tasks .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-auto-director-follow-ups .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
@@ -866,7 +766,6 @@ body {
   .mobile-route-world-workspace .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-style-engine .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-anti-ai-rules .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
-  .mobile-route-prompt-workbench .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-base-characters .rounded-xl.border.bg-card .rounded-xl.border.bg-card {
     border-color: hsl(var(--border) / 0.72);
     background: hsl(var(--muted) / 0.18);
