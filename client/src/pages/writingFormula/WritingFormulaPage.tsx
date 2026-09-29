@@ -522,7 +522,6 @@ export default function WritingFormulaPage() {
 
       <WritingFormulaLanding
         onOpenCreate={() => setCreateDialogOpen(true)}
-        onOpenPromptLab={() => navigate("/prompt-workbench?experience=writing")}
         onSelectProfile={setSelectedProfileId}
         onEditProfile={(profileId) => openWorkspaceDialog("editor", profileId)}
         onOpenWorkbench={(profileId) => openWorkspaceDialog("workbench", profileId)}

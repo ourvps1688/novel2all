@@ -25,7 +25,6 @@ const KnowledgePage = lazy(() => import("@/pages/knowledge/KnowledgePage"));
 const GenreManagementPage = lazy(() => import("@/pages/genres/GenreManagementPage"));
 const StoryModeManagementPage = lazy(() => import("@/pages/storyModes/StoryModeManagementPage"));
 const TitleStudioPage = lazy(() => import("@/pages/titles/TitleStudioPage"));
-const PromptWorkbenchPage = lazy(() => import("@/pages/promptWorkbench/PromptWorkbenchPage"));
 const AntiAiRulesPage = lazy(() => import("@/pages/antiAiRules/AntiAiRulesPage"));
 const SettingsOverviewPage = lazy(() => import("@/pages/settings/views/SettingsOverviewPage"));
 const ModelsSettingsPage = lazy(() => import("@/pages/settings/views/ModelsSettingsPage"));
@@ -69,7 +68,6 @@ const routes: RouteObject[] = [
       { path: "genres", element: <GenreManagementPage /> },
       { path: "story-modes", element: <StoryModeManagementPage /> },
       { path: "titles", element: <TitleStudioPage /> },
-      { path: "prompt-workbench", element: <PromptWorkbenchPage /> },
       { path: "anti-ai-rules", element: <AntiAiRulesPage /> },
       { path: "settings/model-routes", element: <ModelRoutesSettingsPage /> },
       { path: "settings/models", element: <ModelsSettingsPage /> },

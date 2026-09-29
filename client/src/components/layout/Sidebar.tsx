@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   BookOpenText,
-  Braces,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -77,7 +76,6 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/tasks", label: "运行记录", icon: ListTodo },
       { to: "/auto-director/follow-ups", label: "导演跟进", icon: Workflow },
-      { to: "/prompt-workbench", label: "提示词管理", icon: Braces },
       { to: "/settings", label: "系统设置", icon: Settings2 },
     ],
   },

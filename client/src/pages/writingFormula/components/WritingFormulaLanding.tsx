@@ -11,7 +11,6 @@ interface WritingFormulaLandingProps {
   onOpenWorkbench: (profileId: string) => void;
   onUseProfileForClean: (profileId: string) => void;
   onDeleteProfile: (profileId: string) => void;
-  onOpenPromptLab: () => void;
   deletePending: boolean;
   profileItems: LandingProfileItem[];
   selectedProfileId: string;
@@ -73,7 +72,6 @@ export default function WritingFormulaLanding(props: WritingFormulaLandingProps)
     onOpenWorkbench,
     onUseProfileForClean,
     onDeleteProfile,
-    onOpenPromptLab,
     deletePending,
     profileItems,
     selectedProfileId,
@@ -327,9 +325,6 @@ export default function WritingFormulaLanding(props: WritingFormulaLandingProps)
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={onOpenPromptLab}>
-                正文效果实验室
-              </Button>
               <Button type="button" onClick={onOpenCreate}>
                 新建一套写法
               </Button>

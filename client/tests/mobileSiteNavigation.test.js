@@ -26,7 +26,6 @@ const routedPaths = [
   "/genres",
   "/story-modes",
   "/titles",
-  "/prompt-workbench",
   "/settings/models",
   "/settings/director",
   "/settings/knowledge",
@@ -82,7 +81,6 @@ test("mobile more menu contains all non-primary registered pages", () => {
       "/base-characters",
       "/worlds",
       "/worlds/generator",
-      "/prompt-workbench",
       "/settings",
     ],
   );
