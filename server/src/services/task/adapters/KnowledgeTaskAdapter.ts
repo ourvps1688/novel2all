@@ -326,6 +326,9 @@ export class KnowledgeTaskAdapter {
       tenantId: job.tenantId,
       maxAttempts: job.maxAttempts,
     });
+    if (!nextJob) {
+      throw new AppError("RAG is disabled; the index job cannot be retried.", 409);
+    }
     const detail = await this.detail(nextJob.id);
     if (!detail) {
       throw new AppError("Task not found after retry.", 404);

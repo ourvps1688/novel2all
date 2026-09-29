@@ -7,6 +7,7 @@ import type {
 import { prisma } from "../../db/prisma";
 import { ragConfig } from "../../config/rag";
 import { ragServices } from "../rag";
+import type { RetrievedChunk } from "../rag/types";
 import { RAG_ENABLED_KEY } from "../settings/ragSettingKeys";
 import {
   buildKnowledgeContentHash,
@@ -477,13 +478,19 @@ export class KnowledgeService {
       throw new Error("Knowledge document recall test is only available after indexing succeeds.");
     }
 
-    const hits = await ragServices.hybridRetrievalService.retrieve(query, {
-      ownerTypes: ["knowledge_document"],
-      knowledgeDocumentIds: [documentId],
-      finalTopK: limit,
-      vectorCandidates: Math.max(limit * 2, 10),
-      keywordCandidates: Math.max(limit * 2, 10),
-    });
+    let hits: RetrievedChunk[] = [];
+    try {
+      hits = await ragServices.hybridRetrievalService.retrieve(query, {
+        ownerTypes: ["knowledge_document"],
+        knowledgeDocumentIds: [documentId],
+        finalTopK: limit,
+        vectorCandidates: Math.max(limit * 2, 10),
+        keywordCandidates: Math.max(limit * 2, 10),
+      });
+    } catch (error) {
+      console.warn("[rag] knowledge recall test failed.", error);
+      throw new Error("检索服务当前不可用，无法完成召回测试。");
+    }
 
     return {
       documentId,
