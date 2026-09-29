@@ -1,10 +1,4 @@
 import type { WorldLayerKey, WorldStructureSectionKey } from "@ai-novel/shared/types/world";
-import type { WorldReferenceAnchor, WorldReferenceMode } from "@ai-novel/shared/types/worldWizard";
-
-export interface WorldReferenceInspirationPromptInput {
-  userPrompt: string;
-  isRetry: boolean;
-}
 
 export interface WorldVisualizationPromptInput {
   worldPromptSource: string;
@@ -43,41 +37,6 @@ export interface WorldAxiomSuggestionPromptInput {
   templateDescription: string;
   description: string;
   blueprintPromptBlock: string;
-}
-
-export interface WorldInspirationConceptCardPromptInput {
-  mode: "free" | "reference" | "random";
-  worldTypeHint: string;
-  promptText: string;
-  extracted: boolean;
-  originalLength: number;
-  ragContext: string;
-  templateKeysText: string;
-}
-
-export interface WorldInspirationConceptCardLocalizationPromptInput {
-  conceptCardJson: string;
-}
-
-export interface WorldPropertyOptionsPromptInput {
-  referenceMode?: WorldReferenceMode | null;
-  retryStrict?: boolean;
-  optionsCount: number;
-  worldType: string;
-  templateName: string;
-  templateDescription: string;
-  classicElements: string[];
-  pitfalls: string[];
-  conceptSummary: string;
-  coreImagery: string[];
-  keywords: string[];
-  tone: string;
-  sourcePrompt: string;
-  ragContext?: string;
-  referenceAnchors?: WorldReferenceAnchor[];
-  preserveElements?: string[];
-  allowedChanges?: string[];
-  forbiddenElements?: string[];
 }
 
 export interface WorldDeepeningQuestionsPromptInput {

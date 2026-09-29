@@ -3,37 +3,6 @@ import { worldStructuredDataSchema } from "../../../services/world/worldSchemas"
 
 export const worldAxiomSuggestionSchema = z.array(z.string().trim()).max(5);
 
-export const worldConceptCardSchema = z.object({
-  worldType: z.string().trim().min(1),
-  templateKey: z.string().trim().min(1),
-  coreImagery: z.array(z.string().trim().min(1)),
-  tone: z.string().trim().min(1),
-  keywords: z.array(z.string().trim().min(1)),
-  summary: z.string().trim().min(1),
-}).passthrough();
-
-const worldPropertyChoiceSchema = z.object({
-  id: z.string().trim().optional(),
-  label: z.string().trim().min(1),
-  summary: z.string().trim().min(1),
-}).passthrough();
-
-const worldPropertyOptionSchema = z.object({
-  id: z.string().trim().optional(),
-  name: z.string().trim().min(1),
-  description: z.string().trim().min(1),
-  targetLayer: z.union([
-    z.enum(["foundation", "power", "society", "culture", "history", "conflict"]),
-    z.string().trim().min(1),
-  ]),
-  reason: z.string().trim().optional().nullable(),
-  choices: z.array(worldPropertyChoiceSchema).optional(),
-}).passthrough();
-
-export const worldPropertyOptionsPayloadSchema = z.object({
-  options: z.array(worldPropertyOptionSchema),
-}).passthrough();
-
 export const worldDeepeningQuestionsSchema = z.array(z.object({
   priority: z.enum(["required", "recommended", "optional"]).optional(),
   question: z.string().trim().optional(),
