@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BookOpenCheck, Bot, Database, MonitorCog, Palette, Route, SlidersHorizontal } from "lucide-react";
+import { Archive, BookOpenCheck, Bot, Database, Palette, Route, SlidersHorizontal } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -9,7 +9,7 @@ const items = [
   { to: "/settings/model-routes", label: "模型路由管理", icon: Route },
   { to: "/settings/director", label: "自动导演", icon: BookOpenCheck },
   { to: "/settings/knowledge", label: "知识库与写法", icon: Database },
-  { to: "/settings/maintenance", label: "桌面与维护", icon: MonitorCog },
+  { to: "/settings/maintenance", label: "数据与备份", icon: Archive },
   { to: "/settings/appearance", label: "外观与主题", icon: Palette },
 ];
 

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpenCheck, Bot, Database, MonitorCog } from "lucide-react";
+import { Archive, ArrowRight, BookOpenCheck, Bot, Database } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -62,10 +62,10 @@ const entries: Array<{
   },
   {
     to: "/settings/maintenance",
-    title: "桌面与维护",
-    description: "查看适用于当前设备的更新和数据维护。",
-    icon: MonitorCog,
-    summary: () => "由部署环境统一处理更新与数据维护",
+    title: "数据与备份",
+    description: "需要备份或迁移数据时，查看要保留哪些文件。",
+    icon: Archive,
+    summary: () => "更新由部署环境处理，数据文件需要自己保留",
   },
 ];
 
