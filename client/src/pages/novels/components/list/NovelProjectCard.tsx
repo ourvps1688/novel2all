@@ -166,11 +166,11 @@ export function NovelProjectCard(props: {
                   stopCardClick(event);
                   props.onOpenCockpit(props.novel.id);
                 }}
-                title="AI 驾驶舱"
-                aria-label="AI 驾驶舱"
+                title="AI 推进状态"
+                aria-label="AI 推进状态"
               >
                 <Gauge className="h-4 w-4" aria-hidden="true" />
-                <span className="text-xs">AI 驾驶舱</span>
+                <span className="text-xs">AI 推进状态</span>
               </Button>
             ) : null}
           </div>
