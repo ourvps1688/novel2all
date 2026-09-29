@@ -5,12 +5,14 @@ import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   getAPIKeySettings,
+  getAutoDirectorApprovalPreferenceSettings,
   getModelRoutes,
   getRagSettings,
   getStyleEngineRuntimeSettings,
   testModelRouteConnectivity,
 } from "@/api/settings";
 import { queryKeys } from "@/api/queryKeys";
+import { summarizeDirectorAutoApprovalPoints } from "@/components/autoDirector/AutoDirectorApprovalPointMultiSelect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import SettingsReadinessCard, { buildSettingsReadinessItems } from "../components/SettingsReadinessCard";
@@ -22,6 +24,9 @@ interface SettingsOverviewSummaryContext {
   routeCount: number;
   ragEnabled: boolean;
   ragEmbeddingModel: string | null;
+  autoApprovalLoaded: boolean;
+  autoApprovalPointCount: number;
+  autoApprovalSummary: string | null;
 }
 
 const entries: Array<{
@@ -49,7 +54,14 @@ const entries: Array<{
     title: "自动导演",
     description: "安排问题处理、确认偏好与提醒方式。",
     icon: BookOpenCheck,
-    summary: () => "设置确认偏好、问题处理和通知方式",
+    summary: (context) => {
+      if (!context.autoApprovalLoaded) {
+        return "正在读取自动确认设置";
+      }
+      return context.autoApprovalPointCount > 0
+        ? `${context.autoApprovalSummary} 会自动通过，其余关键环节等你确认`
+        : "每个关键环节都会等你确认";
+    },
   },
   {
     to: "/settings/knowledge",
@@ -72,6 +84,10 @@ export default function SettingsOverviewPage() {
     refetchOnWindowFocus: false,
   });
   const ragQuery = useQuery({ queryKey: queryKeys.settings.rag, queryFn: getRagSettings });
+  const approvalPreferenceQuery = useQuery({
+    queryKey: queryKeys.settings.autoDirectorApprovalPreferences,
+    queryFn: getAutoDirectorApprovalPreferenceSettings,
+  });
   const styleQuery = useQuery({ queryKey: queryKeys.settings.styleEngineRuntime, queryFn: getStyleEngineRuntimeSettings });
   const items = useMemo(() => buildSettingsReadinessItems({
     providers: providersQuery.data?.data ?? [],
@@ -85,12 +101,16 @@ export default function SettingsOverviewPage() {
   const configuredProvider = providersQuery.data?.data?.find((item) => item.isConfigured && item.isActive);
   const routeCount = routesQuery.data?.data?.routes.filter((route) => route.provider && route.model).length ?? 0;
   const rag = ragQuery.data?.data;
+  const autoApprovalCodes = approvalPreferenceQuery.data?.data?.approvalPointCodes ?? null;
   const summaryContext: SettingsOverviewSummaryContext = {
     configuredProviderName: configuredProvider?.name ?? null,
     configuredProviderModel: configuredProvider?.currentModel ?? null,
     routeCount,
     ragEnabled: Boolean(rag?.enabled),
     ragEmbeddingModel: rag?.embeddingModel ?? null,
+    autoApprovalLoaded: approvalPreferenceQuery.isSuccess,
+    autoApprovalPointCount: autoApprovalCodes?.length ?? 0,
+    autoApprovalSummary: autoApprovalCodes ? summarizeDirectorAutoApprovalPoints(autoApprovalCodes) : null,
   };
 
   return (
