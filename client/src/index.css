@@ -459,7 +459,6 @@ body {
   .mobile-route-chat-legacy,
   .mobile-route-book-analysis,
   .mobile-route-tasks,
-  .mobile-route-auto-director-follow-ups,
   .mobile-route-knowledge,
   .mobile-route-genres,
   .mobile-route-story-modes,
@@ -486,7 +485,6 @@ body {
   .mobile-route-chat-legacy,
   .mobile-route-book-analysis,
   .mobile-route-tasks,
-  .mobile-route-auto-director-follow-ups,
   .mobile-route-knowledge,
   .mobile-route-genres,
   .mobile-route-story-modes,
@@ -678,8 +676,7 @@ body {
   .mobile-route-creative-hub > .grid,
   .mobile-route-chat-legacy,
   .mobile-route-book-analysis > .grid,
-  .mobile-route-tasks > .grid,
-  .mobile-route-auto-director-follow-ups > .grid {
+  .mobile-route-tasks > .grid {
     grid-template-columns: minmax(0, 1fr);
     min-height: auto;
   }
@@ -691,16 +688,14 @@ body {
   .mobile-route-chat-legacy > .rounded-xl:first-child,
   .mobile-route-creative-hub > .grid > div:first-child,
   .mobile-route-book-analysis > .grid > :first-child,
-  .mobile-route-tasks > .grid > :first-child,
-  .mobile-route-auto-director-follow-ups > .grid > :first-child {
+  .mobile-route-tasks > .grid > :first-child {
     order: 1;
   }
 
   .mobile-route-chat-legacy > .rounded-xl:nth-child(2),
   .mobile-route-creative-hub > .grid > div:nth-child(2),
   .mobile-route-book-analysis > .grid > :nth-child(2),
-  .mobile-route-tasks > .grid > :nth-child(2),
-  .mobile-route-auto-director-follow-ups > .grid > :nth-child(2) {
+  .mobile-route-tasks > .grid > :nth-child(2) {
     order: 2;
   }
 
@@ -711,50 +706,13 @@ body {
   }
 
   .mobile-route-chat-legacy > .rounded-xl,
-  .mobile-route-tasks > .grid > .rounded-xl,
-  .mobile-route-auto-director-follow-ups > .grid > .rounded-xl {
+  .mobile-route-tasks > .grid > .rounded-xl {
     box-shadow: none;
-  }
-
-  .mobile-route-auto-director-follow-ups .auto-director-follow-up-overview-card > .p-6 {
-    padding: 0.75rem;
-  }
-
-  .mobile-route-auto-director-follow-ups .auto-director-follow-up-overview-card > .p-6.pt-0 {
-    padding-top: 0;
-  }
-
-  .mobile-route-auto-director-follow-ups .auto-director-follow-up-section-grid.grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.5rem;
-  }
-
-  .mobile-site-main.mobile-route-auto-director-follow-ups .auto-director-follow-up-filter-grid.grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .mobile-route-auto-director-follow-ups .auto-director-follow-up-section-grid button {
-    padding: 0.5rem;
-  }
-
-  .mobile-route-auto-director-follow-ups .auto-director-follow-up-section-grid .text-sm {
-    font-size: 0.75rem;
-    line-height: 1rem;
-  }
-
-  .mobile-route-auto-director-follow-ups .auto-director-follow-up-section-grid .text-xl {
-    font-size: 1rem;
-    line-height: 1.25rem;
-  }
-
-  .mobile-route-auto-director-follow-ups .auto-director-follow-up-section-grid .text-xs {
-    display: none;
   }
 
   .mobile-route-creative-hub .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-book-analysis .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-tasks .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
-  .mobile-route-auto-director-follow-ups .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-knowledge .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-genres .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-story-modes .rounded-xl.border.bg-card .rounded-xl.border.bg-card,

@@ -25,7 +25,6 @@ import {
 import { NavLink } from "react-router-dom";
 import { listKnowledgeDocuments } from "@/api/knowledge";
 import { queryKeys } from "@/api/queryKeys";
-import { getAutoDirectorFollowUpOverview } from "@/api/autoDirectorFollowUps";
 import { getTaskOverview } from "@/api/tasks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,7 +74,6 @@ const navGroups: NavGroup[] = [
     title: "系统",
     items: [
       { to: "/tasks", label: "运行记录", icon: ListTodo },
-      { to: "/auto-director/follow-ups", label: "导演跟进", icon: Workflow },
       { to: "/settings", label: "系统设置", icon: Settings2 },
     ],
   },
@@ -113,18 +111,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     staleTime: 30_000,
   });
 
-  const autoDirectorFollowUpQuery = useQuery({
-    queryKey: queryKeys.autoDirectorFollowUps.overview,
-    queryFn: getAutoDirectorFollowUpOverview,
-    enabled: badgeQueriesEnabled,
-    refetchInterval: (query) => {
-      const totalCount = query.state.data?.data?.totalCount ?? 0;
-      return totalCount > 0 ? 4000 : false;
-    },
-  });
-
   const failedTaskCount = taskQuery.data?.data?.failedCount ?? 0;
-  const autoDirectorFollowUpCount = autoDirectorFollowUpQuery.data?.data?.totalCount ?? 0;
   const knowledgeDocuments = knowledgeQuery.data?.data ?? [];
   const failedIndexCount = knowledgeDocuments.filter((item) => item.latestIndexStatus === "failed").length;
 
@@ -142,20 +129,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
             {collapsed ? failedTaskCount : `F${failedTaskCount}`}
           </Badge>
         </div>
-      );
-    }
-
-    if (to === "/auto-director/follow-ups" && autoDirectorFollowUpCount > 0) {
-      return (
-        <Badge
-          variant="destructive"
-          className={cn(
-            "h-5 px-1.5 text-[10px]",
-            collapsed ? "absolute right-1 top-1 h-4 min-w-4 px-1 text-[9px]" : "ml-auto",
-          )}
-        >
-          {autoDirectorFollowUpCount}
-        </Badge>
       );
     }
 

@@ -114,8 +114,6 @@ export const queryKeys = {
     directorIssuePolicy: (novelId: string) => ["novels", "director-issue-policy", novelId] as const,
   },
   autoDirectorFollowUps: {
-    overview: ["auto-director-follow-ups", "overview"] as const,
-    list: (params: string) => ["auto-director-follow-ups", "list", params] as const,
     detail: (directorTaskId: string) => ["auto-director-follow-ups", "detail", directorTaskId] as const,
   },
   agentRuns: {
