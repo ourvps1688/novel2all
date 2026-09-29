@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpenCheck, Bot, Database, MonitorCog, Route } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Bot, Database, MonitorCog } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -33,19 +33,16 @@ const entries: Array<{
 }> = [
   {
     to: "/settings/models",
-    title: "模型与厂商",
-    description: "添加模型厂商、选择模型并管理连接。",
+    title: "模型与供应商",
+    description: "接一个能写正文的模型，并指定哪些创作步骤用它。",
     icon: Bot,
-    summary: (context) => (context.configuredProviderName
-      ? `${context.configuredProviderName} · ${context.configuredProviderModel || "未选择模型"}`
-      : "尚未配置可用的文本模型"),
-  },
-  {
-    to: "/settings/model-routes",
-    title: "模型路由管理",
-    description: "为不同创作任务选择模型并检查连接状态。",
-    icon: Route,
-    summary: (context) => `${context.routeCount} 条任务路由已设置`,
+    summary: (context) => {
+      if (!context.configuredProviderName) {
+        return "还没接上模型，接上就能开始写";
+      }
+      const base = `${context.configuredProviderName} · ${context.configuredProviderModel || "未选择模型"}`;
+      return context.routeCount > 0 ? `${base} · 已指定 ${context.routeCount} 个创作步骤` : base;
+    },
   },
   {
     to: "/settings/director",
