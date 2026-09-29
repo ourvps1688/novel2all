@@ -9,7 +9,6 @@ import type { ApiResponse } from "@ai-novel/shared/types/api";
 import { ensureRuntimeDatabaseReady } from "./db/runtimeMigrations";
 import { errorHandler } from "./middleware/errorHandler";
 import { loadProviderApiKeys } from "./llm/factory";
-import astrologyRouter from "./routes/astrology";
 import agentCatalogRouter from "./routes/agentCatalog";
 import agentRunsRouter from "./routes/agentRuns";
 import autoDirectorChannelCallbacksRouter from "./routes/autoDirectorChannelCallbacks";
@@ -29,8 +28,6 @@ import llmLiveRouter from "./platform/llm/live/http/llmLiveRoutes";
 import novelRouter from "./modules/novel/http/novel";
 import creationStudioRouter from "./modules/novel/creation-studio/http/creationStudioRoutes";
 import { shortStoryProductionService } from "./modules/novel/short-story/application/ShortStoryProductionService";
-import dramaRouter from "./modules/drama/http/dramaRoutes";
-import comicRouter from "./modules/comic/http/comicRoutes";
 import marketRadarRouter from "./modules/marketRadar/http/marketRadarRoutes";
 import novelDirectorRouter from "./services/novel/director/http/novelDirector";
 import novelExportRouter from "./modules/export/http/novelExport";
@@ -142,8 +139,6 @@ export function createApp() {
   app.use("/api/novels/director", novelDirectorRouter);
   app.use("/api/novel-workflows", novelWorkflowsRouter);
   app.use("/api/novels", novelExportRouter);
-  app.use("/api/drama", dramaRouter);
-  app.use("/api/comic", comicRouter);
   app.use("/api/market-radar", marketRadarRouter);
   app.use("/api/worlds", worldRouter);
   app.use("/api/rag", ragRouter);
@@ -161,7 +156,6 @@ export function createApp() {
   app.use("/api/auto-director/channel-callbacks", autoDirectorChannelCallbacksRouter);
   app.use("/api/settings", settingsRouter);
   app.use("/api", onboardingRoutes);
-  app.use("/api/astrology", astrologyRouter);
 
   app.use((_req, res) => {
     const response: ApiResponse<null> = {

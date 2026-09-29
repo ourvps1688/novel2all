@@ -27,7 +27,6 @@ export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "novel-preview", pattern: /^\/novels\/[^/]+\/preview\/?$/, title: "小说预览", group: "novels" },
   { key: "novel-edit", pattern: /^\/novels\/[^/]+\/edit\/?$/, title: "小说工作区", group: "novels" },
   { key: "chapter-edit", pattern: /^\/novels\/[^/]+\/chapters\/[^/]+\/?$/, title: "章节正文", group: "novels" },
-  { key: "drama", pattern: /^\/drama\/?$/, title: "短剧", group: "creation" },
   { key: "creative-hub", pattern: /^\/creative-hub\/?$/, title: "创作中枢", group: "creation" },
   { key: "chat-legacy", pattern: /^\/chat-legacy\/?$/, title: "旧版聊天", group: "creation" },
   { key: "book-analysis", pattern: /^\/book-analysis\/?$/, title: "拆书", group: "creation" },
@@ -66,7 +65,6 @@ const moreNavGroups: MobileNavGroup[] = [
     title: "创作辅助",
     items: [
       { key: "help", label: "创作向导", to: "/help", group: "more" },
-      { key: "drama", label: "短剧工作台", to: "/drama", group: "creation" },
       { key: "book-analysis", label: "拆书", to: "/book-analysis", group: "creation" },
       { key: "market-radar", label: "热门题材雷达", to: "/market-radar", group: "creation" },
       { key: "chat-legacy", label: "旧版聊天", to: "/chat-legacy", group: "creation" },
