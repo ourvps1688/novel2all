@@ -21,7 +21,6 @@ export interface MobileRoutePattern {
 
 export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "home", pattern: /^\/$/, title: "首页", group: "home" },
-  { key: "help", pattern: /^\/help\/?$/, title: "创作向导", group: "more" },
   { key: "novels", pattern: /^\/novels\/?$/, title: "小说", group: "novels" },
   { key: "novel-create", pattern: /^\/novels\/create\/?$/, title: "创建小说", group: "novels" },
   { key: "novel-preview", pattern: /^\/novels\/[^/]+\/preview\/?$/, title: "小说预览", group: "novels" },

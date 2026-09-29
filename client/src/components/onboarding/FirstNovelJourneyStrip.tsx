@@ -17,7 +17,7 @@ export default function FirstNovelJourneyStrip() {
   }
   return (
     <Link
-      to="/help"
+      to="/novels/create"
       className="group flex flex-col gap-3 rounded-xl border bg-background px-4 py-3 transition hover:border-primary/35 hover:bg-primary/[0.025] sm:flex-row sm:items-center"
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">

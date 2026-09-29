@@ -11,7 +11,6 @@ import {
 
 const routedPaths = [
   "/",
-  "/help",
   "/novels",
   "/novels/create",
   "/novels/demo/preview",
@@ -20,11 +19,13 @@ const routedPaths = [
   "/creative-hub",
   "/chat-legacy",
   "/book-analysis",
+  "/market-radar",
   "/tasks",
   "/knowledge",
   "/genres",
   "/story-modes",
   "/titles",
+  "/settings/model-routes",
   "/settings/models",
   "/settings/director",
   "/settings/knowledge",
@@ -67,8 +68,8 @@ test("mobile more menu contains all non-primary registered pages", () => {
   assert.deepEqual(
     morePaths,
     [
-      "/help",
       "/book-analysis",
+      "/market-radar",
       "/chat-legacy",
       "/knowledge",
       "/genres",
@@ -77,6 +78,7 @@ test("mobile more menu contains all non-primary registered pages", () => {
       "/style-engine",
       "/anti-ai-rules",
       "/base-characters",
+      "/tasks",
       "/worlds",
       "/worlds/generator",
       "/settings",
