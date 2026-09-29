@@ -120,7 +120,7 @@ export async function getFirstNovelOnboardingProjection(): Promise<FirstNovelOnb
   let description = "只需要一个可用文本模型，系统会自动准备整条创作链的任务路由。";
   let reason = "自动导演、正文生成和审校都需要稳定的模型连接。";
   let primaryAction: FirstNovelOnboardingProjection["primaryAction"] = {
-    label: "快捷配置模型",
+    label: "接入写作模型",
     kind: "open_quick_setup",
   };
 
@@ -154,7 +154,7 @@ export async function getFirstNovelOnboardingProjection(): Promise<FirstNovelOnb
       description = "简易创作会持续写完整本书；专业创作会进入完整可编辑工作台。";
       reason = "故事、角色和卷章资源都已准备好，正文尚未启动。";
       primaryAction = {
-        label: "选择生产方式",
+        label: "选择怎么写正文",
         route: `/novels/${latestTask.novelId}/edit?directorTaskId=${latestTask.id}`,
         kind: "navigate",
       };
@@ -173,7 +173,7 @@ export async function getFirstNovelOnboardingProjection(): Promise<FirstNovelOnb
         ? "从当前检查点恢复会保留已保存的规划和正文。"
         : "正在生成的正文不会提前展示，避免你读到尚未稳定的版本。";
       primaryAction = {
-        label: isAttention ? "查看并恢复" : "查看章节书架",
+        label: isAttention ? "处理并继续写" : "查看章节书架",
         route: latestTask.novel?.creationExperience === "simple"
           ? `/novels/${latestTask.novelId}/simple`
           : `/novels/${latestTask.novelId}/edit?directorTaskId=${latestTask.id}`,
@@ -189,7 +189,7 @@ export async function getFirstNovelOnboardingProjection(): Promise<FirstNovelOnb
         ? "从当前检查点恢复即可，不需要重新创建小说。"
         : "这些资源会直接驱动后续章节，不需要你逐项审核。";
       primaryAction = {
-        label: isAttention ? "查看并恢复" : "查看准备进度",
+        label: isAttention ? "处理并继续写" : "查看准备进度",
         route: `/novels/${latestTask.novelId}/edit?directorTaskId=${latestTask.id}`,
         kind: isAttention ? "resume" : "navigate",
       };
