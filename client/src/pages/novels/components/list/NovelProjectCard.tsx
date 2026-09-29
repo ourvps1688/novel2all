@@ -175,14 +175,6 @@ export function NovelProjectCard(props: {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-1 opacity-70 transition group-hover:opacity-100 focus-within:opacity-100">
-            {task && props.novel.narrativeForm !== "short_story" ? (
-              <Button asChild size="sm" variant="ghost" className="h-8 gap-1 px-2" title="执行详情" aria-label="执行详情">
-                <Link to={`/novels/${props.novel.id}/edit?directorTaskId=${task.id}&taskPanel=1`} onClick={stopCardClick}>
-                  <Gauge className="h-4 w-4" aria-hidden="true" />
-                  <span className="text-xs">执行详情</span>
-                </Link>
-              </Button>
-            ) : null}
             {props.novel.narrativeForm !== "short_story" ? (
               <Button asChild size="sm" variant="ghost" className="h-8 w-8 px-0" title="阅读预览" aria-label="阅读预览">
                 <Link to={`/novels/${props.novel.id}/preview`} onClick={stopCardClick}>
