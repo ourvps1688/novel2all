@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Archive, ArrowRight, BookOpenCheck, Bot, Database } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Bot, Database } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -59,13 +59,6 @@ const entries: Array<{
     summary: (context) => (context.ragEnabled
       ? `资料检索已开启 · ${context.ragEmbeddingModel || "未选择向量模型"}`
       : "可选增强，暂不影响开始创作"),
-  },
-  {
-    to: "/settings/maintenance",
-    title: "数据与备份",
-    description: "需要备份或迁移数据时，查看要保留哪些文件。",
-    icon: Archive,
-    summary: () => "更新由部署环境处理，数据文件需要自己保留",
   },
 ];
 
