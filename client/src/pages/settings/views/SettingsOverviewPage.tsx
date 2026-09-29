@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import SettingsReadinessCard, { buildSettingsReadinessItems } from "../components/SettingsReadinessCard";
 import { SettingsShell } from "../components/SettingsShell";
-import { APP_RUNTIME } from "@/lib/constants";
 
 const entries = [
   { to: "/settings/models", title: "模型与厂商", description: "添加模型厂商、选择模型并管理连接。", icon: Bot },
@@ -60,7 +59,7 @@ export default function SettingsOverviewPage() {
             : title === "知识库与写法"
               ? rag?.enabled ? `资料检索已开启 · ${rag.embeddingModel || "未选择向量模型"}` : "可选增强，暂不影响开始创作"
               : title === "桌面与维护"
-                ? APP_RUNTIME === "desktop" ? "可检查桌面更新和本机旧数据" : "网页端无需桌面维护"
+                ? "由部署环境统一处理更新与数据维护"
                 : "设置确认偏好、问题处理和通知方式";
           return (
             <Card key={to} className="min-w-0">

@@ -12,10 +12,7 @@ interface ClientRuntimeConfig {
   mode?: AppRuntimeMode;
   apiBaseUrl?: string;
   apiTimeoutMs?: number | string;
-  isPackaged?: boolean;
   appVersion?: string;
-  isPortable?: boolean;
-  updateChannel?: string;
 }
 
 function isLoopbackHost(hostname: string | null | undefined): boolean {
@@ -47,10 +44,7 @@ const viteEnv = resolveViteEnv();
 const viteAppVersion = viteEnv.VITE_APP_VERSION;
 
 export const APP_RUNTIME: AppRuntimeMode = resolveAppRuntime(runtimeConfig);
-export const APP_RUNTIME_IS_PACKAGED = runtimeConfig.isPackaged === true;
 export const APP_VERSION = runtimeConfig.appVersion?.trim() || viteAppVersion?.trim() || "0.0.0";
-export const APP_RUNTIME_IS_PORTABLE = runtimeConfig.isPortable === true;
-export const APP_UPDATE_CHANNEL = runtimeConfig.updateChannel?.trim() || "beta";
 
 interface ResolveApiBaseUrlInput {
   runtimeConfig?: ClientRuntimeConfig;
