@@ -144,7 +144,6 @@ test("auto-approval preference controls wrap labels and save actions on mobile t
   const strategyPanel = readSource("components/autoDirector/AutoDirectorApprovalStrategyPanel.tsx");
   const settingsPage = readSource("pages/settings/SettingsPage.tsx");
   const preferenceCard = readSource("pages/settings/AutoDirectorApprovalPreferenceCard.tsx");
-  const channelSettingsCard = readSource("pages/settings/AutoDirectorChannelSettingsCard.tsx");
   const settingsNavigationCards = readSource("pages/settings/components/SettingsNavigationCards.tsx");
 
   assertImportsMobileContracts(settingsPage, "settings route should import mobile settings contracts");
@@ -170,12 +169,6 @@ test("auto-approval preference controls wrap labels and save actions on mobile t
     preferenceCard,
     "AUTO_DIRECTOR_MOBILE_CLASSES.settingsActionRow",
     "settings save action should be full-width on phones and compact on desktop",
-  );
-  assertImportsMobileContracts(channelSettingsCard, "channel settings card should import mobile settings action contracts");
-  assertContains(
-    channelSettingsCard,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.channelSettingsActionRow",
-    "channel settings actions should remain reachable while reviewing auto-approval preferences on phones",
   );
   assertImportsMobileContracts(settingsNavigationCards, "settings navigation cards should import mobile settings entry contracts");
   assertContains(

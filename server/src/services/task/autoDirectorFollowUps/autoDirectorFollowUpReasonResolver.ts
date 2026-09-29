@@ -8,13 +8,6 @@ import type {
 } from "@ai-novel/shared/types/autoDirectorFollowUp";
 import { buildWorkflowResumeAction } from "../novelWorkflowExplainability";
 
-const CHANNEL_ACTION_CODES = new Set<AutoDirectorActionCode>([
-  "continue_auto_execution",
-  "retry_with_task_model",
-  "open_detail",
-  "open_follow_up_center",
-]);
-
 const REASON_LABELS: Record<AutoDirectorFollowUpReason, string> = {
   manual_recovery_required: "人工恢复待处理",
   runtime_failed: "失败待重试",
@@ -70,7 +63,6 @@ function finalizeResolvedReason(input: {
   batchActionCodes?: AutoDirectorMutationActionCode[];
 }): AutoDirectorResolvedFollowUpReason {
   const batchActionCodes = input.batchActionCodes ?? [];
-  const hasChannelAction = input.availableActions.some((item) => CHANNEL_ACTION_CODES.has(item.code));
 
   return {
     reason: input.reason,
@@ -79,10 +71,6 @@ function finalizeResolvedReason(input: {
     availableActions: input.availableActions,
     batchActionCodes,
     supportsBatch: batchActionCodes.length > 0,
-    channelCapabilities: {
-      dingtalk: hasChannelAction,
-      wecom: hasChannelAction,
-    },
   };
 }
 

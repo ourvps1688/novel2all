@@ -76,10 +76,6 @@ test("auto director follow-up routes expose overview, list, detail, and action e
         availableActions: [],
         batchActionCodes: ["continue_auto_execution"],
         supportsBatch: true,
-        channelCapabilities: {
-          dingtalk: true,
-          wecom: true,
-        },
         pendingManualRecovery: false,
         lastMilestoneAt: "2026-04-22T08:00:00.000Z",
         updatedAt: "2026-04-22T08:05:00.000Z",
@@ -112,7 +108,6 @@ test("auto director follow-up routes expose overview, list, detail, and action e
         sections: ["pending"],
         reasons: ["chapter_batch_execution_pending"],
         statuses: ["waiting_approval"],
-        channelTypes: ["dingtalk", "wecom"],
       },
       pagination: {
         page: 1,

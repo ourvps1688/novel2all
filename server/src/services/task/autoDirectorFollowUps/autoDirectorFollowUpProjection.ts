@@ -30,7 +30,6 @@ import {
   parseMilestones,
   parseSeedPayload,
 } from "../../novel/workflow/novelWorkflow.shared";
-import type { getAutoDirectorChannelSettings } from "../../settings/AutoDirectorChannelSettingsService";
 import { buildWorkflowExplainability } from "../novelWorkflowExplainability";
 import { resolveAutoDirectorFollowUpReason } from "./autoDirectorFollowUpReasonResolver";
 import {
@@ -278,17 +277,9 @@ function buildFollowUpSummary(
   return buildBlockingReason(row) ?? resolved.reasonLabel;
 }
 
-function getRuntimeChannelCapabilities(channelSettings?: Awaited<ReturnType<typeof getAutoDirectorChannelSettings>>): AutoDirectorFollowUpItem["channelCapabilities"] {
-  return {
-    dingtalk: Boolean(channelSettings?.dingtalk.webhookUrl?.trim()),
-    wecom: Boolean(channelSettings?.wecom.webhookUrl?.trim()),
-  };
-}
-
 export function projectFollowUpItem(
   row: FollowUpWorkflowRow,
   knownTaskIds: ReadonlySet<string>,
-  channelSettings?: Awaited<ReturnType<typeof getAutoDirectorChannelSettings>>,
 ): AutoDirectorFollowUpItem | null {
   const executionScopeLabel = getExecutionScopeLabel(row.seedPayloadJson);
   const replacementTaskId = getKnownReplacementTaskId(row.seedPayloadJson, knownTaskIds);
@@ -339,10 +330,6 @@ export function projectFollowUpItem(
     availableActions: resolved.availableActions,
     batchActionCodes,
     supportsBatch: batchActionCodes.length > 0,
-    channelCapabilities: {
-      dingtalk: resolved.channelCapabilities.dingtalk && getRuntimeChannelCapabilities(channelSettings).dingtalk,
-      wecom: resolved.channelCapabilities.wecom && getRuntimeChannelCapabilities(channelSettings).wecom,
-    },
     pendingManualRecovery: row.pendingManualRecovery,
     lastMilestoneAt: getLatestMilestoneAt(row.milestonesJson),
     updatedAt: row.updatedAt.toISOString(),
@@ -386,10 +373,6 @@ export function projectAutoApprovalRecordItem(
     }],
     batchActionCodes: [],
     supportsBatch: false,
-    channelCapabilities: {
-      dingtalk: false,
-      wecom: false,
-    },
     pendingManualRecovery: false,
     lastMilestoneAt: row.createdAt.toISOString(),
     updatedAt: row.createdAt.toISOString(),
@@ -410,9 +393,6 @@ export function matchesItemFilters(item: AutoDirectorFollowUpItem, input: AutoDi
     return false;
   }
   if (typeof input.supportsBatch === "boolean" && item.supportsBatch !== input.supportsBatch) {
-    return false;
-  }
-  if (input.channelType && !item.channelCapabilities[input.channelType]) {
     return false;
   }
   return true;

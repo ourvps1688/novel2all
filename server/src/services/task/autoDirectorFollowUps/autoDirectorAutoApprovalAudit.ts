@@ -6,7 +6,6 @@ import {
 } from "@ai-novel/shared/types/autoDirectorApproval";
 import { prisma } from "../../../db/prisma";
 import { appendMilestone, parseSeedPayload } from "../../novel/workflow/novelWorkflow.shared";
-import { AutoDirectorFollowUpNotificationService } from "./AutoDirectorFollowUpNotificationService";
 
 export interface AutoDirectorAutoApprovalRecordRow {
   id: string;
@@ -138,19 +137,6 @@ export async function recordAutoDirectorAutoApproval(
       },
     });
     await pruneOlderAutoDirectorAutoApprovalRecords(input.novelId);
-
-    await new AutoDirectorFollowUpNotificationService().notifyAutoApproved({
-      taskId: input.taskId,
-      novelId: input.novelId,
-      novelTitle: input.novelTitle?.trim() || input.novelId,
-      checkpointType: input.checkpointType,
-      checkpointSummary: input.checkpointSummary ?? null,
-      approvalPointCode,
-      approvalPointLabel,
-      stage: input.stage ?? null,
-      summary,
-      occurredAt,
-    });
 
     return record;
   } catch (error) {

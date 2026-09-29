@@ -1,16 +1,12 @@
 import { prisma } from "../../../db/prisma";
 import { withSqliteRetry } from "../../../db/sqliteRetry";
 import { getArchivedTaskIdSet, isTaskArchived } from "../../task/taskArchive";
-import type { TaskStatus } from "@ai-novel/shared/types/task";
 import type {
-  NovelWorkflowCheckpoint,
   NovelWorkflowLane,
   NovelWorkflowResumeTarget,
   NovelWorkflowStage,
 } from "@ai-novel/shared/types/novelWorkflow";
 import { NovelVolumeService } from "../volume/NovelVolumeService";
-import { AutoDirectorFollowUpNotificationService } from "../../task/autoDirectorFollowUps/AutoDirectorFollowUpNotificationService";
-import type { AutoDirectorEventWorkflowSnapshot } from "../../task/autoDirectorFollowUps/autoDirectorFollowUpEventBuilder";
 import {
   buildCreationStudioResumeTarget,
   buildNovelCreateResumeTarget,
@@ -41,8 +37,6 @@ const ACTIVE_STATUSES = ["queued", "running", "waiting_approval"] as const;
 export class NovelWorkflowStoreService {
   public readonly volumeService = new NovelVolumeService();
 
-  public readonly autoDirectorFollowUpNotificationService = new AutoDirectorFollowUpNotificationService();
-
   private healingPort: NovelWorkflowHealingPort | null = null;
 
   setHealingPort(port: NovelWorkflowHealingPort): void {
@@ -63,86 +57,7 @@ export class NovelWorkflowStoreService {
     );
   }
 
-  private toAutoDirectorEventSnapshot(row: {
-    id: string;
-    novelId: string | null;
-    lane: string;
-    status: string;
-    progress?: number | null;
-    currentStage: string | null;
-    checkpointType: string | null;
-    checkpointSummary?: string | null;
-    currentItemLabel?: string | null;
-    pendingManualRecovery: boolean;
-    lastError?: string | null;
-    updatedAt: Date;
-    seedPayloadJson?: string | null;
-    novel?: {
-      title?: string | null;
-    } | null;
-  } | null): AutoDirectorEventWorkflowSnapshot | null {
-    if (!row || row.lane !== "auto_director") {
-      return null;
-    }
-    return {
-      id: row.id,
-      novelId: row.novelId,
-      status: row.status as TaskStatus,
-      progress: row.progress ?? null,
-      currentStage: row.currentStage,
-      checkpointType: row.checkpointType as NovelWorkflowCheckpoint | null,
-      checkpointSummary: row.checkpointSummary ?? null,
-      currentItemLabel: row.currentItemLabel ?? null,
-      pendingManualRecovery: row.pendingManualRecovery,
-      updatedAt: row.updatedAt,
-      seedPayloadJson: row.seedPayloadJson ?? null,
-      novel: row.novel ?? null,
-    };
-  }
-
-  private async notifyAutoDirectorTaskTransition(input: {
-    before: {
-      id: string;
-      novelId: string | null;
-      lane: string;
-      status: string;
-      progress?: number | null;
-      currentStage: string | null;
-      checkpointType: string | null;
-      checkpointSummary?: string | null;
-      currentItemLabel?: string | null;
-      pendingManualRecovery: boolean;
-      updatedAt: Date;
-      seedPayloadJson?: string | null;
-      novel?: {
-        title?: string | null;
-      } | null;
-    } | null;
-    after: {
-      id: string;
-      novelId: string | null;
-      lane: string;
-      status: string;
-      progress?: number | null;
-      currentStage: string | null;
-      checkpointType: string | null;
-      checkpointSummary?: string | null;
-      currentItemLabel?: string | null;
-      pendingManualRecovery: boolean;
-      updatedAt: Date;
-      seedPayloadJson?: string | null;
-      novel?: {
-        title?: string | null;
-      } | null;
-    } | null;
-  }): Promise<void> {
-    await this.autoDirectorFollowUpNotificationService.handleTaskTransition({
-      before: this.toAutoDirectorEventSnapshot(input.before),
-      after: this.toAutoDirectorEventSnapshot(input.after),
-    });
-  }
-
-  public async updateWorkflowTaskWithNotifications<T extends {
+  public async updateWorkflowTask<T extends {
     id: string;
     novelId: string | null;
     lane: string;
@@ -196,10 +111,6 @@ export class NovelWorkflowStoreService {
         { label: "directorStepRun.finalizeRunning" },
       );
     }
-    await this.notifyAutoDirectorTaskTransition({
-      before: input.before,
-      after: next,
-    });
     return next;
   }
 
