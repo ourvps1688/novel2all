@@ -1,8 +1,8 @@
 import { Github } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const PROJECT_GITHUB_URL = "https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant";
-const PROJECT_GITHUB_LABEL = "AI-Novel-Writing-Assistant";
+const PROJECT_GITHUB_URL = "https://github.com/ourvps1688/novel2all";
+const PROJECT_GITHUB_LABEL = "novel2all";
 
 interface ProjectGithubLinkProps {
   className?: string;

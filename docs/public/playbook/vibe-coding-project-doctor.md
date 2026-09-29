@@ -19,7 +19,7 @@
 .agents/skills/ai-novel-vibe-doctor/SKILL.md
 ```
 
-[查看完整 SKILL.md](https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant/blob/main/.agents/skills/ai-novel-vibe-doctor/SKILL.md)
+[查看完整 SKILL.md](https://github.com/ourvps1688/novel2all/blob/main/.agents/skills/ai-novel-vibe-doctor/SKILL.md)
 
 ## 完整 SKILL.md 内容
 

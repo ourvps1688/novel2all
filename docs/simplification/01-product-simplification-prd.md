@@ -2,7 +2,7 @@
 
 > 文档类型：诊断 + 方案（本轮**不动代码**，仅输出结论供确认）
 > 编写人：许清楚（产品经理）
-> 面向产品：AI 小说创作工作台 / Biz Novel Studio
+> 面向产品：AI 小说创作工作台 / Novel2all
 > 仓库根目录：`D:\workbuddyfiles\AI-Novel-Writing-Assistant-main`
 > 用户诉求：当前项目使用起来非常复杂，希望进一步简化又不丢掉核心能力。本轮按用户确认的**激进精简**取向提出方案。
 > 本文档所有结论均来自对 `client/src` 路由与导航、`client/src/pages`、`server/src`、`shared/types`、`README.md`、`TASK.md`、`AGENTS.md` 的实读，文件名与常量名可直接检索核对。

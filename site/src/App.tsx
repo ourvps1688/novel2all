@@ -20,7 +20,7 @@ import bookshelfImage from "../../images/v2/微信截图_20260813220328.png";
 import chapterExecutionImage from "../../images/write/章节执行.png";
 import projectSettingsImage from "../../images/write/项目设定.png";
 
-const repoUrl = "https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant";
+const repoUrl = "https://github.com/ourvps1688/novel2all";
 const docsIntroBannerImage = `${import.meta.env.BASE_URL}assets/docs-intro-banner.png`;
 
 const proofItems = [
@@ -156,7 +156,7 @@ function App({ initialPath }: AppProps) {
 }
 
 function SiteNav({ page }: { page: "home" | "docs" }) {
-  const stars = useGithubStars("ExplosiveCoderflome", "AI-Novel-Writing-Assistant");
+  const stars = useGithubStars("ourvps1688", "novel2all");
   return (
     <nav className="site-nav" aria-label="主导航">
       <a className="brand" href={sitePath("/")} aria-label="AI 小说创作工作台首页">
@@ -190,7 +190,7 @@ function SiteNav({ page }: { page: "home" | "docs" }) {
 }
 
 function HomePage() {
-  const stars = useGithubStars("ExplosiveCoderflome", "AI-Novel-Writing-Assistant");
+  const stars = useGithubStars("ourvps1688", "novel2all");
   usePageMeta(null);
   return (
     <>
@@ -202,7 +202,7 @@ function HomePage() {
       >
         <div className="hero-scrim" />
         <div className="hero-content">
-          <p className="eyebrow">Biz Novel Studio · AI 驱动的长篇小说生产系统</p>
+          <p className="eyebrow">Novel2all · AI 驱动的长篇小说生产系统</p>
           <h1>说出你的故事</h1>
           <p className="hero-copy">
             你只需要先选开书依据。AI 会准备书级定位、世界、角色和卷章任务；到达可开写状态后，可以让简易创作持续推进，也可以进入专业工作台随时接管。

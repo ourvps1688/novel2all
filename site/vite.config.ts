@@ -2,7 +2,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/AI-Novel-Writing-Assistant/",
+  base: "/novel2all/",
   server: {
     port: 4173,
     strictPort: true,

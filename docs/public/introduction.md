@@ -1,8 +1,8 @@
 # 项目介绍
 
-**AI 小说创作工作台**（英文名 **Biz Novel Studio**）是一套帮助你把灵感推进成长篇小说的创作工具。它不要求你一开始就会写大纲、设计人物关系、拆卷或控制节奏，而是把这些步骤拆成可执行的链路，让 AI 在每一步给出可选择、可保存、可继续的结果。
+**AI 小说创作工作台**（英文名 **Novel2all**）是一套帮助你把灵感推进成长篇小说的创作工具。它不要求你一开始就会写大纲、设计人物关系、拆卷或控制节奏，而是把这些步骤拆成可执行的链路，让 AI 在每一步给出可选择、可保存、可继续的结果。
 
-本次只更新英文名，中文名仍为 **AI 小说创作工作台**。`AI Novel Writing Assistant` 仓库、下载入口和本地作品数据保持不变。
+中文名仍为 **AI 小说创作工作台**，英文名为 **Novel2all**。项目仓库为 `https://github.com/ourvps1688/novel2all`；本地作品数据继续保存在既有位置。
 
 ## 它解决什么问题
 
@@ -90,7 +90,7 @@
 
 源码和项目仓库：
 
-[AI-Novel-Writing-Assistant](https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant)
+[novel2all](https://github.com/ourvps1688/novel2all)
 
 ## 下一步阅读
 

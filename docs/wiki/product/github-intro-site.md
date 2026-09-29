@@ -85,7 +85,7 @@
 
 ## Routing And Prerender Rule
 
-公开文档站使用 History 路由，不再把文档路径放在 hash 里。面向用户和搜索引擎的标准路径是 `/AI-Novel-Writing-Assistant/docs/<docId>`，文档首页是 `/AI-Novel-Writing-Assistant/docs`。组件、搜索结果、面包屑、分页和 Markdown 内部文档链接都应输出真实路径；`#/docs/<docId>` 只作为旧链接兼容入口，由首页脚本替换为新路径。
+公开文档站使用 History 路由，不再把文档路径放在 hash 里。面向用户和搜索引擎的标准路径是 `/novel2all/docs/<docId>`，文档首页是 `/novel2all/docs`。组件、搜索结果、面包屑、分页和 Markdown 内部文档链接都应输出真实路径；`#/docs/<docId>` 只作为旧链接兼容入口，由首页脚本替换为新路径。
 
 GitHub Pages 仍是静态托管，因此必须同时保留两层能力：
 

@@ -1,9 +1,9 @@
-# AI 小说创作工作台 / Biz Novel Studio
-一个帮助新手从灵感走到完整长篇的 AI Native 开源小说创作工作台；英文名由 **AI Novel Production Engine** 更新为 **Biz Novel Studio**。
+# AI 小说创作工作台 / Novel2all
+一个帮助新手从灵感走到完整长篇的 AI Native 开源小说创作工作台；英文名由 **AI Novel Production Engine** 更新为 **Novel2all**。
 
 Open-source AI novel writing assistant and long-form production studio.
 
-> 中文名仍为 **AI 小说创作工作台**；`AI Novel Writing Assistant` 仓库地址和既有下载入口保持不变。
+> 中文名仍为 **AI 小说创作工作台**；仓库地址为 `https://github.com/ourvps1688/novel2all`。
 
 当前开发主线：
 `Creative Hub + 自动导演开书 + 本书世界上下文 + 整本生产主链 + 写法引擎`
@@ -18,12 +18,12 @@ Open-source AI novel writing assistant and long-form production studio.
 ![Vector DB](https://img.shields.io/badge/RAG-Qdrant-E63946)
 
 <a href="https://trendshift.io/repositories/26664?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-26664" target="_blank" rel="noopener noreferrer">
-  <img src="https://trendshift.io/api/badge/repositories/26664" alt="ExplosiveCoderflome/AI-Novel-Writing-Assistant | Trendshift" width="250" height="55" />
+  <img src="https://trendshift.io/api/badge/repositories/26664" alt="ourvps1688/novel2all | Trendshift" width="250" height="55" />
 </a>
 
 ## ✨ 项目简介
 
-**AI 小说创作工作台 / Biz Novel Studio** 是一个**面向长篇小说完成度的 AI 生产系统**。
+**AI 小说创作工作台 / Novel2all** 是一个**面向长篇小说完成度的 AI 生产系统**。
 
 它的核心做法是：
 
@@ -38,7 +38,7 @@ Open-source AI novel writing assistant and long-form production studio.
 ## 开始使用
 
 - 从源码运行：先确认 Node.js 和 pnpm 版本满足仓库要求，再执行 `pnpm install` 与 `pnpm dev`。
-- 公开介绍站：[GitHub Pages 介绍站](https://explosivecoderflome.github.io/AI-Novel-Writing-Assistant/) 提供功能预览、模块文档和使用指南。
+- 公开介绍站：[GitHub Pages 介绍站](https://ourvps1688.github.io/novel2all/) 提供功能预览、模块文档和使用指南。
 
 ## 用 Codex 持续创作长篇：Ani Book Skill
 
@@ -150,9 +150,9 @@ Open-source AI novel writing assistant and long-form production studio.
 
 ## 自动导演交互架构图
 
-[![自动导演：从想法到完整小说](./docs/architecture/diagram.webp)](https://explosivecoderflome.github.io/AI-Novel-Writing-Assistant/architecture/auto-director-idea-to-novel.detailed.workflow.html)
+[![自动导演：从想法到完整小说](./docs/architecture/diagram.webp)](https://ourvps1688.github.io/novel2all/architecture/auto-director-idea-to-novel.detailed.workflow.html)
 
-- [打开交互架构图](https://explosivecoderflome.github.io/AI-Novel-Writing-Assistant/architecture/auto-director-idea-to-novel.detailed.workflow.html)，查看从想法、全书规划、写法与反 AI 契约到逐章生产和写后同步的完整链路。
+- [打开交互架构图](https://ourvps1688.github.io/novel2all/architecture/auto-director-idea-to-novel.detailed.workflow.html)，查看从想法、全书规划、写法与反 AI 契约到逐章生产和写后同步的完整链路。
 - 图表使用 [Archify](https://github.com/tt-a1i/archify) 生成；仓库内保留[图表源数据](./docs/architecture/auto-director-idea-to-novel.detailed.workflow.json)与[自包含 HTML](./docs/architecture/auto-director-idea-to-novel.detailed.workflow.html)。
 
 ## 最新更新
