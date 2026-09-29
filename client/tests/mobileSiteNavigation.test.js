@@ -55,7 +55,7 @@ test("mobile primary nav keeps core beginner actions visible", () => {
       ["home", "/", "首页"],
       ["novels", "/novels", "小说"],
       ["creation", "/creative-hub", "创作"],
-      ["tasks", "/tasks", "任务"],
+      ["tasks", "/tasks", "运行记录"],
       ["more", "", "更多"],
     ],
   );
@@ -77,7 +77,6 @@ test("mobile more menu contains all non-primary registered pages", () => {
       "/style-engine",
       "/anti-ai-rules",
       "/base-characters",
-      "/tasks",
       "/worlds",
       "/settings",
     ],

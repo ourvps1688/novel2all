@@ -30,7 +30,7 @@ export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "chat-legacy", pattern: /^\/chat-legacy\/?$/, title: "旧版聊天", group: "creation" },
   { key: "book-analysis", pattern: /^\/book-analysis\/?$/, title: "拆书", group: "creation" },
   { key: "market-radar", pattern: /^\/market-radar\/?$/, title: "热门题材雷达", group: "creation" },
-  { key: "tasks", pattern: /^\/tasks\/?$/, title: "任务", group: "tasks" },
+  { key: "tasks", pattern: /^\/tasks\/?$/, title: "运行记录", group: "tasks" },
   { key: "knowledge", pattern: /^\/knowledge\/?$/, title: "知识库", group: "more" },
   { key: "genres", pattern: /^\/genres\/?$/, title: "题材基底", group: "more" },
   { key: "story-modes", pattern: /^\/story-modes\/?$/, title: "推进模式", group: "more" },
@@ -52,7 +52,7 @@ const primaryNavItems: MobileNavItem[] = [
   { key: "home", label: "首页", to: "/", group: "home" },
   { key: "novels", label: "小说", to: "/novels", group: "novels" },
   { key: "creation", label: "创作", to: "/creative-hub", group: "creation" },
-  { key: "tasks", label: "任务", to: "/tasks", group: "more" },
+  { key: "tasks", label: "运行记录", to: "/tasks", group: "more" },
   { key: "more", label: "更多", to: "", group: "more" },
 ];
 
@@ -80,7 +80,6 @@ const moreNavGroups: MobileNavGroup[] = [
   {
     title: "世界与系统",
     items: [
-      { key: "tasks", label: "运行记录", to: "/tasks", group: "more" },
       { key: "worlds", label: "世界样本库", to: "/worlds", group: "more" },
       { key: "settings", label: "系统设置", to: "/settings", group: "more" },
     ],
