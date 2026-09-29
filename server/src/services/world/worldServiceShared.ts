@@ -163,31 +163,6 @@ export type LayerStateMap = Record<
   }
 >;
 
-export interface CreateWorldInput {
-  name: string;
-  description?: string;
-  worldType?: string;
-  templateKey?: string;
-  axioms?: string;
-  background?: string;
-  geography?: string;
-  cultures?: string;
-  magicSystem?: string;
-  politics?: string;
-  races?: string;
-  religions?: string;
-  technology?: string;
-  conflicts?: string;
-  history?: string;
-  economy?: string;
-  factions?: string;
-  selectedDimensions?: string;
-  selectedElements?: string;
-  knowledgeDocumentIds?: string[];
-  structure?: unknown;
-  bindingSupport?: unknown;
-}
-
 export interface WorldGenerateInput {
   name: string;
   description: string;
@@ -311,13 +286,6 @@ export function safeParseJSON<T>(raw: string | null | undefined, fallback: T): T
 
 export function nowISO(): string {
   return new Date().toISOString();
-}
-
-export function uniqueKnowledgeDocumentIds(ids: string[] | undefined): string[] {
-  if (!ids || ids.length === 0) {
-    return [];
-  }
-  return Array.from(new Set(ids.map((item) => item.trim()).filter(Boolean)));
 }
 
 export function normalizeLayerStates(raw: string | null | undefined): LayerStateMap {

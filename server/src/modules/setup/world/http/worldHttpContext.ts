@@ -56,33 +56,6 @@ export const snapshotRestoreParamsSchema = z.object({
   snapshotId: z.string().trim().min(1),
 });
 
-export const createWorldSchema = z.object({
-  name: z.string().trim().min(1),
-  description: z.string().trim().optional(),
-  worldType: z.string().trim().optional(),
-  templateKey: z.string().trim().optional(),
-  axioms: z.string().optional(),
-  background: z.string().optional(),
-  geography: z.string().optional(),
-  cultures: z.string().optional(),
-  magicSystem: z.string().optional(),
-  politics: z.string().optional(),
-  races: z.string().optional(),
-  religions: z.string().optional(),
-  technology: z.string().optional(),
-  conflicts: z.string().optional(),
-  history: z.string().optional(),
-  economy: z.string().optional(),
-  factions: z.string().optional(),
-  selectedDimensions: z.string().optional(),
-  selectedElements: z.string().optional(),
-  knowledgeDocumentIds: z.array(z.string().trim().min(1)).optional(),
-  structure: z.unknown().optional(),
-  bindingSupport: z.unknown().optional(),
-});
-
-export const updateWorldSchema = createWorldSchema.partial();
-
 export const worldGenerateSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().trim().min(1),

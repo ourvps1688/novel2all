@@ -3,14 +3,12 @@ import type { ApiResponse } from "@ai-novel/shared/types/api";
 import { z } from "zod";
 import { validate } from "../../../../middleware/validate";
 import {
-  createWorldSchema,
   knowledgeBindingsSchema,
   knowledgeService,
   requireWorldWizard,
   snapshotCreateSchema,
   snapshotDiffQuerySchema,
   snapshotRestoreParamsSchema,
-  updateWorldSchema,
   worldExportQuerySchema,
   worldIdSchema,
   worldImportSchema,
@@ -38,19 +36,6 @@ export function registerCoreWorldRoutes(router: Router): void {
         success: true,
         data,
         message: "World list loaded.",
-      } satisfies ApiResponse<typeof data>);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  router.post("/", validate({ body: createWorldSchema }), async (req, res, next) => {
-    try {
-      const data = await worldService.createWorld(req.body as z.infer<typeof createWorldSchema>);
-      res.status(201).json({
-        success: true,
-        data,
-        message: "World created.",
       } satisfies ApiResponse<typeof data>);
     } catch (error) {
       next(error);
@@ -110,20 +95,6 @@ export function registerCoreWorldRoutes(router: Router): void {
       }
     },
   );
-
-  router.put("/:id", validate({ params: worldIdSchema, body: updateWorldSchema }), async (req, res, next) => {
-    try {
-      const { id } = req.params as z.infer<typeof worldIdSchema>;
-      const data = await worldService.updateWorld(id, req.body as z.infer<typeof updateWorldSchema>);
-      res.status(200).json({
-        success: true,
-        data,
-        message: "World updated.",
-      } satisfies ApiResponse<typeof data>);
-    } catch (error) {
-      next(error);
-    }
-  });
 
   router.delete("/:id", validate({ params: worldIdSchema }), async (req, res, next) => {
     try {

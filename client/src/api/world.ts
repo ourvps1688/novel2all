@@ -115,14 +115,6 @@ export async function getWorldDetail(id: string) {
   return data;
 }
 
-export async function updateWorld(
-  id: string,
-  payload: Partial<World> & { structure?: WorldStructuredData; bindingSupport?: WorldBindingSupport },
-) {
-  const { data } = await apiClient.put<ApiResponse<World>>(`/worlds/${id}`, payload);
-  return data;
-}
-
 export async function getWorldStructure(id: string) {
   const { data } = await apiClient.get<ApiResponse<WorldStructurePayload>>(`/worlds/${id}/structure`);
   return data;
