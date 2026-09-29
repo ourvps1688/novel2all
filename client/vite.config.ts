@@ -78,10 +78,10 @@ export default defineConfig({
           if (!id.includes("node_modules")) {
             return undefined;
           }
-          if (id.includes("@assistant-ui") || id.includes("@langchain/langgraph-sdk")) {
+          if (id.includes("@assistant-ui")) {
             return "assistant-ui";
           }
-          if (id.includes("platejs") || id.includes("@platejs")) {
+          if (id.includes("platejs")) {
             return "plate-editor";
           }
           return "vendor";
