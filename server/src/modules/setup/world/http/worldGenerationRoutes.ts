@@ -8,14 +8,13 @@ import {
   libraryListQuerySchema,
   libraryUseParamsSchema,
   libraryUseSchema,
-  requireWorldWizard,
   worldIdSchema,
   worldRefineSchema,
   worldService,
 } from "./worldHttpContext";
 
 export function registerGenerationWorldRoutes(router: Router): void {
-  router.get("/library", requireWorldWizard, validate({ query: libraryListQuerySchema }), async (req, res, next) => {
+  router.get("/library", validate({ query: libraryListQuerySchema }), async (req, res, next) => {
     try {
       const query = libraryListQuerySchema.parse(req.query);
       const data = await worldService.listLibrary(query);
@@ -29,7 +28,7 @@ export function registerGenerationWorldRoutes(router: Router): void {
     }
   });
 
-  router.post("/library", requireWorldWizard, validate({ body: libraryCreateSchema }), async (req, res, next) => {
+  router.post("/library", validate({ body: libraryCreateSchema }), async (req, res, next) => {
     try {
       const data = await worldService.createLibraryItem(req.body as z.infer<typeof libraryCreateSchema>);
       res.status(201).json({
@@ -44,7 +43,6 @@ export function registerGenerationWorldRoutes(router: Router): void {
 
   router.post(
     "/library/:libraryId/use",
-    requireWorldWizard,
     validate({ params: libraryUseParamsSchema, body: libraryUseSchema }),
     async (req, res, next) => {
       try {

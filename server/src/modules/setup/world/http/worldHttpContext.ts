@@ -9,17 +9,6 @@ import { WorldService } from "../../../../services/world/WorldService";
 export const worldService = new WorldService();
 export const knowledgeService = new KnowledgeService();
 
-export const requireWorldWizard: RequestHandler = (_req, res, next) => {
-  if (featureFlags.worldWizardEnabled) {
-    next();
-    return;
-  }
-  res.status(404).json({
-    success: false,
-    error: "World wizard feature is disabled.",
-  } satisfies ApiResponse<null>);
-};
-
 export const requireWorldVisualization: RequestHandler = (_req, res, next) => {
   if (featureFlags.worldVisEnabled) {
     next();

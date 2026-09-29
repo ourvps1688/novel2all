@@ -5,7 +5,6 @@ import { validate } from "../../../../middleware/validate";
 import {
   knowledgeBindingsSchema,
   knowledgeService,
-  requireWorldWizard,
   snapshotCreateSchema,
   snapshotDiffQuerySchema,
   snapshotRestoreParamsSchema,
@@ -16,7 +15,7 @@ import {
 } from "./worldHttpContext";
 
 export function registerCoreWorldRoutes(router: Router): void {
-  router.post("/import", requireWorldWizard, validate({ body: worldImportSchema }), async (req, res, next) => {
+  router.post("/import", validate({ body: worldImportSchema }), async (req, res, next) => {
     try {
       const data = await worldService.importWorld(req.body as z.infer<typeof worldImportSchema>);
       res.status(201).json({
@@ -109,7 +108,7 @@ export function registerCoreWorldRoutes(router: Router): void {
     }
   });
 
-  router.get("/:id/snapshots", requireWorldWizard, validate({ params: worldIdSchema }), async (req, res, next) => {
+  router.get("/:id/snapshots", validate({ params: worldIdSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const data = await worldService.listSnapshots(id);
@@ -125,7 +124,6 @@ export function registerCoreWorldRoutes(router: Router): void {
 
   router.post(
     "/:id/snapshots",
-    requireWorldWizard,
     validate({ params: worldIdSchema, body: snapshotCreateSchema }),
     async (req, res, next) => {
       try {
@@ -145,7 +143,6 @@ export function registerCoreWorldRoutes(router: Router): void {
 
   router.post(
     "/:id/snapshots/:snapshotId/restore",
-    requireWorldWizard,
     validate({ params: snapshotRestoreParamsSchema }),
     async (req, res, next) => {
       try {
@@ -164,7 +161,6 @@ export function registerCoreWorldRoutes(router: Router): void {
 
   router.get(
     "/:id/snapshots/diff",
-    requireWorldWizard,
     validate({ params: worldIdSchema, query: snapshotDiffQuerySchema }),
     async (req, res, next) => {
       try {
@@ -184,7 +180,6 @@ export function registerCoreWorldRoutes(router: Router): void {
 
   router.get(
     "/:id/export",
-    requireWorldWizard,
     validate({ params: worldIdSchema, query: worldExportQuerySchema }),
     async (req, res, next) => {
       try {
