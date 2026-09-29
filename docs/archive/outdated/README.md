@@ -16,6 +16,5 @@
 
 ## 已被当前实现取代的早期计划
 
-- [Desktop Plan 2026-04-17](./desktop-plan-2026-04-17.md)：文档仍停留在“未进入可分发打包”阶段；当前桌面发布已推进到 2026-05-14 release notes 中的 Windows 客户端包。
 - [Knowledge Module Plan](./knowledge-module-plan-implemented-reference.md)：知识库文档、绑定、索引和检索能力已进入当前产品；长期规则已沉淀到 [知识库与上下文组装](../../wiki/rag/knowledge-and-context-assembly.md)。
 - [Progress Audit](./progress-audit-superseded.md)：早期 TASK 对照审计，里面的许多“未实现”判断已被后续实现和 release notes 取代。

@@ -86,13 +86,7 @@
 
 写法引擎适合保存“这本书应该怎么写”的语言和叙事偏好。你可以从样本文本中提取写法特征，也可以手动调整规则，再把它用于试写、章节生成和后续修正。
 
-## 下载入口
-
-普通用户优先使用 Windows 桌面版：
-
-- 最新版本页：[GitHub Releases](https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant/releases/latest)
-- 建议优先下载安装版。
-- 不想安装时，可以选择 portable 版本直接运行。
+## 源码与项目仓库
 
 源码和项目仓库：
 

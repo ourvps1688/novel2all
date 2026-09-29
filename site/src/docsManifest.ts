@@ -48,7 +48,7 @@ export const docsManifest: SiteDocCategory[] = [
       doc(
         "installation",
         "安装与准备",
-        "在 Windows 上安装桌面版，确认模型、存储和知识库选项。",
+        "完成安装与准备，确认模型、存储和知识库选项。",
         "docs/public/installation.md",
       ),
       doc(

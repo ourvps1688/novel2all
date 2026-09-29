@@ -3,7 +3,6 @@ import {
   Boxes,
   BrainCircuit,
   CheckCircle2,
-  Download,
   FileText,
   Github,
   PenLine,
@@ -22,7 +21,6 @@ import chapterExecutionImage from "../../images/write/章节执行.png";
 import projectSettingsImage from "../../images/write/项目设定.png";
 
 const repoUrl = "https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant";
-const releaseUrl = `${repoUrl}/releases/latest`;
 const docsIntroBannerImage = `${import.meta.env.BASE_URL}assets/docs-intro-banner.png`;
 
 const proofItems = [
@@ -175,9 +173,7 @@ function SiteNav({ page }: { page: "home" | "docs" }) {
             <a href="#console">控制台</a>
             <a href="#audience">适合谁</a>
           </>
-        ) : (
-          <a href={releaseUrl}>下载桌面版</a>
-        )}
+        ) : null}
         <a className="nav-github" href={repoUrl} aria-label={stars !== null ? `GitHub · ${stars} stars` : "GitHub"}>
           <Github size={15} />
           <span>GitHub</span>
@@ -212,11 +208,7 @@ function HomePage() {
             你只需要先选开书依据。AI 会准备书级定位、世界、角色和卷章任务；到达可开写状态后，可以让简易创作持续推进，也可以进入专业工作台随时接管。
           </p>
           <div className="hero-actions">
-            <a className="button primary" href={releaseUrl}>
-              <Download size={18} />
-              下载桌面版
-            </a>
-            <a className="button ghost" href={repoUrl}>
+            <a className="button primary" href={repoUrl}>
               <Github size={18} />
               查看 GitHub
             </a>
@@ -328,17 +320,13 @@ function HomePage() {
           </div>
         </div>
         <aside className="download-panel">
-          <p className="panel-label">Windows desktop</p>
+          <p className="panel-label">Self-host</p>
           <h3>先连接一个文本模型，跑通第一本测试小说</h3>
           <p>
-            桌面版默认使用 SQLite 保存本地作品。第一次使用只需完成文本模型连接；需要知识库检索时再配置 Qdrant。
+            系统默认使用 SQLite 保存本地作品。第一次使用只需完成文本模型连接；需要知识库检索时再配置 Qdrant。
           </p>
           <div className="panel-actions">
-            <a className="button primary dark" href={releaseUrl}>
-              <Download size={18} />
-              最新版本
-            </a>
-            <a className="text-link" href={repoUrl}>
+            <a className="button primary dark" href={repoUrl}>
               打开仓库
               <ArrowRight size={17} />
             </a>
@@ -362,11 +350,7 @@ function HomePage() {
         <p className="eyebrow">Open source</p>
         <h2>让 AI 不只写一章，而是陪你把整本书推进到完成。</h2>
         <div className="cta-actions">
-          <a className="button primary" href={releaseUrl}>
-            <Download size={18} />
-            下载桌面版
-          </a>
-          <a className="button ghost" href={repoUrl}>
+          <a className="button primary" href={repoUrl}>
             <Github size={18} />
             查看源码
           </a>

@@ -35,14 +35,10 @@ Open-source AI novel writing assistant and long-form production studio.
 
 适合**完全不懂写作的新手**走完一本长篇，也适合研究 AI Native 应用、Agent Workflow、LangGraph 编排和长链路任务的开发者参考。
 
-## Windows 桌面版
+## 开始使用
 
-如果你只是想直接下载安装并开始使用，优先从桌面版入口进入：
-
-- 下载入口：[GitHub Releases](https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant/releases)
-- 最新版本页：[Latest Release](https://github.com/ExplosiveCoderflome/AI-Novel-Writing-Assistant/releases/latest)
-- 建议优先下载 `Setup.exe` 安装版；如果你不想安装，或者想放在 U 盘 / 临时目录里直接运行，再选择 `portable` 版本
-- 公开介绍站：[GitHub Pages 介绍站](https://explosivecoderflome.github.io/AI-Novel-Writing-Assistant/) 提供功能预览、模块文档和使用指南
+- 从源码运行：先确认 Node.js 和 pnpm 版本满足仓库要求，再执行 `pnpm install` 与 `pnpm dev`。
+- 公开介绍站：[GitHub Pages 介绍站](https://explosivecoderflome.github.io/AI-Novel-Writing-Assistant/) 提供功能预览、模块文档和使用指南。
 
 ## 用 Codex 持续创作长篇：Ani Book Skill
 

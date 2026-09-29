@@ -7,7 +7,6 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
-    "build:desktop": "tsc -p tsconfig.json --noEmit && node scripts/build-desktop.mjs",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test tests/*.test.js src/**/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

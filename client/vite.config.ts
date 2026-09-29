@@ -3,7 +3,7 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-interface DesktopPackageJson {
+interface ClientPackageJson {
   version?: unknown;
 }
 
@@ -47,23 +47,19 @@ function resolveDevProxyTarget(): string {
   return `http://${targetHost}:${port}`;
 }
 
-function resolveDesktopAppVersion(): string {
-  const desktopPackagePath = path.resolve(__dirname, "../desktop/package.json");
-  const packageJson = JSON.parse(fs.readFileSync(desktopPackagePath, "utf8")) as DesktopPackageJson;
+function resolveAppVersion(): string {
+  const packageJsonPath = path.resolve(__dirname, "package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as ClientPackageJson;
   const version = typeof packageJson.version === "string" ? packageJson.version.trim() : "";
-  if (!/^\d+\.\d+\.\d+$/.test(version)) {
-    throw new Error(`desktop/package.json version must be stable semver like 0.3.19, got ${version || "(empty)"}.`);
-  }
-  return version;
+  return version || "0.0.0";
 }
 
 clearStaleOptimizeCache(__dirname);
 
-const isDesktopRelativeBaseBuild = process.env.AI_NOVEL_CLIENT_BASE === "relative";
-const appVersion = resolveDesktopAppVersion();
+const appVersion = resolveAppVersion();
 
 export default defineConfig({
-  base: isDesktopRelativeBaseBuild ? "./" : "/",
+  base: "/",
   plugins: [react()],
   define: {
     "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),

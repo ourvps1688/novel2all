@@ -22,7 +22,6 @@
 - [Chapter Editor V2 Progress](./checkpoints/chapter-editor-v2-progress.md)
 - [Prompt Governance Audit 2026-05-08](./checkpoints/prompt-governance-audit-2026-05-08.md)
 - [LLM Schema Refactor Checkpoint](./checkpoints/llm-schema-refactor-checkpoint.md)
-- [Windows Desktop Installer Manual Checklist](./checkpoints/windows-desktop-installer-manual-checklist.md)
 
 ### `docs/plans`
 
