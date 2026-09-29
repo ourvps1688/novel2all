@@ -14,7 +14,7 @@ import {
 const QUERY_PARAMS_KEY = "auto-director-pause-notifications";
 
 function buildFollowUpTargetUrl(directorTaskId: string): string {
-  return `/auto-director/follow-ups?directorTaskId=${encodeURIComponent(directorTaskId)}`;
+  return `/tasks?kind=novel_workflow&id=${encodeURIComponent(directorTaskId)}`;
 }
 
 export default function AutoDirectorPauseNotificationWatcher() {

@@ -302,8 +302,8 @@ export function buildHomeAttentionItems(input: {
       title: `${Math.max(actionRequiredCount, waitingApprovalCount)} 个创作流程等待处理`,
       description: "这些项目可能在等待方向确认、阶段继续或失败后的恢复决策。",
       tone: "warning",
-      to: "/auto-director/follow-ups",
-      actionLabel: "查看跟进事项",
+      to: "/tasks",
+      actionLabel: "查看运行记录",
     });
   }
   if (readyForExecutionCount > 0) {
