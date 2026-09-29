@@ -32,7 +32,6 @@ export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "book-analysis", pattern: /^\/book-analysis\/?$/, title: "拆书", group: "creation" },
   { key: "market-radar", pattern: /^\/market-radar\/?$/, title: "热门题材雷达", group: "creation" },
   { key: "tasks", pattern: /^\/tasks\/?$/, title: "任务", group: "tasks" },
-  { key: "auto-director-follow-ups", pattern: /^\/auto-director\/follow-ups\/?$/, title: "导演跟进", group: "tasks" },
   { key: "knowledge", pattern: /^\/knowledge\/?$/, title: "知识库", group: "more" },
   { key: "genres", pattern: /^\/genres\/?$/, title: "题材基底", group: "more" },
   { key: "story-modes", pattern: /^\/story-modes\/?$/, title: "推进模式", group: "more" },
@@ -85,7 +84,6 @@ const moreNavGroups: MobileNavGroup[] = [
     title: "世界与系统",
     items: [
       { key: "tasks", label: "运行记录", to: "/tasks", group: "more" },
-      { key: "auto-director-follow-ups", label: "导演跟进", to: "/auto-director/follow-ups", group: "more" },
       { key: "worlds", label: "世界样本库", to: "/worlds", group: "more" },
       { key: "world-generator", label: "创建世界样本", to: "/worlds/generator", group: "more" },
       { key: "settings", label: "系统设置", to: "/settings", group: "more" },

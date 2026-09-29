@@ -37,7 +37,6 @@ test("auto-director mobile support is centralized under the mobile directory", (
     "mobile layout/style contracts should live in the auto-director mobile directory",
   );
   [
-    "/auto-director/follow-ups",
     "/settings",
     "/novels/create",
     "/novels/auto-director",

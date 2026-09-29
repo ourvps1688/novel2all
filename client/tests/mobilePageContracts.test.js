@@ -22,10 +22,6 @@ const mobileNovelStepNav = readClientFile("src/pages/novels/mobile/MobileNovelSt
 const mobileAutoDirectorStatusCard = readClientFile("src/pages/novels/mobile/MobileAutoDirectorStatusCard.tsx");
 const mobileFloatingSaveButton = readClientFile("src/pages/novels/mobile/MobileFloatingSaveButton.tsx");
 const mobileAutoDirectorContracts = readClientFile("src/mobile/autoDirector/mobileSupportContracts.ts");
-const autoDirectorFollowUpList = readFileSync(
-  join(clientRoot, "src/pages/autoDirectorFollowUps/components/AutoDirectorFollowUpList.tsx"),
-  "utf8",
-);
 
 function getMobileRouteKeys() {
   const routeBlock = mobileSiteNavigation.match(/export const MOBILE_ROUTE_PATTERNS[\s\S]*?\n\];/)?.[0] ?? "";
@@ -406,8 +402,6 @@ test("mobile follow-up filters stay in one compact row after generic grid collap
     elementClassName: followUpFilterClassName,
   });
 
-  assert.match(autoDirectorFollowUpList, /AUTO_DIRECTOR_MOBILE_CLASSES\.followUpFilterGrid/);
-  assert.match(autoDirectorFollowUpList, /AUTO_DIRECTOR_MOBILE_CLASSES\.followUpFilterTrigger/);
   assert.match(
     css,
     /mobile-route-auto-director-follow-ups \.auto-director-follow-up-filter-grid\.grid[\s\S]+grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,

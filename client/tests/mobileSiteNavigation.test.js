@@ -21,7 +21,6 @@ const routedPaths = [
   "/chat-legacy",
   "/book-analysis",
   "/tasks",
-  "/auto-director/follow-ups",
   "/knowledge",
   "/genres",
   "/story-modes",
@@ -70,7 +69,6 @@ test("mobile more menu contains all non-primary registered pages", () => {
     [
       "/help",
       "/book-analysis",
-      "/auto-director/follow-ups",
       "/chat-legacy",
       "/knowledge",
       "/genres",
