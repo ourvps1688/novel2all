@@ -10,65 +10,11 @@ import type {
   WorldSnapshot,
   WorldStructuredData,
   WorldStructureSectionKey,
-  WorldTemplate,
   WorldVisualizationPayload,
 } from "@ai-novel/shared/types/world";
-import type {
-  WorldOptionRefinementLevel,
-  WorldPropertyOption,
-  WorldReferenceAnchor,
-  WorldGenerationBlueprint,
-  WorldReferenceMode,
-  WorldReferenceContext,
-  WorldReferenceSeedBundle,
-  WorldSkeletonGenerationOptions,
-  WorldSkeletonGenerationPayload,
-} from "@ai-novel/shared/types/worldWizard";
 import { apiClient } from "./client";
 
 const WORLD_GENERATE_ALL_TIMEOUT_MS = 3 * 60 * 1000;
-const WORLD_SKELETON_GENERATE_TIMEOUT_MS = 130 * 1000;
-
-function normalizeSuggestedAxioms(raw: unknown): string[] {
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-
-  const normalized = raw
-    .map((item) => {
-      if (typeof item === "string") {
-        return item.trim();
-      }
-      if (!item || typeof item !== "object") {
-        return "";
-      }
-
-      const record = item as Record<string, unknown>;
-      const title = [record.axiom, record.text, record.title, record.name, record.rule]
-        .find((value) => typeof value === "string") as string | undefined;
-      const description = [record.description, record.detail, record.content]
-        .find((value) => typeof value === "string") as string | undefined;
-      const effect = [record.effect, record.impact, record.result]
-        .find((value) => typeof value === "string") as string | undefined;
-
-      if (title && description && effect) {
-        return `${title}（${description}，影响：${effect}）`.trim();
-      }
-      if (title && description) {
-        return `${title}：${description}`.trim();
-      }
-      if (title) {
-        return title.trim();
-      }
-      if (description) {
-        return description.trim();
-      }
-      return "";
-    })
-    .filter(Boolean);
-
-  return Array.from(new Set(normalized));
-}
 
 export type WorldDetail = World & {
   deepeningQA?: WorldDeepeningQuestion[];
@@ -82,28 +28,6 @@ export interface WorldStructurePayload {
   structure: WorldStructuredData;
   bindingSupport: WorldBindingSupport;
 }
-
-export interface WorldInspirationAnalysisResult {
-  mode: string;
-  conceptCard: {
-    worldType: string;
-    templateKey: string;
-    coreImagery: string[];
-    tone: string;
-    keywords: string[];
-    summary: string;
-  };
-  propertyOptions?: WorldPropertyOption[];
-  referenceAnchors?: WorldReferenceAnchor[];
-  referenceSeeds?: WorldReferenceSeedBundle;
-  sourceMeta?: {
-    extracted: boolean;
-    originalLength: number;
-    chunkCount: number;
-  };
-}
-
-export const WORLD_INSPIRATION_ANALYZE_STREAM_PATH = "/worlds/inspiration/analyze/stream";
 
 export async function getWorldList() {
   const { data } = await apiClient.get<ApiResponse<World[]>>("/worlds");
@@ -172,49 +96,6 @@ export async function generateWorldStructure(
 
 export async function deleteWorld(id: string) {
   const { data } = await apiClient.delete<ApiResponse<null>>(`/worlds/${id}`);
-  return data;
-}
-
-export async function getWorldTemplates() {
-  const { data } = await apiClient.get<ApiResponse<WorldTemplate[]>>("/worlds/templates");
-  return data;
-}
-
-export async function analyzeWorldInspiration(payload: {
-  input?: string;
-  mode?: "free" | "reference" | "random";
-  worldType?: string;
-  knowledgeDocumentIds?: string[];
-  referenceMode?: WorldReferenceMode;
-  preserveElements?: string[];
-  allowedChanges?: string[];
-  forbiddenElements?: string[];
-  refinementLevel?: WorldOptionRefinementLevel;
-  optionsCount?: number;
-  provider?: LLMProvider;
-  model?: string;
-}) {
-  const { data } = await apiClient.post<
-    ApiResponse<WorldInspirationAnalysisResult>
-  >("/worlds/inspiration/analyze", payload);
-  return data;
-}
-
-export async function generateWorldSkeleton(payload: {
-  idea: string;
-  worldType?: string;
-  template?: string;
-  referenceContext?: WorldReferenceContext | null;
-  blueprint?: WorldGenerationBlueprint | null;
-  options: WorldSkeletonGenerationOptions;
-  provider?: LLMProvider;
-  model?: string;
-}) {
-  const { data } = await apiClient.post<ApiResponse<WorldSkeletonGenerationPayload>>(
-    "/worlds/skeleton/generate",
-    payload,
-    { timeout: WORLD_SKELETON_GENERATE_TIMEOUT_MS },
-  );
   return data;
 }
 
@@ -407,7 +288,7 @@ export async function useWorldLibraryItem(
     injected: boolean;
     worldId: string | null;
     targetCollection?: "forces" | "locations" | null;
-  }>>(`/worlds/library/${libraryId}/use`, payload ?? {});
+  }>>(`/worlds/${libraryId}/use`, payload ?? {});
   return data;
 }
 
@@ -454,4 +335,45 @@ export async function importWorldData(payload: {
 }) {
   const { data } = await apiClient.post<ApiResponse<World>>("/worlds/import", payload);
   return data;
+}
+
+function normalizeSuggestedAxioms(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const normalized = raw
+    .map((item) => {
+      if (typeof item === "string") {
+        return item.trim();
+      }
+      if (!item || typeof item !== "object") {
+        return "";
+      }
+
+      const record = item as Record<string, unknown>;
+      const title = [record.axiom, record.text, record.title, record.name, record.rule]
+        .find((value) => typeof value === "string") as string | undefined;
+      const description = [record.description, record.detail, record.content]
+        .find((value) => typeof value === "string") as string | undefined;
+      const effect = [record.effect, record.impact, record.result]
+        .find((value) => typeof value === "string") as string | undefined;
+
+      if (title && description && effect) {
+        return `${title}（${description}，影响：${effect}）`.trim();
+      }
+      if (title && description) {
+        return `${title}：${description}`.trim();
+      }
+      if (title) {
+        return title.trim();
+      }
+      if (description) {
+        return description.trim();
+      }
+      return "";
+    })
+    .filter(Boolean);
+
+  return Array.from(new Set(normalized));
 }
