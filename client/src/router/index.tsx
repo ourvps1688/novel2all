@@ -15,10 +15,6 @@ const SimpleNovelShelfPage = lazy(() => import("@/pages/novels/simpleCreation/Si
 const NovelPreview = lazy(() => import("@/pages/novels/NovelPreview"));
 const NarrativeFormNovelEditRoute = lazy(() => import("@/pages/novels/NarrativeFormNovelEditRoute"));
 const NovelChapterEdit = lazy(() => import("@/pages/novels/NovelChapterEdit"));
-const DramaWorkspacePage = lazy(() => import("@/pages/drama/DramaWorkspacePage"));
-const DramaProjectPage = lazy(() => import("@/pages/drama/DramaProjectPage"));
-const ComicWorkspacePage = lazy(() => import("@/pages/comic/ComicWorkspacePage"));
-const ComicProjectPage = lazy(() => import("@/pages/comic/ComicProjectPage"));
 const CreativeHubPage = lazy(() => import("@/pages/creativeHub/CreativeHubPage"));
 const ChatPage = lazy(() => import("@/pages/chat/ChatPage"));
 const BookAnalysisPage = lazy(() => import("@/pages/bookAnalysis/BookAnalysisPage"));
@@ -29,7 +25,6 @@ const KnowledgePage = lazy(() => import("@/pages/knowledge/KnowledgePage"));
 const GenreManagementPage = lazy(() => import("@/pages/genres/GenreManagementPage"));
 const StoryModeManagementPage = lazy(() => import("@/pages/storyModes/StoryModeManagementPage"));
 const TitleStudioPage = lazy(() => import("@/pages/titles/TitleStudioPage"));
-const PromptWorkbenchPage = lazy(() => import("@/pages/promptWorkbench/PromptWorkbenchPage"));
 const AntiAiRulesPage = lazy(() => import("@/pages/antiAiRules/AntiAiRulesPage"));
 const SettingsOverviewPage = lazy(() => import("@/pages/settings/views/SettingsOverviewPage"));
 const ModelsSettingsPage = lazy(() => import("@/pages/settings/views/ModelsSettingsPage"));
@@ -60,10 +55,6 @@ const routes: RouteObject[] = [
       { path: "novels/:id/preview", element: <NovelPreview /> },
       { path: "novels/:id/edit", element: <NarrativeFormNovelEditRoute /> },
       { path: "novels/:id/chapters/:chapterId", element: <NovelChapterEdit /> },
-      { path: "drama", element: <DramaWorkspacePage /> },
-      { path: "drama/projects/:id", element: <DramaProjectPage /> },
-      { path: "comic", element: <ComicWorkspacePage /> },
-      { path: "comic/projects/:id", element: <ComicProjectPage /> },
       { path: "creative-hub", element: <CreativeHubPage /> },
       { path: "chat-legacy", element: <ChatPage /> },
       { path: "chat", element: <Navigate to="/creative-hub" replace /> },
@@ -77,7 +68,6 @@ const routes: RouteObject[] = [
       { path: "genres", element: <GenreManagementPage /> },
       { path: "story-modes", element: <StoryModeManagementPage /> },
       { path: "titles", element: <TitleStudioPage /> },
-      { path: "prompt-workbench", element: <PromptWorkbenchPage /> },
       { path: "anti-ai-rules", element: <AntiAiRulesPage /> },
       { path: "settings/model-routes", element: <ModelRoutesSettingsPage /> },
       { path: "settings/models", element: <ModelsSettingsPage /> },

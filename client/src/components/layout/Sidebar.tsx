@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   BookOpenText,
-  Braces,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -12,9 +11,7 @@ import {
   Images,
   LayoutDashboard,
   ListTodo,
-  MonitorPlay,
   Radar,
-  SquareStack,
   ScanSearch,
   Settings2,
   ShieldCheck,
@@ -56,8 +53,6 @@ const navGroups: NavGroup[] = [
       { to: "/help", label: "创作向导", icon: CircleHelp },
       { to: "/market-radar", label: "热门题材雷达", icon: Radar },
       { to: "/novels", label: "小说列表", icon: BookOpenText },
-      { to: "/drama", label: "短剧工作台", icon: MonitorPlay, disabled: true },
-      { to: "/comic", label: "漫画工作台", icon: SquareStack },
       { to: "/creative-hub", label: "创作中枢", icon: LayoutDashboard },
       { to: "/book-analysis", label: "拆书", icon: ScanSearch },
     ],
@@ -81,7 +76,6 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/tasks", label: "运行记录", icon: ListTodo },
       { to: "/auto-director/follow-ups", label: "导演跟进", icon: Workflow },
-      { to: "/prompt-workbench", label: "提示词管理", icon: Braces },
       { to: "/settings", label: "系统设置", icon: Settings2 },
     ],
   },
@@ -135,21 +129,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const failedIndexCount = knowledgeDocuments.filter((item) => item.latestIndexStatus === "failed").length;
 
   const renderBadge = (to: string) => {
-    if (to === "/comic") {
-      if (collapsed) {
-        return null;
-      }
-      return (
-        <Badge
-          variant="outline"
-          className="ml-auto h-5 border-amber-300 bg-amber-50 px-1.5 text-[10px] font-medium text-amber-700"
-          title="漫画工作台仍在 Beta 阶段"
-        >
-          Beta
-        </Badge>
-      );
-    }
-
     if (to === "/tasks") {
       if (failedTaskCount <= 0) {
         return null;
