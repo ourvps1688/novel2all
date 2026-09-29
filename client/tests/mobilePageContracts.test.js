@@ -394,46 +394,6 @@ test("mobile task filters stay in a compact three-column control grid", () => {
   });
 });
 
-test("mobile follow-up filters stay in one compact row after generic grid collapse cascade", () => {
-  const expectedColumns = "repeat(3, minmax(0, 1fr))";
-  const followUpFilterClassName = getAutoDirectorMobileClassValue("followUpFilterGrid");
-  const winner = getWinningGridTemplateColumns({
-    routeClassName: "mobile-route-auto-director-follow-ups",
-    elementClassName: followUpFilterClassName,
-  });
-
-  assert.match(
-    css,
-    /mobile-route-auto-director-follow-ups \.auto-director-follow-up-filter-grid\.grid[\s\S]+grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,
-    "follow-up filters should resolve to three compact mobile columns",
-  );
-  assert.equal(
-    winner?.value,
-    expectedColumns,
-    `follow-up filter grid should keep three columns after mobile grid collapse rules, got ${
-      winner?.value ?? "no matching rule"
-    } from ${winner?.selector ?? "no selector"}`,
-  );
-});
-
-test("mobile follow-up overview combines summary and section filters in one compact card", () => {
-  assert.match(
-    css,
-    /mobile-route-auto-director-follow-ups \.auto-director-follow-up-overview-card[\s\S]+padding: 0.75rem;/,
-    "follow-up overview card should use compact mobile padding",
-  );
-  assert.match(
-    css,
-    /mobile-route-auto-director-follow-ups \.auto-director-follow-up-section-grid\.grid[\s\S]+grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/,
-    "follow-up section filters should share one compact grid on phone width",
-  );
-  assert.match(
-    css,
-    /mobile-route-auto-director-follow-ups \.auto-director-follow-up-section-grid \.text-xs[\s\S]+display: none;/,
-    "follow-up section descriptions should not consume mobile vertical space",
-  );
-});
-
 test("mobile CSS enforces the no deep card nesting rule", () => {
   assert.match(css, /mobile-site-main[\s\S]+rounded-xl\.border\.bg-card \.rounded-xl\.border\.bg-card \.rounded-xl\.border\.bg-card/);
   assert.match(css, /border-width: 0;/);

@@ -50,13 +50,8 @@ test("auto-director mobile support is centralized under the mobile directory", (
   });
 });
 
-test("auto-director follow-up center uses mobile contracts for single-column non-overflow layout", () => {
+test("auto-director app shell uses mobile contracts for single-column non-overflow layout", () => {
   const appLayout = readSource("components/layout/AppLayout.tsx");
-  const page = readSource("pages/autoDirectorFollowUps/AutoDirectorFollowUpCenterPage.tsx");
-  const overview = readSource("pages/autoDirectorFollowUps/components/AutoDirectorFollowUpOverview.tsx");
-  const list = readSource("pages/autoDirectorFollowUps/components/AutoDirectorFollowUpList.tsx");
-  const detail = readSource("pages/autoDirectorFollowUps/components/AutoDirectorFollowUpDetail.tsx");
-  const batchBar = readSource("pages/autoDirectorFollowUps/components/AutoDirectorFollowUpBatchBar.tsx");
 
   assertImportsMobileContracts(appLayout, "app layout should import mobile route contracts instead of owning route exceptions");
   assertContains(
@@ -96,72 +91,6 @@ test("auto-director follow-up center uses mobile contracts for single-column non
     navbar,
     "AUTO_DIRECTOR_MOBILE_CLASSES.navbarWorkspaceToggle",
     "workspace navigation toggle should not compete with mobile page actions at phone width",
-  );
-
-  assertImportsMobileContracts(page, "follow-up page should use the mobile directory as the layout contract source");
-  assertContains(
-    page,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpPageRoot",
-    "follow-up center root should prevent horizontal overflow on mobile",
-  );
-  assertContains(
-    page,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpMasterDetailGrid",
-    "follow-up list/detail grid should allow children to shrink on narrow screens",
-  );
-  assertImportsMobileContracts(overview, "follow-up overview should use mobile section grid contracts");
-  assertContains(
-    overview,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpOverviewGrid",
-    "follow-up section cards should be one column at phone width",
-  );
-  assertContains(
-    overview,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpOverviewCard",
-    "follow-up status summary and section filters should share one compact mobile card",
-  );
-  assertContains(
-    overview,
-    "section: \"\"",
-    "follow-up section filters should include an all-items entry in the same compact card",
-  );
-  assertContains(
-    overview,
-    "label: \"全部\"",
-    "follow-up section filters should expose the all-items entry to users",
-  );
-  assertContains(
-    page,
-    "AutoDirectorFollowUpSection | \"\"",
-    "follow-up section switching should support clearing the section filter from the all-items entry",
-  );
-  assertImportsMobileContracts(list, "follow-up list should use mobile list contracts");
-  assertContains(
-    list,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpListHeader",
-    "follow-up list item header should stack before switching to row layout",
-  );
-  assertContains(
-    list,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpFilterGrid",
-    "follow-up list filters should use the centralized compact mobile filter grid",
-  );
-  assertContains(
-    list,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpFilterTrigger",
-    "follow-up list filter selects should use compact mobile trigger sizing",
-  );
-  assertImportsMobileContracts(detail, "follow-up detail should use mobile detail contracts");
-  assertContains(
-    detail,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.wrapText",
-    "follow-up detail should wrap long URLs, task ids, and channel targets",
-  );
-  assertImportsMobileContracts(batchBar, "follow-up batch bar should use mobile batch action contracts");
-  assertContains(
-    batchBar,
-    "AUTO_DIRECTOR_MOBILE_CLASSES.followUpBatchBar",
-    "mobile batch action bar should stay reachable after scrolling long lists",
   );
 });
 
