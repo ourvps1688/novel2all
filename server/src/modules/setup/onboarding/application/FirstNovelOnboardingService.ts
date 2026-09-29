@@ -121,7 +121,6 @@ export async function getFirstNovelOnboardingProjection(): Promise<FirstNovelOnb
   let reason = "自动导演、正文生成和审校都需要稳定的模型连接。";
   let primaryAction: FirstNovelOnboardingProjection["primaryAction"] = {
     label: "快捷配置模型",
-    route: "/help",
     kind: "open_quick_setup",
   };
 

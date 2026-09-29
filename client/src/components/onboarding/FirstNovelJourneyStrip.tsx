@@ -3,8 +3,12 @@ import { ArrowRight, CheckCircle2, Compass } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getFirstNovelOnboarding } from "@/api/onboarding";
 import { queryKeys } from "@/api/queryKeys";
+import { useCreationSetup } from "@/components/onboarding/CreationSetupContext";
+
+const containerClass = "group flex flex-col gap-3 rounded-xl border bg-background px-4 py-3 transition hover:border-primary/35 hover:bg-primary/[0.025] sm:flex-row sm:items-center w-full text-left";
 
 export default function FirstNovelJourneyStrip() {
+  const { openQuickSetup } = useCreationSetup();
   const query = useQuery({
     queryKey: queryKeys.onboarding.firstNovel,
     queryFn: getFirstNovelOnboarding,
@@ -15,11 +19,8 @@ export default function FirstNovelJourneyStrip() {
   if (!journey || journey.graduated) {
     return null;
   }
-  return (
-    <Link
-      to="/novels/create"
-      className="group flex flex-col gap-3 rounded-xl border bg-background px-4 py-3 transition hover:border-primary/35 hover:bg-primary/[0.025] sm:flex-row sm:items-center"
-    >
+  const content = (
+    <>
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Compass className="h-4 w-4" />
@@ -44,6 +45,17 @@ export default function FirstNovelJourneyStrip() {
         {journey.completedCount > 0 ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : null}
         <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
-    </Link>
+    </>
   );
+  return journey.primaryAction.kind === "open_quick_setup"
+    ? (
+        <button type="button" className={containerClass} onClick={openQuickSetup}>
+          {content}
+        </button>
+      )
+    : (
+        <Link to={journey.primaryAction.route ?? "/"} className={containerClass}>
+          {content}
+        </Link>
+      );
 }
