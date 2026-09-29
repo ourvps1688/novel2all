@@ -27,6 +27,7 @@ import {
 import { buildWorldVisualizationPayload } from "./worldVisualization";
 import { applyGeneratedWorldFields, buildWorldBlueprintPromptBlock } from "./worldGenerationBlueprint";
 import { createWorldDraftGenerateStream, createWorldDraftRefineStream } from "./worldDraftGeneration";
+import {
   answerWorldDeepeningQuestions,
   checkWorldConsistency,
   createWorldDeepeningQuestions,
@@ -51,6 +52,7 @@ import {
   type DeepeningAnswerInput,
   type ImportWorldInput,
   type LayerGenerateInput,
+  type LayerStateMap,
   type LayerUpdateInput,
   type LibraryUseInput,
   type RefineWorldInput,
@@ -68,6 +70,7 @@ import {
 } from "./worldServiceShared";
 import { exportWorldData, importWorldData } from "./worldTransfer";
 import { ragServices } from "../rag";
+import type { RagOwnerType } from "../rag/types";
 
 function buildGeneratedStructurePersistence(
   world: Parameters<typeof buildWorldStructureFromLegacySource>[0],
@@ -153,6 +156,10 @@ export class WorldService {
   private queueRagUpsert(ownerType: RagOwnerType, ownerId: string): void {
     void ragServices.ragIndexService.enqueueUpsert(ownerType, ownerId).catch(() => {
       // keep primary workflow resilient even when rag queueing fails
+    });
+  }
+
+  private queueRagDelete(ownerType: RagOwnerType, ownerId: string): void {
     void ragServices.ragIndexService.enqueueDelete(ownerType, ownerId).catch(() => {
       // keep primary workflow resilient even when rag queueing fails
     });
@@ -165,6 +172,13 @@ export class WorldService {
         deepeningQA: { orderBy: { createdAt: "desc" } },
         consistencyIssues: { orderBy: [{ status: "asc" }, { severity: "desc" }, { createdAt: "desc" }] },
         snapshots: { orderBy: { createdAt: "desc" }, take: 20 },
+      },
+    });
+  }
+
+  async deleteWorld(id: string) {
+    this.queueRagDelete("world", id);
+    await prisma.world.delete({ where: { id } });
   }
 
   async suggestAxioms(
