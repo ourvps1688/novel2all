@@ -61,15 +61,20 @@ export class BookAnalysisCharacterRagAdapter {
     const chunksById = new Map<string, RetrievedChunk & { dimension: BookAnalysisCharacterDimension }>();
 
     await Promise.all(dimensions.map(async (dimension) => {
-      const rows = await ragServices.hybridRetrievalService.retrieveByFacet({
-        query: buildBookAnalysisCharacterDimensionQuery(input, dimension),
-        ownerTypes: ["knowledge_document"],
-        knowledgeDocumentIds: [input.documentId],
-        finalTopK: 5,
-        facets: {
-          characterRole: [input.characterName],
-        },
-      });
+      let rows: RetrievedChunk[] = [];
+      try {
+        rows = await ragServices.hybridRetrievalService.retrieveByFacet({
+          query: buildBookAnalysisCharacterDimensionQuery(input, dimension),
+          ownerTypes: ["knowledge_document"],
+          knowledgeDocumentIds: [input.documentId],
+          finalTopK: 5,
+          facets: {
+            characterRole: [input.characterName],
+          },
+        });
+      } catch (error) {
+        console.warn("[rag] book analysis character retrieval degraded.", error);
+      }
       for (const row of rows) {
         if (!chunksById.has(row.id)) {
           chunksById.set(row.id, { ...row, dimension });

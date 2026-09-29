@@ -7,7 +7,7 @@ export class RagRetrievalTraceRetention {
   private timer: NodeJS.Timeout | null = null;
 
   start(intervalMs = DEFAULT_CLEANUP_INTERVAL_MS): void {
-    if (this.timer) {
+    if (!ragConfig.enabled || this.timer) {
       return;
     }
     this.timer = setInterval(() => {

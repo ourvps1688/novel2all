@@ -43,6 +43,7 @@ import worldRouter from "./modules/setup/world/http";
 import writingFormulaRouter from "./routes/writingFormula";
 import { novelEventBus, registerNovelEventHandlers } from "./events";
 import { bookAnalysisService } from "./services/bookAnalysis/BookAnalysisService";
+import { ragConfig } from "./config/rag";
 import { ragServices } from "./services/rag";
 import { getSharedNovelServices } from "./services/novel/application/sharedNovelServices";
 import { novelSideEffectWorker } from "./events/sideEffects";
@@ -253,8 +254,10 @@ function initializeBackgroundServices(): BackgroundServicesHandle {
   void marketRadarService.recoverInterruptedRuns().catch((error) => {
     console.warn("[market-radar] failed to mark interrupted scans.", error);
   });
-  ragServices.ragWorker.start();
-  ragServices.ragRetrievalTraceRetention.start();
+  if (ragConfig.enabled) {
+    ragServices.ragWorker.start();
+    ragServices.ragRetrievalTraceRetention.start();
+  }
   novelSideEffectWorker.start();
   const recoveryInitialization = recoveryTaskService.initializePendingRecoveries();
   const directorWorker = new DirectorWorker();

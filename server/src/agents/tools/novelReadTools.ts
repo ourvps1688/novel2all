@@ -454,11 +454,16 @@ export const novelReadToolDefinitions: Partial<
     outputSchema: searchKnowledgeOutput,
     execute: async (_context, rawInput) => {
       const input = searchKnowledgeInput.parse(rawInput);
-      const contextBlock = await ragServices.hybridRetrievalService.buildContextBlock(input.query, {
-        novelId: input.novelId,
-        worldId: input.worldId,
-        finalTopK: input.topK ?? 6,
-      });
+      let contextBlock = "";
+      try {
+        contextBlock = await ragServices.hybridRetrievalService.buildContextBlock(input.query, {
+          novelId: input.novelId,
+          worldId: input.worldId,
+          finalTopK: input.topK ?? 6,
+        });
+      } catch (error) {
+        console.warn("[rag] knowledge search degraded to empty context.", error);
+      }
       const hitCount = contextBlock ? contextBlock.split("[RAG-").length - 1 : 0;
       return searchKnowledgeOutput.parse({
         query: input.query,

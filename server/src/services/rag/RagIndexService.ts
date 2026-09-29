@@ -938,7 +938,10 @@ export class RagIndexService {
       runAfter?: Date;
       maxAttempts?: number;
     },
-  ) {
+  ): Promise<RagIndexJob | null> {
+    if (!ragConfig.enabled) {
+      return null;
+    }
     const tenantId = options?.tenantId ?? ragConfig.defaultTenantId;
     const existing = await prisma.ragIndexJob.findFirst({
       where: {
@@ -1066,12 +1069,18 @@ export class RagIndexService {
   }
 
   async enqueueReindex(scope: ReindexScope, id?: string, tenantId?: string) {
+    if (!ragConfig.enabled) {
+      return { scope, id: id ?? null, count: 0, jobs: [] as RagIndexJob[] };
+    }
     const owners = await this.collectOwners(scope, id);
-    const jobs = await Promise.all(
-      owners.map((owner) =>
-        this.enqueueOwnerJob("rebuild", owner.ownerType, owner.ownerId, { tenantId }),
-      ),
-    );
+    // RAG 未启用时上面已提前返回，此处入队结果必然非空。
+    const jobs = (
+      await Promise.all(
+        owners.map((owner) =>
+          this.enqueueOwnerJob("rebuild", owner.ownerType, owner.ownerId, { tenantId }),
+        ),
+      )
+    ).filter(Boolean) as RagIndexJob[];
     return {
       scope,
       id: id ?? null,
