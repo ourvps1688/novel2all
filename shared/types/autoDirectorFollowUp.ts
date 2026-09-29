@@ -38,8 +38,7 @@ export type AutoDirectorMutationActionCode =
 export type AutoDirectorNavigationActionCode =
   | "go_replan"
   | "go_candidate_selection"
-  | "open_detail"
-  | "open_follow_up_center";
+  | "open_detail";
 
 export type AutoDirectorActionCode = AutoDirectorMutationActionCode | AutoDirectorNavigationActionCode;
 

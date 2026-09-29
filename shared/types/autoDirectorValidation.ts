@@ -14,10 +14,7 @@ export type AutoDirectorValidationSource =
   | "retry"
   | "follow_up_action"
   | "batch_action"
-  | "channel_callback"
-  | "web"
-  | "dingtalk"
-  | "wecom";
+  | "web";
 
 export type AutoDirectorAffectedScope =
   | {

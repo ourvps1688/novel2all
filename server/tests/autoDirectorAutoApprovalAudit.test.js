@@ -19,12 +19,6 @@ test("auto director auto-approval audit records the event, appends a milestone, 
   };
   const taskUpdates = [];
   const deletedRows = [];
-  const previousEnv = {
-    AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL: process.env.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL,
-    AUTO_DIRECTOR_WECOM_WEBHOOK_URL: process.env.AUTO_DIRECTOR_WECOM_WEBHOOK_URL,
-  };
-  delete process.env.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL;
-  delete process.env.AUTO_DIRECTOR_WECOM_WEBHOOK_URL;
 
   prisma.novelWorkflowTask.findUnique = async () => ({
     id: "task_auto_approval",
@@ -87,8 +81,6 @@ test("auto director auto-approval audit records the event, appends a milestone, 
     prisma.autoDirectorAutoApprovalRecord.findMany = originals.findMany;
     prisma.autoDirectorAutoApprovalRecord.deleteMany = originals.deleteMany;
     prisma.appSetting.findMany = originals.appSettingFindMany;
-    process.env.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL = previousEnv.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL;
-    process.env.AUTO_DIRECTOR_WECOM_WEBHOOK_URL = previousEnv.AUTO_DIRECTOR_WECOM_WEBHOOK_URL;
   }
 });
 
@@ -102,12 +94,6 @@ test("auto director replan notice audit records a reminder instead of an auto-ap
     appSettingFindMany: prisma.appSetting.findMany,
   };
   const taskUpdates = [];
-  const previousEnv = {
-    AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL: process.env.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL,
-    AUTO_DIRECTOR_WECOM_WEBHOOK_URL: process.env.AUTO_DIRECTOR_WECOM_WEBHOOK_URL,
-  };
-  delete process.env.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL;
-  delete process.env.AUTO_DIRECTOR_WECOM_WEBHOOK_URL;
 
   prisma.novelWorkflowTask.findUnique = async () => ({
     id: "task_replan_notice",
@@ -151,8 +137,6 @@ test("auto director replan notice audit records a reminder instead of an auto-ap
     prisma.autoDirectorAutoApprovalRecord.findMany = originals.findMany;
     prisma.autoDirectorAutoApprovalRecord.deleteMany = originals.deleteMany;
     prisma.appSetting.findMany = originals.appSettingFindMany;
-    process.env.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL = previousEnv.AUTO_DIRECTOR_DINGTALK_WEBHOOK_URL;
-    process.env.AUTO_DIRECTOR_WECOM_WEBHOOK_URL = previousEnv.AUTO_DIRECTOR_WECOM_WEBHOOK_URL;
   }
 });
 
