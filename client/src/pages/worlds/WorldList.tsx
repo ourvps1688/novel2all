@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { deleteWorld, getWorldList } from "@/api/world";
 import { queryKeys } from "@/api/queryKeys";
-import { featureFlags } from "@/config/featureFlags";
 import { toast } from "@/components/ui/toast";
 
 interface WorldLibraryCardProjection {
@@ -251,15 +250,9 @@ export default function WorldList() {
             <h1 className="text-xl font-semibold tracking-tight">世界样本库</h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
               浏览可复用的世界设定，从中寻找适合新故事的规则、势力、舞台和冲突线索。
+              这里收录的是随小说沉淀下来的世界。想再加一个，去小说设定区搭就好，它会自动出现在这里。
             </p>
           </div>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          {featureFlags.worldWizardEnabled ? (
-            <Button asChild className="rounded-full">
-              <Link to="/worlds/generator">生成世界样本</Link>
-            </Button>
-          ) : null}
         </div>
       </div>
 
@@ -292,13 +285,11 @@ export default function WorldList() {
       ) : worlds.length === 0 ? (
         <div className="flex min-h-64 flex-col items-center justify-center rounded-3xl bg-muted/20 px-6 text-center">
           <BookOpen className="h-7 w-7 text-muted-foreground/60" aria-hidden="true" />
-          <div className="mt-3 font-medium">还没有世界样本</div>
-          <div className="mt-1 text-sm text-muted-foreground">生成一个可复用世界，为后续小说准备规则、舞台和冲突来源。</div>
-          {featureFlags.worldWizardEnabled ? (
-            <Button asChild className="mt-5 rounded-full">
-              <Link to="/worlds/generator">生成第一个世界样本</Link>
-            </Button>
-          ) : null}
+          <div className="mt-3 font-medium">还没有可复用的世界</div>
+          <div className="mt-1 text-sm text-muted-foreground">在你的小说里搭好一场世界观，它会自动收进这里，下一本书可以直接接着用。</div>
+          <Button asChild variant="outline" className="mt-5 rounded-full">
+            <Link to="/novels">去看看我的小说</Link>
+          </Button>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">

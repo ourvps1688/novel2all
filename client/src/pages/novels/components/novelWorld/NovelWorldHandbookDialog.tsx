@@ -551,7 +551,7 @@ export function NovelWorldHandbookDialog(props: NovelWorldHandbookDialogProps) {
             <TabsContent value="sync" className="mt-0 space-y-8">
               {props.novelWorld?.sourceWorldId ? (
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/worlds/${props.novelWorld.sourceWorldId}/workspace`}>打开来源世界手册</Link>
+                  <Link to={`/worlds/${props.novelWorld.sourceWorldId}/workspace`}>在世界样本库中打开</Link>
                 </Button>
               ) : null}
               <AssetsPanel worldAssets={props.worldAssets} />

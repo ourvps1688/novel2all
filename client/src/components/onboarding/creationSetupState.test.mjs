@@ -30,7 +30,7 @@ test("does not open setup after the creation environment is ready", () => {
   assert.equal(shouldOpenSetupPromptForRoute({
     statusResolved: true,
     readyForCreation: true,
-    pathname: "/worlds/generator",
+    pathname: "/style-engine",
   }), false);
 });
 

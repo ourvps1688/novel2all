@@ -8,6 +8,6 @@ function isEnabled(rawValue: string | undefined, defaultValue: boolean): boolean
 
 export const featureFlags = {
   creationStudioEnabled: isEnabled(import.meta.env.VITE_CREATION_STUDIO_ENABLED, true),
-  worldWizardEnabled: isEnabled(import.meta.env.VITE_WORLD_WIZARD_ENABLED, true),
+  worldWorkspaceEnabled: isEnabled(import.meta.env.VITE_WORLD_WORKSPACE_ENABLED, true),
   worldVisEnabled: isEnabled(import.meta.env.VITE_WORLD_VIS_ENABLED, true),
 };

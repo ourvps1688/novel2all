@@ -32,7 +32,6 @@ const KnowledgeSettingsPage = lazy(() => import("@/pages/settings/views/Knowledg
 const MaintenanceSettingsPage = lazy(() => import("@/pages/settings/views/MaintenanceSettingsPage"));
 const AppearanceSettingsPage = lazy(() => import("@/pages/settings/views/AppearanceSettingsPage"));
 const WorldList = lazy(() => import("@/pages/worlds/WorldList"));
-const WorldGenerator = lazy(() => import("@/pages/worlds/WorldGenerator"));
 const WorldWorkspace = lazy(() => import("@/pages/worlds/WorldWorkspace"));
 const WritingFormulaPage = lazy(() => import("@/pages/writingFormula/WritingFormulaPage"));
 const CharacterLibrary = lazy(() => import("@/pages/characters/CharacterLibrary"));
@@ -72,12 +71,8 @@ const routes: RouteObject[] = [
       { path: "settings", element: <SettingsOverviewPage /> },
       { path: "worlds", element: <WorldList /> },
       {
-        path: "worlds/generator",
-        element: featureFlags.worldWizardEnabled ? <WorldGenerator /> : <Navigate to="/worlds" replace />,
-      },
-      {
         path: "worlds/:id/workspace",
-        element: featureFlags.worldWizardEnabled ? <WorldWorkspace /> : <Navigate to="/worlds" replace />,
+        element: featureFlags.worldWorkspaceEnabled ? <WorldWorkspace /> : <Navigate to="/worlds" replace />,
       },
       { path: "style-engine", element: <WritingFormulaPage /> },
       { path: "writing-formula", element: <Navigate to="/style-engine" replace /> },

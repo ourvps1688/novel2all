@@ -32,7 +32,6 @@ const routedPaths = [
   "/settings/maintenance",
   "/settings",
   "/worlds",
-  "/worlds/generator",
   "/worlds/world-1/workspace",
   "/style-engine",
   "/anti-ai-rules",
@@ -80,7 +79,6 @@ test("mobile more menu contains all non-primary registered pages", () => {
       "/base-characters",
       "/tasks",
       "/worlds",
-      "/worlds/generator",
       "/settings",
     ],
   );

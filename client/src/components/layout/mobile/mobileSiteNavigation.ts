@@ -42,7 +42,6 @@ export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "settings-maintenance", pattern: /^\/settings\/maintenance\/?$/, title: "数据与备份", group: "more" },
   { key: "settings", pattern: /^\/settings\/?$/, title: "系统设置", group: "more" },
   { key: "worlds", pattern: /^\/worlds\/?$/, title: "世界样本库", group: "more" },
-  { key: "world-generator", pattern: /^\/worlds\/generator\/?$/, title: "创建世界样本", group: "more" },
   { key: "world-workspace", pattern: /^\/worlds\/[^/]+\/workspace\/?$/, title: "世界手册", group: "more" },
   { key: "style-engine", pattern: /^\/style-engine\/?$/, title: "写法引擎", group: "more" },
   { key: "anti-ai-rules", pattern: /^\/anti-ai-rules\/?$/, title: "反 AI 规则", group: "more" },
@@ -83,7 +82,6 @@ const moreNavGroups: MobileNavGroup[] = [
     items: [
       { key: "tasks", label: "运行记录", to: "/tasks", group: "more" },
       { key: "worlds", label: "世界样本库", to: "/worlds", group: "more" },
-      { key: "world-generator", label: "创建世界样本", to: "/worlds/generator", group: "more" },
       { key: "settings", label: "系统设置", to: "/settings", group: "more" },
     ],
   },
