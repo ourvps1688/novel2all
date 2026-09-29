@@ -17,8 +17,6 @@ const reasonSchema = z.enum(AUTO_DIRECTOR_FOLLOW_UP_REASONS);
 
 const statusSchema = z.enum(["queued", "running", "waiting_approval", "succeeded", "failed", "cancelled"]);
 
-const channelTypeSchema = z.enum(["dingtalk", "wecom"]);
-
 const sectionSchema = z.enum(["pending", "auto_progress", "exception", "replaced", "needs_validation"]);
 
 const listQuerySchema = z.object({
@@ -27,7 +25,6 @@ const listQuerySchema = z.object({
   status: statusSchema.optional(),
   novelId: z.string().trim().optional(),
   supportsBatch: z.coerce.boolean().optional(),
-  channelType: channelTypeSchema.optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });

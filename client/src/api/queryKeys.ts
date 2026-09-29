@@ -136,7 +136,6 @@ export const queryKeys = {
     modelRoutes: ["settings", "model-routes"] as const,
     modelRouteConnectivity: ["settings", "model-route-connectivity"] as const,
     structuredFallback: ["settings", "structured-fallback"] as const,
-    autoDirectorChannels: ["settings", "auto-director-channels"] as const,
     autoDirectorIssuePolicy: ["settings", "auto-director-issue-policy"] as const,
     autoDirectorApprovalPreferences: ["settings", "auto-director-approval-preferences"] as const,
     pendingReviewAutoPromotion: ["settings", "pending-review-auto-promotion"] as const,

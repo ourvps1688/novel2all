@@ -182,19 +182,6 @@ export interface StructuredFallbackSettings {
   retryCount: number;
 }
 
-export interface AutoDirectorChannelConfig {
-  webhookUrl: string;
-  callbackToken: string;
-  operatorMapJson: string;
-  eventTypes: string[];
-}
-
-export interface AutoDirectorChannelSettings {
-  baseUrl: string;
-  dingtalk: AutoDirectorChannelConfig;
-  wecom: AutoDirectorChannelConfig;
-}
-
 export interface PendingReviewAutoPromotionSettings {
   enabled: boolean;
   baselineAt: string | null;
@@ -455,16 +442,6 @@ export async function getStructuredFallbackConfig() {
 
 export async function saveStructuredFallbackConfig(payload: Partial<StructuredFallbackSettings>) {
   const { data } = await apiClient.put<ApiResponse<StructuredFallbackSettings>>("/llm/structured-fallback", payload);
-  return data;
-}
-
-export async function getAutoDirectorChannelSettings() {
-  const { data } = await apiClient.get<ApiResponse<AutoDirectorChannelSettings>>("/settings/auto-director/channels");
-  return data;
-}
-
-export async function saveAutoDirectorChannelSettings(payload: Partial<AutoDirectorChannelSettings>) {
-  const { data } = await apiClient.put<ApiResponse<AutoDirectorChannelSettings>>("/settings/auto-director/channels", payload);
   return data;
 }
 

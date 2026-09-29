@@ -393,7 +393,7 @@ export class NovelWorkflowHealingService {
       lane: existing.lane ?? "auto_director",
       stage: "auto_director",
     });
-    await this.workflow.updateWorkflowTaskWithNotifications({
+    await this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: "failed",
@@ -461,7 +461,7 @@ export class NovelWorkflowHealingService {
     if (!restored) {
       return false;
     }
-    await this.workflow.updateWorkflowTaskWithNotifications({
+    await this.workflow.updateWorkflowTask({
       before: existing as never,
       data: restored.data,
     });

@@ -211,7 +211,7 @@ export class NovelWorkflowApplicationService {
       chapterId: input.chapterId,
       volumeId: input.volumeId,
     });
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: "running",
@@ -262,7 +262,7 @@ export class NovelWorkflowApplicationService {
       chapterId: input.chapterId,
       volumeId: input.volumeId,
     });
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: "waiting_approval",
@@ -305,7 +305,7 @@ export class NovelWorkflowApplicationService {
       chapterId: patch?.chapterId,
       volumeId: patch?.volumeId,
     });
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: "failed",
@@ -327,7 +327,7 @@ export class NovelWorkflowApplicationService {
     if (!existing) {
       throw new AppError("Task not found.", 404);
     }
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: "cancelled",
@@ -343,7 +343,7 @@ export class NovelWorkflowApplicationService {
     if (!existing) {
       throw new AppError("Task not found.", 404);
     }
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: existing.checkpointType ? "waiting_approval" : "queued",
@@ -372,7 +372,7 @@ export class NovelWorkflowApplicationService {
     if (!existing || !restored) {
       return existing;
     }
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: restored.data,
     });
@@ -411,7 +411,7 @@ export class NovelWorkflowApplicationService {
     if (isTaskCancellationRequested(existing)) {
       throw new AppError("WORKFLOW_TASK_CANCELLED", 409);
     }
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         heartbeatAt: new Date(),
@@ -430,7 +430,7 @@ export class NovelWorkflowApplicationService {
     if (!existing) {
       throw new AppError("Task not found.", 404);
     }
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: "queued",
@@ -459,7 +459,7 @@ export class NovelWorkflowApplicationService {
     if (isTaskCancellationRequested(existing)) {
       throw new AppError("WORKFLOW_TASK_CANCELLED", 409);
     }
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: "waiting_approval",
@@ -530,7 +530,7 @@ export class NovelWorkflowApplicationService {
       chapterId: input.chapterId,
       volumeId: input.volumeId,
     });
-    return this.workflow.updateWorkflowTaskWithNotifications({
+    return this.workflow.updateWorkflowTask({
       before: existing,
       data: {
         status: input.checkpointType === "workflow_completed" ? "succeeded" : "waiting_approval",

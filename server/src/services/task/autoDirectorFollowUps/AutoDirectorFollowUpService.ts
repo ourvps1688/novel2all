@@ -1,13 +1,9 @@
 import type {
-  AutoDirectorChannelDeliveryStatus,
   AutoDirectorFollowUpDetail,
   AutoDirectorFollowUpItem,
   AutoDirectorFollowUpListInput,
   AutoDirectorFollowUpListResponse,
   AutoDirectorFollowUpOverview,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
-import {
-  AUTO_DIRECTOR_CHANNEL_TYPES,
 } from "@ai-novel/shared/types/autoDirectorFollowUp";
 import { prisma } from "../../../db/prisma";
 import { NovelWorkflowService } from "../../novel/workflow/NovelWorkflowService";
@@ -16,7 +12,6 @@ import {
   getArchivedTaskIds,
   isTaskArchived,
 } from "../taskArchive";
-import { getAutoDirectorChannelSettings } from "../../settings/AutoDirectorChannelSettingsService";
 import {
   buildAvailableReasons,
   buildAvailableSections,
@@ -38,22 +33,6 @@ import {
 } from "./autoDirectorFollowUpProjection";
 import { loadRecentAutoDirectorAutoApprovalRecords } from "./autoDirectorAutoApprovalAudit";
 
-function isMissingTableError(error: unknown): boolean {
-  return typeof error === "object"
-    && error !== null
-    && "code" in error
-    && (error as { code?: string }).code === "P2021";
-}
-
-function isDbUnavailableError(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-  const code = "code" in error ? (error as { code?: string }).code : undefined;
-  const message = "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
-  return code === "P1001" || /can't reach database server/i.test(message);
-}
-
 export class AutoDirectorFollowUpService {
   readonly workflowService = new NovelWorkflowService();
 
@@ -63,9 +42,8 @@ export class AutoDirectorFollowUpService {
     const rows = await this.loadRows({ heal: false });
     const knownTaskIds = new Set(rows.map((row) => row.id));
     const taskById = new Map(rows.map((row) => [row.id, row]));
-    const channelSettings = await getAutoDirectorChannelSettings();
     const taskItems = rows
-      .map((row) => projectFollowUpItem(row, knownTaskIds, channelSettings))
+      .map((row) => projectFollowUpItem(row, knownTaskIds))
       .filter((item): item is AutoDirectorFollowUpItem => Boolean(item));
     const autoApprovalItems = await this.loadAutoApprovalItems(rows, taskById);
     const items = taskItems.concat(autoApprovalItems);
@@ -81,10 +59,9 @@ export class AutoDirectorFollowUpService {
     const rows = await this.loadRows();
     const knownTaskIds = new Set(rows.map((row) => row.id));
     const taskById = new Map(rows.map((row) => [row.id, row]));
-    const channelSettings = await getAutoDirectorChannelSettings();
     const scopedRows = rows.filter((row) => matchesRowScopeFilters(row, input));
     const scopedTaskItems = scopedRows
-      .map((row) => projectFollowUpItem(row, knownTaskIds, channelSettings))
+      .map((row) => projectFollowUpItem(row, knownTaskIds))
       .filter((item): item is AutoDirectorFollowUpItem => Boolean(item));
     const scopedItems = scopedTaskItems.concat(await this.loadAutoApprovalItems(scopedRows, taskById));
     const filteredItems = scopedItems
@@ -104,7 +81,6 @@ export class AutoDirectorFollowUpService {
         sections: buildAvailableSections(scopedItems),
         reasons: buildAvailableReasons(filteredItems),
         statuses: buildAvailableStatuses(filteredItems),
-        channelTypes: [...AUTO_DIRECTOR_CHANNEL_TYPES],
       },
       pagination: {
         page,
@@ -149,7 +125,7 @@ export class AutoDirectorFollowUpService {
         knownTaskIds.add(replacement.id);
       }
     }
-    const item = projectFollowUpItem(row, knownTaskIds, await getAutoDirectorChannelSettings());
+    const item = projectFollowUpItem(row, knownTaskIds);
     if (!item) {
       return null;
     }
@@ -191,40 +167,8 @@ export class AutoDirectorFollowUpService {
         replanUrl,
       }),
       milestones: buildMilestones(row),
-      channelDeliveries: await this.getRecentChannelDeliveries(taskId),
       task,
     };
-  }
-
-  private async getRecentChannelDeliveries(taskId: string): Promise<AutoDirectorChannelDeliveryStatus[]> {
-    try {
-      const rows = await prisma.autoDirectorFollowUpNotificationLog.findMany({
-        where: {
-          taskId,
-        },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 10,
-      });
-      const latestByChannel = new Map<string, typeof rows[number]>();
-      for (const row of rows) {
-        if (!latestByChannel.has(row.channelType)) {
-          latestByChannel.set(row.channelType, row);
-        }
-      }
-      return Array.from(latestByChannel.values()).map((row) => ({
-        channelType: row.channelType === "wecom" ? "wecom" : "dingtalk",
-        status: row.status === "delivered" ? "delivered" : (row.status === "pending" ? "pending" : "failed"),
-        deliveredAt: row.deliveredAt?.toISOString() ?? null,
-        responseStatus: row.responseStatus ?? null,
-        eventType: row.eventType as AutoDirectorChannelDeliveryStatus["eventType"],
-        target: row.target ?? null,
-      }));
-    } catch (error) {
-      if (isMissingTableError(error) || isDbUnavailableError(error)) {
-        return [];
-      }
-      throw error;
-    }
   }
 
   private async loadAutoApprovalItems(

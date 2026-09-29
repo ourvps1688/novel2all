@@ -237,7 +237,6 @@ test("stale running auto director healing does not recurse through markTaskFaile
     service.markTaskFailed = async () => {
       throw new Error("healStaleAutoDirectorRunningTask must not call markTaskFailed");
     };
-    service.notifyAutoDirectorTaskTransition = async () => {};
 
     const changed = await service.healStaleAutoDirectorRunningTask("task-stale", staleRow);
 
