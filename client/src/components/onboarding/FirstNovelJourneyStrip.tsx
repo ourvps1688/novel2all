@@ -26,10 +26,7 @@ export default function FirstNovelJourneyStrip() {
           <Compass className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold">第一本书向导</span>
-            <span className="text-xs text-muted-foreground">{journey.completedCount}/{journey.totalCount} 步完成</span>
-          </div>
+          <span className="block text-sm font-semibold">写你的第一本书</span>
           <p className="mt-1 truncate text-xs text-muted-foreground">{journey.headline}</p>
         </div>
       </div>
@@ -43,6 +40,7 @@ export default function FirstNovelJourneyStrip() {
           ))}
         </div>
         {journey.completedCount > 0 ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : null}
+        <span className="hidden text-xs font-medium text-foreground sm:inline">{journey.primaryAction.label}</span>
         <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
     </>
