@@ -9,6 +9,7 @@ import type {
 import {
   getWorkflowCheckpointLabel,
   resolveWorkflowStageFromCheckpoint,
+  resolveWorkflowStageTab,
 } from "@ai-novel/shared/types/directorWorkflowStepCatalog";
 import { NOVEL_WORKFLOW_STAGE_LABELS, NOVEL_WORKFLOW_STAGE_PROGRESS } from "@ai-novel/shared/types/novelWorkflow";
 import { parseResumeTarget, parseSeedPayload } from "./novelWorkflow.shared";
@@ -192,14 +193,7 @@ export function isChapterBatchCheckpointRow(
 }
 
 export function mapStageToTab(stage: NovelWorkflowStage): NovelWorkflowResumeTarget["stage"] {
-  if (stage === "story_macro") return "story_macro";
-  if (stage === "world_setup") return "world";
-  if (stage === "character_setup") return "character";
-  if (stage === "volume_strategy") return "outline";
-  if (stage === "structured_outline") return "structured";
-  if (stage === "chapter_execution") return "chapter";
-  if (stage === "quality_repair") return "pipeline";
-  return "basic";
+  return resolveWorkflowStageTab(stage);
 }
 
 export function normalizeResumeStage(
