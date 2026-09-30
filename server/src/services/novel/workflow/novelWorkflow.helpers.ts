@@ -201,6 +201,28 @@ export function mapStageToTab(stage: NovelWorkflowStage): NovelWorkflowResumeTar
   return "basic";
 }
 
+export function normalizeResumeStage(
+  stage: NovelWorkflowStage | "book_contract" | null | undefined,
+): NovelWorkflowResumeTarget["stage"] {
+  if (!stage) {
+    return "basic";
+  }
+  if (stage === "book_contract") {
+    return "story_macro";
+  }
+  return mapStageToTab(stage);
+}
+
+export function parseResumeTargetLike(value: unknown): ReturnType<typeof parseResumeTarget> {
+  if (typeof value === "string") {
+    return parseResumeTarget(value);
+  }
+  if (value && typeof value === "object") {
+    return value as NonNullable<ReturnType<typeof parseResumeTarget>>;
+  }
+  return null;
+}
+
 export function defaultProgressForStage(stage: NovelWorkflowStage): number {
   return NOVEL_WORKFLOW_STAGE_PROGRESS[stage] ?? 0.08;
 }

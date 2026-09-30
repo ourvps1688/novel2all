@@ -59,6 +59,7 @@ export const NOVEL_WORKFLOW_STAGE_STEPS = [
 export function buildNovelCreateResumeTarget(taskId: string, mode: "director" | null = null): NovelWorkflowResumeTarget {
   return {
     route: "/novels/create",
+    lane: mode === "director" ? "auto_director" : "manual_create",
     taskId,
     mode,
   };
@@ -89,14 +90,43 @@ export function buildNovelEditResumeTarget(params: {
   chapterId?: string | null;
   volumeId?: string | null;
 }): NovelWorkflowResumeTarget {
-  return {
-    route: "/novels/:id/edit",
+  return composeResumeTarget({
+    lane: params.lane ?? "auto_director",
     novelId: params.novelId,
-    taskId: params.taskId ?? null,
-    lane: params.lane ?? null,
+    taskId: params.taskId,
     stage: params.stage,
-    chapterId: params.chapterId ?? null,
-    volumeId: params.volumeId ?? null,
+    chapterId: params.chapterId,
+    volumeId: params.volumeId,
+  });
+}
+
+export function composeResumeTarget(input: {
+  lane: NovelWorkflowLane;
+  route?: NovelWorkflowResumeTarget["route"];
+  novelId?: string | null;
+  taskId?: string | null;
+  workspaceTaskId?: string | null;
+  directorTaskId?: string | null;
+  stage?: NovelWorkflowResumeTarget["stage"] | null;
+  chapterId?: string | null;
+  volumeId?: string | null;
+  mode?: "director" | null;
+}): NovelWorkflowResumeTarget {
+  const descriptor = getNovelWorkflowLaneDescriptor(input.lane);
+  const taskId =
+    input.taskId
+    ?? (descriptor.taskQueryKey === "workspaceTaskId" ? input.workspaceTaskId : null)
+    ?? (descriptor.taskQueryKey === "directorTaskId" ? input.directorTaskId : null)
+    ?? null;
+  return {
+    route: input.route ?? "/novels/:id/edit",
+    lane: input.lane,
+    novelId: input.novelId ?? null,
+    taskId,
+    stage: input.stage ?? undefined,
+    chapterId: input.chapterId ?? null,
+    volumeId: input.volumeId ?? null,
+    mode: input.mode ?? null,
   };
 }
 

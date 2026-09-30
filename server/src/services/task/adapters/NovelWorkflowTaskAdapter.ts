@@ -32,6 +32,10 @@ import {
   resumeTargetToRoute,
 } from "../../novel/workflow/novelWorkflow.shared";
 import {
+  mergeResumeTargets,
+  parseResumeTargetLike,
+} from "../../novel/workflow/novelWorkflow.helpers";
+import {
   buildTaskRecoveryHint,
   isArchivableTaskStatus,
   normalizeFailureSummary,
@@ -75,11 +79,7 @@ function parseLinkedPipelineJobId(seedPayloadJson?: string | null): string | nul
 function parseTaskNotice(seedPayloadJson?: string | null): DirectorTaskNotice | null {
   const seedPayload = parseSeedPayload<DirectorWorkflowSeedPayload>(seedPayloadJson);
   const notice = seedPayload?.taskNotice;
-  const seedResumeTarget = typeof seedPayload?.resumeTarget === "string"
-    ? parseResumeTarget(seedPayload.resumeTarget)
-    : (seedPayload?.resumeTarget && typeof seedPayload.resumeTarget === "object"
-      ? seedPayload.resumeTarget as NonNullable<ReturnType<typeof parseResumeTarget>>
-      : null);
+  const seedResumeTarget = parseResumeTargetLike(seedPayload?.resumeTarget);
   if (!notice || typeof notice !== "object") {
     return null;
   }
@@ -104,27 +104,6 @@ function parseTaskNotice(seedPayloadJson?: string | null): DirectorTaskNotice | 
           : (seedResumeTarget?.volumeId?.trim() || null),
       }
       : null,
-  };
-}
-
-function mergeResumeTargets(
-  primary: ReturnType<typeof parseResumeTarget>,
-  fallback: ReturnType<typeof parseResumeTarget>,
-) {
-  if (!primary) {
-    return fallback;
-  }
-  if (!fallback) {
-    return primary;
-  }
-  return {
-    ...fallback,
-    ...primary,
-    stage: primary.stage === "basic" && fallback.stage !== "basic"
-      ? fallback.stage
-      : primary.stage,
-    chapterId: primary.chapterId ?? fallback.chapterId ?? null,
-    volumeId: primary.volumeId ?? fallback.volumeId ?? null,
   };
 }
 
@@ -228,11 +207,7 @@ export function normalizeWorkflowResumeTargetForCandidateSelection(input: {
   const seedResumeTarget = parseSeedPayload<DirectorWorkflowSeedPayload>(input.seedPayloadJson)?.resumeTarget;
   const parsed = mergeResumeTargets(
     parseResumeTarget(input.resumeTargetJson),
-    typeof seedResumeTarget === "string"
-      ? parseResumeTarget(seedResumeTarget)
-      : (seedResumeTarget && typeof seedResumeTarget === "object"
-        ? seedResumeTarget as NonNullable<ReturnType<typeof parseResumeTarget>>
-        : null),
+    parseResumeTargetLike(seedResumeTarget),
   );
   const isCandidateSelectionTask = input.checkpointType === "candidate_selection_required"
     || input.currentItemKey === "auto_director"

@@ -12,9 +12,13 @@ import type { NovelVolumeService } from "../../volume/NovelVolumeService";
 import type { NovelWorkflowService } from "../../workflow/NovelWorkflowService";
 import {
   buildNovelEditResumeTarget,
-  parseResumeTarget,
   parseSeedPayload,
 } from "../../workflow/novelWorkflow.shared";
+import {
+  mergeResumeTargets,
+  normalizeResumeStage,
+  parseResumeTargetLike,
+} from "../../workflow/novelWorkflow.helpers";
 import { normalizeDirectorMemoryScope } from "./autoDirectorMemorySafety";
 import { DirectorRecoveryNotNeededError } from "./novelDirectorErrors";
 import {
@@ -49,37 +53,6 @@ export type DirectorAssetFirstRecovery =
     phase: "story_macro" | "book_contract" | "world_setup" | "character_setup" | "volume_strategy" | "structured_outline";
   }
   | null;
-
-function mergeResumeTargets(
-  primary: ReturnType<typeof parseResumeTarget>,
-  fallback: ReturnType<typeof parseResumeTarget>,
-) {
-  if (!primary) {
-    return fallback;
-  }
-  if (!fallback) {
-    return primary;
-  }
-  return {
-    ...fallback,
-    ...primary,
-    stage: primary.stage === "basic" && fallback.stage !== "basic"
-      ? fallback.stage
-      : primary.stage,
-    chapterId: primary.chapterId ?? fallback.chapterId ?? null,
-    volumeId: primary.volumeId ?? fallback.volumeId ?? null,
-  };
-}
-
-function parseResumeTargetLike(value: unknown) {
-  if (typeof value === "string") {
-    return parseResumeTarget(value);
-  }
-  if (value && typeof value === "object") {
-    return value as NonNullable<ReturnType<typeof parseResumeTarget>>;
-  }
-  return null;
-}
 
 function inferPhaseFromTaskState(input: {
   currentItemKey?: string | null;
@@ -444,7 +417,7 @@ export class NovelDirectorContinueRuntime {
     const resumeTarget = buildNovelEditResumeTarget({
       novelId,
       taskId,
-      stage: this.resolveDirectorEditStage(phase),
+      stage: normalizeResumeStage(phase),
       volumeId: recoveryResumeTarget?.volumeId,
       chapterId: recoveryResumeTarget?.chapterId,
     });
@@ -491,27 +464,6 @@ export class NovelDirectorContinueRuntime {
         approveAutoExecutionScope: requestedAutoExecutionContinue || isFullBookAutopilot,
       });
     });
-  }
-
-  private resolveDirectorEditStage(
-    phase: "story_macro" | "book_contract" | "world_setup" | "character_setup" | "volume_strategy" | "structured_outline" | "chapter_execution",
-  ): "story_macro" | "world" | "character" | "outline" | "structured" | "chapter" {
-    if (phase === "story_macro" || phase === "book_contract") {
-      return "story_macro";
-    }
-    if (phase === "world_setup") {
-      return "world";
-    }
-    if (phase === "character_setup") {
-      return "character";
-    }
-    if (phase === "volume_strategy") {
-      return "outline";
-    }
-    if (phase === "structured_outline") {
-      return "structured";
-    }
-    return "chapter";
   }
 
   private continueCandidateStageTask(

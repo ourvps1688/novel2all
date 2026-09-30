@@ -7,41 +7,14 @@ import {
   parseSeedPayload,
   parseResumeTarget,
 } from "../../workflow/novelWorkflow.shared";
+import {
+  mergeResumeTargets,
+  parseResumeTargetLike,
+} from "../../workflow/novelWorkflow.helpers";
 import { getDirectorInputFromSeedPayload, getDirectorLlmOptionsFromSeedPayload, type DirectorWorkflowSeedPayload } from "../runtime/novelDirectorHelpers";
 import { buildDirectorSessionState } from "../runtime/novelDirectorHelpers";
 import { repairDirectorChapterTitles } from "./novelDirectorChapterTitleRepair";
 import { DIRECTOR_PROGRESS } from "../projections/novelDirectorProgress";
-
-function parseResumeTargetLike(value: unknown) {
-  if (typeof value === "string") {
-    return parseResumeTarget(value);
-  }
-  if (value && typeof value === "object") {
-    return value as NonNullable<ReturnType<typeof parseResumeTarget>>;
-  }
-  return null;
-}
-
-function mergeResumeTargets(
-  primary: ReturnType<typeof parseResumeTarget>,
-  fallback: ReturnType<typeof parseResumeTarget>,
-) {
-  if (!primary) {
-    return fallback;
-  }
-  if (!fallback) {
-    return primary;
-  }
-  return {
-    ...fallback,
-    ...primary,
-    stage: primary.stage === "basic" && fallback.stage !== "basic"
-      ? fallback.stage
-      : primary.stage,
-    chapterId: primary.chapterId ?? fallback.chapterId ?? null,
-    volumeId: primary.volumeId ?? fallback.volumeId ?? null,
-  };
-}
 
 export class NovelDirectorChapterTitleRepairRuntime {
   constructor(private readonly deps: {
