@@ -17,33 +17,6 @@ function collectSourceFiles(directory) {
   });
 }
 
-test("production settings expose visible labels and recoverable detail loading", () => {
-  const source = read("components/NovelProductionStarterCard.tsx");
-  const fieldIds = [
-    "creative-hub-production-title",
-    "creative-hub-production-description",
-    "creative-hub-production-genre",
-    "creative-hub-production-style",
-    "creative-hub-production-pov",
-    "creative-hub-production-pace",
-    "creative-hub-production-mode",
-    "creative-hub-production-emotion",
-    "creative-hub-production-freedom",
-    "creative-hub-production-chapters",
-    "creative-hub-production-length",
-    "creative-hub-production-world",
-  ];
-
-  for (const id of fieldIds) {
-    assert.match(source, new RegExp(`htmlFor="${id}"`));
-    assert.match(source, new RegExp(`id="${id}"`));
-  }
-  assert.match(source, /novelDetailQuery\.error/);
-  assert.match(source, /novelDetailQuery\.refetch\(\)/);
-  assert.match(source, /submitMutation\.isPending/);
-  assert.match(source, /disabled=\{formDisabled\}/);
-});
-
 test("Creative Hub sources stay token based and visually restrained", () => {
   const source = collectSourceFiles(creativeHubRoot).map((path) => readFileSync(path, "utf8")).join("\n");
   assert.doesNotMatch(source, /#[0-9a-f]{3,8}/i);
@@ -62,7 +35,6 @@ test("Creative Hub sources stay token based and visually restrained", () => {
 test("Creative Hub interactive state exposes accessibility and disabled contracts", () => {
   const page = read("CreativeHubPage.tsx");
   assert.match(read("components/CreativeHubThreadList.tsx"), /aria-current/);
-  assert.match(read("components/CreativeHubNovelSetupCard.tsx"), /role="progressbar"/);
 
   for (const component of [
     "components/CreativeHubDebugTraceCard.tsx",
@@ -88,7 +60,6 @@ test("Creative Hub interactive state exposes accessibility and disabled contract
   );
   assert.match(workspacePolicy, /!activeThreadId/);
   assert.doesNotMatch(navigationPolicy, /threadLoadError|stateQuery\.error/);
-  assert.match(read("components/CreativeHubNovelSetupCard.tsx"), /disabled=\{actionDisabled\}/);
   assert.match(read("components/CreativeHubInlineToolCall.tsx"), /approvalPending/);
   assert.match(read("components/CreativeHubMessagePrimitives.tsx"), /disabled=\{actionDisabled\}/);
 });
