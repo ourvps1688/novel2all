@@ -11,7 +11,7 @@ test("设置路由提供四个独立页面并兼容旧模型路由链接", async
   assert.match(source, /path: "settings\/director", element: <DirectorSettingsPage \/>/);
   assert.match(source, /path: "settings\/knowledge", element: <KnowledgeSettingsPage \/>/);
   assert.match(source, /path: "settings\/maintenance", element: <MaintenanceSettingsPage \/>/);
-  assert.match(source, /path: "settings\/model-routes", element: <Navigate to="\/settings\/models" replace \/>/);
+  assert.match(source, /path: "settings\/model-routes", element: <ModelRoutesSettingsPage \/>/);
 });
 
 test("系统导航只保留设置入口，设置页提供稳定二级导航", async () => {

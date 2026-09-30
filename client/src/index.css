@@ -472,6 +472,11 @@ body {
   .mobile-route-anti-ai-rules,
   .mobile-route-base-characters,
   .mobile-route-novel-edit,
+  .mobile-route-market-radar,
+  .mobile-route-settings-models,
+  .mobile-route-settings-director,
+  .mobile-route-settings-knowledge,
+  .mobile-route-settings-maintenance,
   .mobile-route-chapter-edit {
     overflow-x: hidden;
   }
@@ -498,6 +503,11 @@ body {
   .mobile-route-anti-ai-rules,
   .mobile-route-base-characters,
   .mobile-route-novel-edit,
+  .mobile-route-market-radar,
+  .mobile-route-settings-models,
+  .mobile-route-settings-director,
+  .mobile-route-settings-knowledge,
+  .mobile-route-settings-maintenance,
   .mobile-route-chapter-edit,
   .mobile-page-novel-edit,
   .mobile-page-chapter-edit {

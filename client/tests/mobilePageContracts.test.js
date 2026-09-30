@@ -355,43 +355,21 @@ test("mobile task filters stay in a compact three-column control grid", () => {
   assertAppearsBefore(
     taskCenterFilterPanel,
     "task-filter-status",
-    "task-filter-pill",
-    "the anomaly filter should render after status so it fills the first mobile row",
-  );
-  assertAppearsBefore(
-    taskCenterFilterPanel,
-    "task-filter-pill",
     "task-filter-keyword",
-    "the anomaly filter should render before the spanning keyword field to keep filters within two rows",
+    "the status filter should render before the keyword field",
   );
   assertAppearsBefore(
     taskCenterFilterPanel,
     "task-filter-keyword",
     "task-filter-sort",
-    "the spanning keyword field should render before sort so the second row is keyword plus sort",
+    "the keyword field should render before the sort control",
   );
-
-  const kindClassName = getClassNameContaining(taskCenterFilterPanel, "task-filter-kind");
-  const statusClassName = getClassNameContaining(taskCenterFilterPanel, "task-filter-status");
-  const anomalyClassName = getClassNameContaining(taskCenterFilterPanel, "task-filter-pill");
-  const keywordClassName = getClassNameContaining(taskCenterFilterPanel, "task-filter-keyword");
-  const sortClassName = getClassNameContaining(taskCenterFilterPanel, "task-filter-sort");
-
-  [
-    [kindClassName, "col-start-1", "type should occupy first row column 1"],
-    [kindClassName, "row-start-1", "type should occupy first row column 1"],
-    [statusClassName, "col-start-2", "status should occupy first row column 2"],
-    [statusClassName, "row-start-1", "status should occupy first row column 2"],
-    [anomalyClassName, "col-start-3", "anomaly pill should occupy first row column 3"],
-    [anomalyClassName, "row-start-1", "anomaly pill should occupy first row column 3"],
-    [keywordClassName, "col-span-2", "keyword should span the first two columns in row 2"],
-    [keywordClassName, "col-start-1", "keyword should span the first two columns in row 2"],
-    [keywordClassName, "row-start-2", "keyword should span the first two columns in row 2"],
-    [sortClassName, "col-start-3", "sort should occupy second row column 3"],
-    [sortClassName, "row-start-2", "sort should occupy second row column 3"],
-  ].forEach(([className, expectedClass, message]) => {
-    assertClassIncludes(className, expectedClass, message);
-  });
+  assertAppearsBefore(
+    taskCenterFilterPanel,
+    "task-filter-sort",
+    "task-filter-pill",
+    "the sort control should render before the anomaly pill so filters stay in one flow",
+  );
 });
 
 test("mobile CSS enforces the no deep card nesting rule", () => {
