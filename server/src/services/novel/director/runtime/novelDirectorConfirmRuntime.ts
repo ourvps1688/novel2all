@@ -301,21 +301,15 @@ export class NovelDirectorConfirmRuntime {
           phase: "story_macro",
           isBackgroundRunning: true,
         });
-        const resumeTarget = buildNovelEditResumeTarget({
-          novelId: createdNovel.id,
-          taskId: workflowTask.id,
-          stage: "story_macro",
-        });
         await this.deps.workflowService.bootstrapTask({
           workflowTaskId: workflowTask.id,
           novelId: createdNovel.id,
           lane: "auto_director",
           title,
           seedPayload: this.deps.buildDirectorSeedPayload(executionDirectorInput, createdNovel.id, {
-            startupPreparation: executionDirectorInput.startupPreparation,
-            directorSession,
-            resumeTarget,
-          }),
+          startupPreparation: executionDirectorInput.startupPreparation,
+          directorSession,
+        }),
         });
         await this.deps.directorRuntime.initializeRun({
           taskId: workflowTask.id,
@@ -359,10 +353,9 @@ export class NovelDirectorConfirmRuntime {
           },
           createdChapterCount: 0,
           createdArcCount: 0,
-          workflowTaskId: workflowTask.id,
-          directorSession,
-          resumeTarget,
-          plans: seededPlanDigests,
+      workflowTaskId: workflowTask.id,
+      directorSession,
+      plans: seededPlanDigests,
           seededPlans: seededPlanDigests,
         };
       });
@@ -424,7 +417,6 @@ export class NovelDirectorConfirmRuntime {
       createdArcCount: 0,
       workflowTaskId: task.id,
       directorSession,
-      resumeTarget,
       plans: seededPlanDigests,
       seededPlans: seededPlanDigests,
     };

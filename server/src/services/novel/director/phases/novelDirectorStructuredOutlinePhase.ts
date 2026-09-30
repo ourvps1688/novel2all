@@ -8,7 +8,6 @@ import {
 } from "@ai-novel/shared/types/novelDirector";
 import type { VolumeGenerationPhaseEvent } from "../../volume/volumeModels";
 import { getChapterTitleDiversityIssue } from "../../volume/chapterTitleDiversity";
-import { buildNovelEditResumeTarget } from "../../workflow/novelWorkflow.shared";
 import { logMemoryUsage } from "../../../../runtime/memoryTelemetry";
 import {
   buildDirectorSessionState,
@@ -213,13 +212,6 @@ export async function runDirectorStructuredOutlinePhase(input: {
     plan: detailPlan,
     allowPartialChapterListReady: isDirectorAutoExecutionRunMode(normalizeDirectorRunMode(request.runMode)),
   });
-  const runningResumeTarget = buildNovelEditResumeTarget({
-    novelId,
-    taskId,
-    stage: "structured",
-    volumeId: initialRecoveryCursor.volumeId ?? firstVolume.id,
-    chapterId: initialRecoveryCursor.chapterId,
-  });
   await dependencies.workflowService.bootstrapTask({
     workflowTaskId: taskId,
     novelId,
@@ -227,7 +219,6 @@ export async function runDirectorStructuredOutlinePhase(input: {
     title: request.candidate.workingTitle,
     seedPayload: callbacks.buildDirectorSeedPayload(request, novelId, {
       directorSession,
-      resumeTarget: runningResumeTarget,
     }),
   });
 
@@ -355,6 +346,7 @@ export async function runDirectorStructuredOutlinePhase(input: {
         itemLabel: `第 ${targetVolume.sortOrder} 卷章节列表已生成`,
         progress: DIRECTOR_PROGRESS.chapterList,
         volumeId: targetVolume.id,
+        chapterId: initialRecoveryCursor.chapterId,
       });
       continue;
     }
@@ -593,13 +585,6 @@ export async function runDirectorStructuredOutlinePhase(input: {
     phase: "chapter_execution",
     isBackgroundRunning: false,
   });
-  const chapterResumeTarget = buildNovelEditResumeTarget({
-    novelId,
-    taskId,
-    stage: "chapter",
-    volumeId: selectedChapters[0]?.volumeId ?? firstVolume.id,
-    chapterId: selectedChapters[0]?.id ?? null,
-  });
   await dependencies.workflowService.recordCheckpoint(taskId, {
     stage: "chapter_execution",
     checkpointType: "production_experience_required",
@@ -610,7 +595,6 @@ export async function runDirectorStructuredOutlinePhase(input: {
     progress: DIRECTOR_PROGRESS.chapterBatchReady,
     seedPayload: callbacks.buildDirectorSeedPayload(request, novelId, {
       directorSession: pausedSession,
-      resumeTarget: chapterResumeTarget,
       autoExecution: autoExecutionState,
       startupPreparation: request.startupPreparation,
     }),

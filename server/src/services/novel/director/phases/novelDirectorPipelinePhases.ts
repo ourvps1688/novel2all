@@ -2,7 +2,6 @@ import type { VolumePlanDocument } from "@ai-novel/shared/types/novel";
 import type { DirectorConfirmRequest } from "@ai-novel/shared/types/novelDirector";
 import { buildCharacterCastBlockedMessage } from "../../characterPrep/characterCastQuality";
 import type { VolumeGenerationPhaseEvent } from "../../volume/volumeModels";
-import { buildNovelEditResumeTarget } from "../../workflow/novelWorkflow.shared";
 import {
   buildDirectorSessionState,
   buildStoryInput,
@@ -90,11 +89,6 @@ export async function runDirectorCharacterSetupPhase(input: {
     phase: "character_setup",
     isBackgroundRunning: true,
   });
-  const resumeTarget = buildNovelEditResumeTarget({
-    novelId,
-    taskId,
-    stage: "character",
-  });
   await dependencies.workflowService.bootstrapTask({
     workflowTaskId: taskId,
     novelId,
@@ -102,7 +96,6 @@ export async function runDirectorCharacterSetupPhase(input: {
     title: request.candidate.workingTitle,
     seedPayload: callbacks.buildDirectorSeedPayload(request, novelId, {
       directorSession,
-      resumeTarget,
     }),
   });
   const storyInput = buildStoryInput(request, toBookSpec(request.candidate, request.idea, request.estimatedChapterCount));
@@ -163,7 +156,6 @@ export async function runDirectorCharacterSetupPhase(input: {
       progress: DIRECTOR_PROGRESS.characterSetup,
       seedPayload: callbacks.buildDirectorSeedPayload(request, novelId, {
         directorSession: blockedSession,
-        resumeTarget,
       }),
     });
     return {
@@ -234,8 +226,7 @@ export async function runDirectorCharacterSetupPhase(input: {
     itemLabel: "等待审核角色准备",
     progress: DIRECTOR_PROGRESS.characterSetupReady,
     seedPayload: callbacks.buildDirectorSeedPayload(request, novelId, {
-      directorSession: pausedSession,
-      resumeTarget,
+        directorSession: pausedSession,
     }),
   });
   return {
@@ -260,11 +251,6 @@ export async function runDirectorVolumeStrategyPhase(input: {
     phase: "volume_strategy",
     isBackgroundRunning: true,
   });
-  const resumeTarget = buildNovelEditResumeTarget({
-    novelId,
-    taskId,
-    stage: "outline",
-  });
   await dependencies.workflowService.bootstrapTask({
     workflowTaskId: taskId,
     novelId,
@@ -272,7 +258,6 @@ export async function runDirectorVolumeStrategyPhase(input: {
     title: request.candidate.workingTitle,
     seedPayload: callbacks.buildDirectorSeedPayload(request, novelId, {
       directorSession,
-      resumeTarget,
     }),
   });
   let workspace = await runDirectorTrackedStep({
@@ -385,8 +370,7 @@ export async function runDirectorVolumeStrategyPhase(input: {
     itemLabel: "等待审核卷战略 / 卷骨架",
     progress: DIRECTOR_PROGRESS.volumeStrategyReady,
     seedPayload: callbacks.buildDirectorSeedPayload(request, novelId, {
-      directorSession: pausedSession,
-      resumeTarget,
+        directorSession: pausedSession,
     }),
   });
   return null;

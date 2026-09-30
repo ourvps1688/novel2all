@@ -53,6 +53,8 @@ interface TakeoverExecutionWorkflowPort {
     itemKey?: string | null;
     progress?: number;
     clearCheckpoint?: boolean;
+    chapterId?: string | null;
+    volumeId?: string | null;
   }): Promise<unknown>;
   markTaskFailed?(taskId: string, message: string): Promise<unknown>;
   recordCheckpoint(taskId: string, input: {
@@ -253,14 +255,12 @@ function buildTakeoverMetadata(plan: DirectorTakeoverResolvedPlan) {
 
 function buildTakeoverSeedPayloadExtra(input: {
   directorSession: DirectorSessionState;
-  resumeTarget: ReturnType<typeof buildResumeTargetFromPlan>;
   plan: DirectorTakeoverResolvedPlan;
   takeoverState: DirectorTakeoverLoadedState;
   rewriteSnapshot: RewriteSnapshotReference | null;
 }) {
   return {
     directorSession: input.directorSession,
-    resumeTarget: input.resumeTarget,
     takeover: buildTakeoverMetadata(input.plan),
     ...(input.rewriteSnapshot ? { rewriteSnapshot: input.rewriteSnapshot } : {}),
     ...(input.plan.executionMode === "auto_execution" && input.plan.usesCurrentBatch
@@ -414,7 +414,6 @@ export async function startDirectorTakeoverExecution(
     initialState,
     seedPayload: input.buildDirectorSeedPayload(directorInput, request.novelId, buildTakeoverSeedPayloadExtra({
       directorSession,
-      resumeTarget: initialResumeTarget,
       plan,
       takeoverState: input.takeoverState,
       rewriteSnapshot,
@@ -461,7 +460,13 @@ export async function startDirectorTakeoverExecution(
           scope: "book",
         });
       }
-      await input.workflowService.markTaskRunning(workflowTask.id, resolveDirectorRunningStateForPhase(plan.phase ?? plan.startPhase));
+      await input.workflowService.markTaskRunning(workflowTask.id, {
+        ...resolveDirectorRunningStateForPhase(plan.phase ?? plan.startPhase),
+        volumeId: input.takeoverState.latestCheckpoint?.volumeId
+          ?? input.takeoverState.snapshot.firstVolumeId
+          ?? null,
+        chapterId: input.takeoverState.latestCheckpoint?.chapterId ?? null,
+      });
       input.scheduleBackgroundRun(workflowTask.id, async () => {
         await input.runDirectorPipeline({
           taskId: workflowTask.id,
@@ -487,7 +492,6 @@ export async function startDirectorTakeoverExecution(
             phase: "chapter_execution",
             isBackgroundRunning: false,
           }),
-          resumeTarget,
         }),
       });
     }

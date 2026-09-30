@@ -11,7 +11,6 @@ import type { StoryMacroPlanService } from "../../storyMacro/StoryMacroPlanServi
 import type { NovelVolumeService } from "../../volume/NovelVolumeService";
 import type { NovelWorkflowService } from "../../workflow/NovelWorkflowService";
 import {
-  buildNovelEditResumeTarget,
   parseSeedPayload,
 } from "../../workflow/novelWorkflow.shared";
 import {
@@ -327,17 +326,12 @@ export class NovelDirectorContinueRuntime {
           : "正在根据当前内容恢复章节执行",
         progress: assetFirstRecovery.resumeCheckpointType === "replan_required" ? 0.975 : 0.93,
         clearCheckpoint: assetFirstRecovery.resumeCheckpointType === "chapter_batch_ready",
+        chapterId: resumedChapterId,
         seedPayload: this.deps.buildDirectorSeedPayload(effectiveDirectorInput, novelId, {
           directorSession: buildDirectorSessionState({
             runMode: effectiveDirectorInput.runMode,
             phase: "chapter_execution",
             isBackgroundRunning: true,
-          }),
-          resumeTarget: buildNovelEditResumeTarget({
-            novelId,
-            taskId,
-            stage: "pipeline",
-            chapterId: resumedChapterId,
           }),
           autoExecution: seedPayload.autoExecution ?? null,
         }),
@@ -414,13 +408,6 @@ export class NovelDirectorContinueRuntime {
       parseResumeTargetLike(row.resumeTargetJson),
       parseResumeTargetLike(seedPayload.resumeTarget),
     );
-    const resumeTarget = buildNovelEditResumeTarget({
-      novelId,
-      taskId,
-      stage: normalizeResumeStage(phase),
-      volumeId: recoveryResumeTarget?.volumeId,
-      chapterId: recoveryResumeTarget?.chapterId,
-    });
     if (phase === "structured_outline") {
       await this.deps.assertHighMemoryStartAllowed({
         taskId,
@@ -440,7 +427,6 @@ export class NovelDirectorContinueRuntime {
       title: effectiveDirectorInput.candidate.workingTitle,
       seedPayload: this.deps.buildDirectorSeedPayload(effectiveDirectorInput, novelId, {
         directorSession,
-        resumeTarget,
       }),
     });
     await this.deps.workflowService.markTaskRunning(taskId, {
