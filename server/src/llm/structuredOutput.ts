@@ -443,6 +443,26 @@ export function extractStructuredOutputErrorCategory(message?: string | null): S
   ].includes(category) ? category : null;
 }
 
+/**
+ * 把结构化输出报错的内部错误串（形如 `[STRUCTURED_OUTPUT:transport_error] ...`）
+ * 转成面向新手的中文说明。非结构化输出错误返回 null，调用方应保留原串展示。
+ * 文案需与 structuredInvoke.ts 中 summarizeStructuredOutputFailure 的 summaryMap 保持一致。
+ */
+export function structuredOutputFailureToSummary(raw?: string | null): string | null {
+  if (!raw) return null;
+  const category = extractStructuredOutputErrorCategory(raw);
+  if (!category) return null;
+  const summaryMap: Record<StructuredOutputErrorCategory, string> = {
+    unsupported_native_json: "当前模型端点不兼容原生 JSON 输出。",
+    thinking_pollution: "当前模型的思考内容污染了结构化输出。",
+    incomplete_json: "模型输出的 JSON 被截断或不完整，可能是输出被截断或 token 上限不足；建议先重试，必要时切换更强模型。",
+    malformed_json: "模型输出的 JSON 格式不稳定。",
+    schema_mismatch: "模型输出未满足目标结构要求。",
+    transport_error: "结构化调用过程发生传输或服务端错误。",
+  };
+  return summaryMap[category];
+}
+
 export class StructuredOutputError extends Error {
   readonly category: StructuredOutputErrorCategory;
 
