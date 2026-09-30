@@ -1,5 +1,6 @@
 import type { LLMProvider } from "./llm";
 import type { NovelWorkflowStage } from "./novelWorkflow";
+import type { WorkflowStepCatalogDisplayStage } from "./directorWorkflowStepCatalogData";
 import type {
   DirectorCircuitBreakerState,
   DirectorQualityLoopBudgetNextAction,
@@ -858,15 +859,9 @@ export interface DirectorTaskShell {
   cancelRequestedAt?: string | null;
 }
 
-export type DirectorDisplayStageKey =
-  | "project_setup"
-  | "story_planning"
-  | "world_setup"
-  | "character_setup"
-  | "volume_strategy"
-  | "structured_outline"
-  | "chapter_execution"
-  | "quality_repair";
+// 展示阶段枚举统一为单一权威源 WorkflowStepCatalogDisplayStage（directorWorkflowStepCatalogData.ts），
+// DirectorDisplayStageKey 仅作兼容别名，避免两处重复声明（C21）。
+export type DirectorDisplayStageKey = WorkflowStepCatalogDisplayStage;
 
 export type DirectorDisplayMode =
   | "idle"
