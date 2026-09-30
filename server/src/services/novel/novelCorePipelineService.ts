@@ -8,7 +8,7 @@ import {
   type PipelineRunOptions,
 } from "./novelCoreShared";
 import { ensureNovelCharacters } from "./novelCoreSupport";
-import { ChapterRuntimeCoordinator } from "./runtime/ChapterRuntimeCoordinator";
+import { sharedChapterRuntimeCoordinator } from "./runtime/ChapterRuntimeCoordinator";
 import { CHAPTER_ARTIFACT_BOUNDARY_TYPE } from "./runtime/artifactSync";
 import { selectPrimaryPipelineJob } from "./pipelineJobDedup";
 import { buildPipelineCurrentItemLabel, buildPipelineStageProgress, decoratePipelineJob as decoratePipelineJobRow, isPipelineActiveStage, parsePipelinePayload as parsePipelineJobPayload, stringifyPipelinePayload as stringifyPipelineJobPayload, type DecoratedPipelineJob, type PipelineActiveStage, type PipelineJobLike } from "./pipelineJobState";
@@ -30,7 +30,7 @@ function clampPipelineMaxRetries(value: number | null | undefined): number {
 export class NovelCorePipelineService {
   private static readonly activeJobIds = new Set<string>();
   private static readonly startLocks = new Set<string>();
-  private readonly chapterRuntimeCoordinator = new ChapterRuntimeCoordinator();
+  private readonly chapterRuntimeCoordinator = sharedChapterRuntimeCoordinator;
   private readonly pipelineExecutor = new NovelPipelineExecutor(this.chapterRuntimeCoordinator);
   private readonly pipelineExecutionLeases = new PipelineExecutionLeaseService();
   private decoratePipelineJob<T extends PipelineJobLike | null>(

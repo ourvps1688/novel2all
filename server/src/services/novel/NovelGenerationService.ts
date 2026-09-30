@@ -4,7 +4,7 @@ import {
   registerChapterExecutionStageRunner,
 } from "./production/ChapterExecutionStageRunner";
 import { novelProductionOrchestrator } from "./production/NovelProductionOrchestrator";
-import { ChapterRuntimeCoordinator } from "./runtime/ChapterRuntimeCoordinator";
+import { ChapterRuntimeCoordinator, sharedChapterRuntimeCoordinator } from "./runtime/ChapterRuntimeCoordinator";
 
 /**
  * @deprecated Use `createNovelApplicationServices()` and inject only the
@@ -12,7 +12,7 @@ import { ChapterRuntimeCoordinator } from "./runtime/ChapterRuntimeCoordinator";
  */
 export class NovelGenerationService {
   protected readonly core = new NovelCoreService();
-  protected readonly chapterRuntimeCoordinator = new ChapterRuntimeCoordinator();
+  protected readonly chapterRuntimeCoordinator = sharedChapterRuntimeCoordinator;
 
   constructor() {
     registerChapterExecutionStageRunner({

@@ -21,7 +21,7 @@ import {
 import { GenerationContextAssembler } from "./runtime/GenerationContextAssembler";
 import { chapterQualityLoopService } from "./quality/ChapterQualityLoopService";
 import { directorAutomationLedgerEventService } from "./director/runtime/DirectorAutomationLedgerEventService";
-import { ChapterRuntimeCoordinator } from "./runtime/ChapterRuntimeCoordinator";
+import { sharedChapterRuntimeCoordinator } from "./runtime/ChapterRuntimeCoordinator";
 import {
   ChapterContextAssemblyError,
   type AuditContextOperation,
@@ -51,9 +51,7 @@ export async function createQualityReport(
 
 export class NovelCoreReviewService {
   private readonly generationContextAssembler = new GenerationContextAssembler();
-  private readonly chapterRuntimeCoordinator = new ChapterRuntimeCoordinator({
-    resolveAuditIssues: (novelId, issueIds) => this.resolveAuditIssues(novelId, issueIds),
-  });
+  private readonly chapterRuntimeCoordinator = sharedChapterRuntimeCoordinator;
 
   async reviewChapter(novelId: string, chapterId: string, options: ReviewOptions = {}) {
     const chapter = await prisma.chapter.findFirst({

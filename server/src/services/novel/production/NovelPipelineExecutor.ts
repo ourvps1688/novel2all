@@ -9,7 +9,7 @@ import { novelEventBus } from "../../../events";
 import { runWithLlmUsageTracking } from "../../../llm/usageTracking";
 import { buildDirectorCompletionProfile } from "@ai-novel/shared/types/directorCompletion";
 import { ChapterRouteWindowService } from "../planning/ChapterRouteWindowService";
-import { ChapterRuntimeCoordinator } from "../runtime/ChapterRuntimeCoordinator";
+import { ChapterRuntimeCoordinator, sharedChapterRuntimeCoordinator } from "../runtime/ChapterRuntimeCoordinator";
 import { CHAPTER_ARTIFACT_BOUNDARY_TYPE } from "../runtime/artifactSync";
 import { isChapterEmptyContentError } from "../runtime/chapterEmptyContentError";
 import { ChapterContentPersistenceError } from "../runtime/lifecycle";
@@ -83,7 +83,7 @@ export class NovelPipelineExecutor {
   private readonly executionOwnerStore = new AsyncLocalStorage<string | null>();
 
   constructor(
-    private readonly chapterRuntimeCoordinator = new ChapterRuntimeCoordinator(),
+    private readonly chapterRuntimeCoordinator = sharedChapterRuntimeCoordinator,
     private readonly automaticAttempts = new ChapterAutomaticAttemptService(),
   ) {}
 
