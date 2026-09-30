@@ -1,24 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
+  Boxes,
   BookOpenText,
   ChevronLeft,
   ChevronRight,
-  Database,
-  Globe2,
   House,
   Images,
   LayoutDashboard,
   ListTodo,
-  Radar,
-  ScanSearch,
   Settings2,
-  ShieldCheck,
-  SquarePen,
-  Tags,
-  UsersRound,
-  WandSparkles,
-  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -48,23 +39,14 @@ const navGroups: NavGroup[] = [
     title: "创作",
     items: [
       { to: "/", label: "首页", icon: House },
-      { to: "/market-radar", label: "热门题材雷达", icon: Radar },
       { to: "/novels", label: "小说列表", icon: BookOpenText },
       { to: "/creative-hub", label: "创作中枢", icon: LayoutDashboard },
-      { to: "/book-analysis", label: "拆书", icon: ScanSearch },
     ],
   },
   {
     title: "资产",
     items: [
-      { to: "/genres", label: "题材基底库", icon: Tags },
-      { to: "/story-modes", label: "推进模式库", icon: Workflow },
-      { to: "/titles", label: "标题工坊", icon: SquarePen },
-      { to: "/knowledge", label: "知识库", icon: Database },
-      { to: "/worlds", label: "世界样本库", icon: Globe2 },
-      { to: "/style-engine", label: "写法引擎", icon: WandSparkles },
-      { to: "/anti-ai-rules", label: "反 AI 规则", icon: ShieldCheck },
-      { to: "/base-characters", label: "基础角色库", icon: UsersRound },
+      { to: "/assets", label: "创作资产", icon: Boxes },
       { to: "#visual-assets", label: "视觉资源库", icon: Images, action: "visual_asset_library" },
     ],
   },

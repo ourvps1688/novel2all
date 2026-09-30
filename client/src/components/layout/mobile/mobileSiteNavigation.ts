@@ -60,27 +60,18 @@ const moreNavGroups: MobileNavGroup[] = [
   {
     title: "创作辅助",
     items: [
-      { key: "book-analysis", label: "拆书", to: "/book-analysis", group: "creation" },
-      { key: "market-radar", label: "热门题材雷达", to: "/market-radar", group: "creation" },
       { key: "chat-legacy", label: "旧版聊天", to: "/chat-legacy", group: "creation" },
     ],
   },
   {
     title: "资产库",
     items: [
-      { key: "knowledge", label: "知识库", to: "/knowledge", group: "more" },
-      { key: "genres", label: "题材基底", to: "/genres", group: "more" },
-      { key: "story-modes", label: "推进模式", to: "/story-modes", group: "more" },
-      { key: "titles", label: "标题工坊", to: "/titles", group: "more" },
-      { key: "style-engine", label: "写法引擎", to: "/style-engine", group: "more" },
-      { key: "anti-ai-rules", label: "反 AI 规则", to: "/anti-ai-rules", group: "more" },
-      { key: "base-characters", label: "基础角色", to: "/base-characters", group: "more" },
+      { key: "assets", label: "创作资产", to: "/assets", group: "more" },
     ],
   },
   {
-    title: "世界与系统",
+    title: "系统",
     items: [
-      { key: "worlds", label: "世界样本库", to: "/worlds", group: "more" },
       { key: "settings", label: "系统设置", to: "/settings", group: "more" },
     ],
   },
