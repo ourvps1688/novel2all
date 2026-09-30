@@ -190,7 +190,7 @@ export class ChapterArtifactBackgroundSyncService {
       });
       if (deltaClaim === "running") {
         return {
-          status: artifactSyncMode === "strict" ? "pending" : "degraded",
+          status: artifactSyncMode === "adaptive" ? "degraded" : "pending",
           contentHash,
           completedArtifacts: [],
           reason: "同一正文版本的资产同步仍在运行。",
@@ -309,7 +309,7 @@ export class ChapterArtifactBackgroundSyncService {
       });
       if (reconcileClaim === "running") {
         return {
-          status: artifactSyncMode === "strict" ? "pending" : "degraded",
+          status: artifactSyncMode === "adaptive" ? "degraded" : "pending",
           contentHash,
           completedArtifacts: ["artifact_delta"],
           reason: "同一正文版本的伏笔账本对账仍在运行。",

@@ -159,11 +159,19 @@ function withPatchedPrisma(store, fn) {
 
   prisma.bookAnalysis.findUnique = async (args) => {
     if (args?.select?.status) return { status: "succeeded" };
-    return createAnalysis();
+    // Surface budgetTokens so BookAnalysisBudgetGuard does not early-return before it
+    // records token usage. Present usedTokens as 0 so each guard call reports its own
+    // token delta and the test store can accumulate deterministically (the guard writes
+    // an absolute value computed from this read).
+    return { ...createAnalysis(), budgetTokens: store.budgetTokens, usedTokens: 0 };
   };
   prisma.bookAnalysis.update = async ({ data }) => {
-    const increment = data?.usedTokens?.increment ?? 0;
-    store.usedTokens += increment;
+    const incoming = data?.usedTokens;
+    if (typeof incoming === "number") {
+      store.usedTokens += incoming;
+    } else if (incoming && typeof incoming.increment === "number") {
+      store.usedTokens += incoming.increment;
+    }
     return { budgetTokens: store.budgetTokens, usedTokens: store.usedTokens };
   };
   prisma.bookAnalysisCharacter.findMany = async (args = {}) => {

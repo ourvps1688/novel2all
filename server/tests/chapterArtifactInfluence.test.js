@@ -4,47 +4,58 @@ const assert = require("node:assert/strict");
 const { prisma } = require("../dist/db/prisma.js");
 const { ChapterArtifactDeltaService } = require("../dist/services/novel/runtime/ChapterArtifactDeltaService.js");
 
-test("artifact delta only applies accepted influence proposals that are active in this chapter", async () => {
-  const service = new ChapterArtifactDeltaService();
-  const originalUpdateMany = prisma.characterInfluenceProposal.updateMany;
+// The artifact delta service applies and expires dialogue influence rows through
+// prisma.$transaction(...). The tests below stub the transaction so the
+// characterDialogueInfluence.updateMany calls can be inspected without touching
+// the database.
+function withDialogueInfluenceStub(run) {
+  const originalTransaction = prisma.$transaction;
+  const originalUpdateMany = prisma.characterDialogueInfluence.updateMany;
   const updateCalls = [];
-  prisma.characterInfluenceProposal.updateMany = async (args) => {
+  prisma.$transaction = async (fn) => (typeof fn === "function" ? fn(prisma) : Promise.resolve());
+  prisma.characterDialogueInfluence.updateMany = async (args) => {
     updateCalls.push(args);
     return { count: 1 };
   };
+  return run(updateCalls).finally(() => {
+    prisma.characterDialogueInfluence.updateMany = originalUpdateMany;
+    prisma.$transaction = originalTransaction;
+  });
+}
 
-  try {
-    const count = await service.applyCharacterInfluenceResolutions({
+test("artifact delta only applies accepted dialogue influence resolutions that are active in this chapter", async () => {
+  const service = new ChapterArtifactDeltaService();
+  await withDialogueInfluenceStub(async (updateCalls) => {
+    const count = await service.applyCharacterDialogueInfluenceResolutions({
       novelId: "novel-1",
       chapterId: "chapter-5",
       chapterOrder: 5,
-      activeProposals: [{
-        id: "proposal-active",
+      activeInfluences: [{
+        id: "influence-active",
         characterId: "character-1",
         characterName: "程秩",
-        title: "先确认退路",
+        summary: "先确认退路",
         behaviorGuidance: "先确认退路再行动。",
         emotionalGuidance: null,
         relationTension: null,
-        authorIntent: null,
         targetStartChapterOrder: 5,
         targetEndChapterOrder: 7,
       }],
       resolutions: [
         {
-          proposalId: "proposal-active",
+          influenceId: "influence-active",
           status: "applied",
           evidence: ["程秩确认退路后才潜入。"],
           confidence: 0.88,
         },
         {
-          proposalId: "proposal-foreign",
+          influenceId: "influence-foreign",
           status: "applied",
           evidence: ["不应命中的提案。"],
           confidence: 0.9,
         },
         {
-          proposalId: "proposal-active",
+          influenceId: "influence-active",
           status: "defer",
           evidence: ["尚未承接。"],
           confidence: 0.7,
@@ -55,45 +66,44 @@ test("artifact delta only applies accepted influence proposals that are active i
     assert.equal(count, 1);
     assert.equal(updateCalls.length, 1);
     assert.deepEqual(updateCalls[0].where, {
-      id: "proposal-active",
+      id: "influence-active",
       novelId: "novel-1",
-      status: "accepted",
+      status: "active",
       targetStartChapterOrder: { lte: 5 },
       targetEndChapterOrder: { gte: 5 },
     });
     assert.equal(updateCalls[0].data.status, "applied");
     assert.equal(updateCalls[0].data.resolvedChapterId, "chapter-5");
     assert.deepEqual(JSON.parse(updateCalls[0].data.resolutionEvidenceJson), ["程秩确认退路后才潜入。"]);
-  } finally {
-    prisma.characterInfluenceProposal.updateMany = originalUpdateMany;
-  }
+  });
 });
 
-test("artifact delta expires accepted influence proposals once their window has passed", async () => {
+test("artifact delta expires active dialogue influence resolutions once their window has passed", async () => {
   const service = new ChapterArtifactDeltaService();
-  const originalUpdateMany = prisma.characterInfluenceProposal.updateMany;
-  const updateCalls = [];
-  prisma.characterInfluenceProposal.updateMany = async (args) => {
-    updateCalls.push(args);
-    return { count: 2 };
-  };
-
-  try {
-    const count = await service.expirePastCharacterInfluenceProposals({
-      novelId: "novel-1",
-      chapterOrder: 8,
-    });
-
-    assert.equal(count, 2);
-    assert.deepEqual(updateCalls[0], {
-      where: {
+  await withDialogueInfluenceStub(async (updateCalls) => {
+    const originalUpdateMany = prisma.characterDialogueInfluence.updateMany;
+    prisma.characterDialogueInfluence.updateMany = async (args) => {
+      updateCalls.push(args);
+      return { count: 2 };
+    };
+    try {
+      const count = await service.expirePastCharacterDialogueInfluences({
         novelId: "novel-1",
-        status: "accepted",
-        targetEndChapterOrder: { lt: 8 },
-      },
-      data: { status: "expired" },
-    });
-  } finally {
-    prisma.characterInfluenceProposal.updateMany = originalUpdateMany;
-  }
+        chapterId: "chapter-5",
+        chapterOrder: 8,
+      });
+
+      assert.equal(count, 2);
+      assert.deepEqual(updateCalls[0], {
+        where: {
+          novelId: "novel-1",
+          status: "active",
+          targetEndChapterOrder: { lt: 8 },
+        },
+        data: { status: "expired" },
+      });
+    } finally {
+      prisma.characterDialogueInfluence.updateMany = originalUpdateMany;
+    }
+  });
 });

@@ -65,7 +65,7 @@ export class NovelExportService {
       title: novel.title,
       description: novel.description,
       narrativeForm: novel.narrativeForm,
-      shortStoryContent: novel.shortStorySegments
+      shortStoryContent: (novel.shortStorySegments ?? [])
         .map((segment) => segment.content.trim())
         .filter(Boolean)
         .join("\n\n"),

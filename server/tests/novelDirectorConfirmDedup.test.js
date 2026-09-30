@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 require("../dist/app.js");
 const { NovelDirectorService } = require("../dist/services/novel/director/NovelDirectorService.js");
 const { NovelDirectorConfirmRuntime } = require("../dist/services/novel/director/runtime/novelDirectorConfirmRuntime.js");
+const { novelCreateResourceRecommendationService } = require("../dist/services/novel/NovelCreateResourceRecommendationService.js");
+const { writingPlatformProfileService } = require("../dist/modules/novel/writing-platform/index.js");
 const { prisma } = require("../dist/db/prisma.js");
 
 function buildDirectorInput(overrides = {}) {
@@ -272,11 +274,35 @@ test("confirm runtime creates the novel through the standard runtime node", asyn
     calls.push(["updateNovel", where.id, data.creationExperience]);
     return buildNovel(where.id);
   };
+  const originalResolveRequired = novelCreateResourceRecommendationService.resolveRequired;
+  novelCreateResourceRecommendationService.resolveRequired = async () => ({
+    genreId: "genre-1",
+    primaryStoryModeId: "mode-1",
+    secondaryStoryModeId: "mode-2",
+    recommendation: {
+      genre: { id: "genre-1" },
+      primaryStoryMode: { id: "mode-1" },
+      secondaryStoryMode: { id: "mode-2" },
+    },
+    promptBlock: "",
+  });
+  const originalSnapshot = writingPlatformProfileService.snapshot;
+  writingPlatformProfileService.snapshot = async () => ({
+    platform: "web",
+    label: "Web",
+    narrativeForm: "long_novel",
+    profileVersion: 1,
+    source: "official",
+    guidance: {},
+  });
+  input.candidate.recommendedWritingPlatform = "web";
   let result;
   try {
     result = await runtime.confirmCandidate(input);
   } finally {
     prisma.novel.update = originalNovelUpdate;
+    novelCreateResourceRecommendationService.resolveRequired = originalResolveRequired;
+    writingPlatformProfileService.snapshot = originalSnapshot;
   }
 
   assert.equal(result.novel.id, "novel_created_demo");

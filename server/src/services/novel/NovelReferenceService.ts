@@ -16,7 +16,8 @@ export type NovelReferenceStage =
   | "structured_outline"
   | "bible"
   | "beats"
-  | "character";
+  | "character"
+  | "chapter";
 
 const MAX_REFERENCE_CHARS_PER_STAGE = 5_000;
 const MAX_KNOWLEDGE_EXCERPT_CHARS = 1_500;
@@ -219,6 +220,7 @@ const STAGE_SECTION_MAP: Record<NovelReferenceStage, BookAnalysisSectionKey[]> =
   bible: ["character_system", "worldbuilding", "themes"],
   beats: ["plot_structure", "timeline", "market_highlights"],
   character: ["character_system"],
+  chapter: ["plot_structure", "timeline", "character_system", "worldbuilding"],
 };
 
 export class NovelReferenceService {

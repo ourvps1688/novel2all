@@ -1,0 +1,53 @@
+name: Test Suite
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      AI_NOVEL_DATABASE_MODE: sqlite
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Prepare Prisma (generate client + sqlite db push)
+        run: pnpm --filter @ai-novel/server exec node scripts/ensure-dev-prisma.cjs
+
+      - name: Build shared
+        run: pnpm --filter @ai-novel/shared build
+
+      - name: Server tests (fast)
+        run: pnpm --filter @ai-novel/server test
+
+      - name: Client tests
+        run: pnpm --filter @ai-novel/client test
+
+      - name: Typecheck
+        run: pnpm typecheck

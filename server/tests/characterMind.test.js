@@ -32,6 +32,7 @@ test("character mind persistence archives the old current snapshot before creati
         archivalCalls.push(args);
         return { count: 1 };
       },
+      deleteMany: async () => ({ count: 0 }),
       create: async (args) => {
         const row = {
           id: `snapshot-${createdRows.length + 1}`,
