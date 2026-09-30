@@ -126,7 +126,6 @@ function buildBlockerCardData(input: {
       title: "当前风险",
       summary: input.diagnostics.failureSummary,
       details: [
-        input.diagnostics.failureCode ? `错误码: ${input.diagnostics.failureCode}` : "",
         input.diagnostics.recoveryHint ? `恢复建议: ${input.diagnostics.recoveryHint}` : "",
       ].filter(Boolean),
       tone: "border-destructive/30 bg-destructive/5 text-foreground",

@@ -11,6 +11,7 @@ import type {
 import type { FailureDiagnostic } from "@ai-novel/shared/types/agent";
 import { prisma } from "../db/prisma";
 import { novelSetupStatusService } from "../services/novel/NovelSetupStatusService";
+import { structuredOutputFailureToSummary } from "../llm/structuredOutput";
 
 interface CreateThreadInput {
   title?: string;
@@ -96,7 +97,7 @@ function mapThread(record: {
     archived: record.archived,
     status: record.status,
     latestRunId: record.latestRunId,
-    latestError: record.latestError,
+    latestError: structuredOutputFailureToSummary(record.latestError) ?? record.latestError,
     resourceBindings: normalizeBindings(safeParseJson(record.resourceBindingsJson, {})),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -138,9 +139,10 @@ async function loadFailureDiagnostic(runId: string | null | undefined): Promise<
   });
   if (!run) return undefined;
   const latestStep = run.steps[0];
+  const rawFailure = run.error ?? latestStep?.error ?? null;
   return {
     failureCode: latestStep?.errorCode ?? null,
-    failureSummary: run.error ?? latestStep?.error ?? null,
+    failureSummary: structuredOutputFailureToSummary(rawFailure) ?? rawFailure,
     failureDetails: latestStep?.error ?? null,
     recoveryHint: run.status === "failed"
       ? "请查看最近一次失败步骤，必要时从创作中枢重新发起或重放。"
