@@ -69,6 +69,39 @@ export function resolveWorkflowTabFromDisplayStage(ds: WorkflowStepCatalogDispla
   return DISPLAY_TO_TAB[k] ?? null;
 }
 
+// T3-5e: canonical node-display-label authority derived ONCE from the catalog.
+// Supersedes the overlapping hand-copied entries previously kept in
+// DIRECTOR_NODE_DISPLAY_LABELS (shared/types/directorRuntime.ts): when a
+// nodeKey or label matches a catalog nodeKey / display-stage key, the catalog
+// label wins. This is the single source of truth for the 29 catalog keys; the
+// slimmed DIRECTOR_NODE_DISPLAY_LABELS table only covers the 42 catalog-only
+// fallback keys that remain.
+const DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const stage of WORKFLOW_DISPLAY_STAGES) {
+    map[stage.key] = stage.label;
+  }
+  for (const entry of WORKFLOW_STEP_CATALOG) {
+    map[entry.nodeKey] = entry.label;
+  }
+  return map;
+})();
+
+export function resolveDirectorNodeDisplayLabel(input: {
+  label?: string | null;
+  nodeKey?: string | null;
+}): string | null {
+  const label = input.label?.trim();
+  const nodeKey = input.nodeKey?.trim();
+  if (label && DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[label]) {
+    return DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[label];
+  }
+  if (nodeKey && DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[nodeKey]) {
+    return DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[nodeKey];
+  }
+  return null;
+}
+
 function buildStepAliasMap(aliasKey: "nodeKeys" | "currentItemKeys"): Map<string, WorkflowStepCatalogEntry> {
   const result = new Map<string, WorkflowStepCatalogEntry>();
   for (const entry of WORKFLOW_STEP_CATALOG) {
