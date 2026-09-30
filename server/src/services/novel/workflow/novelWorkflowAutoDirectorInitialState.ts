@@ -4,8 +4,8 @@ import type {
   NovelWorkflowStage,
 } from "@ai-novel/shared/types/novelWorkflow";
 import { DIRECTOR_PROGRESS } from "../director/projections/novelDirectorProgress";
-import { NOVEL_WORKFLOW_STAGE_PROGRESS } from "@ai-novel/shared/types/novelWorkflow";
 import { parseResumeTarget } from "./novelWorkflow.shared";
+import { defaultProgressForStage } from "./novelWorkflow.helpers";
 import { resolveTabWorkflowStageForRecovery } from "@ai-novel/shared/types/directorWorkflowStepCatalog";
 
 export interface AutoDirectorBootstrapInitialState {
@@ -19,10 +19,6 @@ export interface AutoDirectorBootstrapInitialState {
 
 function mapTabToStage(stage: NovelWorkflowResumeTarget["stage"] | null | undefined): NovelWorkflowStage | null {
   return resolveTabWorkflowStageForRecovery(stage);
-}
-
-function defaultProgressForStage(stage: NovelWorkflowStage): number {
-  return NOVEL_WORKFLOW_STAGE_PROGRESS[stage] ?? 0.08;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
