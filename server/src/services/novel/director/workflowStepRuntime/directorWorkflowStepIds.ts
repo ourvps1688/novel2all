@@ -34,7 +34,6 @@ export const DIRECTOR_EXECUTION_STEP_IDS: Record<DirectorExecutionStage, string>
   chapter_state_commit: DIRECTOR_WORKFLOW_STEP_IDS.execution.chapter_state_commit,
   payoff_ledger_sync: DIRECTOR_WORKFLOW_STEP_IDS.execution.payoff_ledger_sync,
   character_resource_sync: DIRECTOR_WORKFLOW_STEP_IDS.execution.character_resource_sync,
-  quality_repair: DIRECTOR_WORKFLOW_STEP_IDS.execution.quality_repair,
 };
 
 export const DIRECTOR_TAKEOVER_STEP_ID = DIRECTOR_WORKFLOW_STEP_IDS.takeover;

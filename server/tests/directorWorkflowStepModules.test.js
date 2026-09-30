@@ -44,7 +44,6 @@ test("director workflow step registry exposes unified step modules", () => {
   assert.ok(ids.includes("chapter.draft.write"));
   assert.ok(ids.includes("chapter.quality.review"));
   assert.ok(ids.includes("chapter.draft.repair"));
-  assert.ok(ids.includes("chapter.quality.repair"));
   assert.ok(ids.includes("workflow.takeover.execute"));
 
   const candidateModule = getDirectorCandidateStepModule("candidate_generation");
@@ -710,7 +709,6 @@ test("chapter quality review and repair facts are scoped to the active auto exec
   const originalFindMany = prisma.chapter.findMany;
   const qualityReviewModule = getDirectorExecutionStepModule("chapter_quality_review");
   const repairModule = getDirectorExecutionStepModule("chapter_repair");
-  const qualityRepairModule = getDirectorExecutionStepModule("quality_repair");
   const outsideUnreviewedChapter = buildProgressChapter(1, {
     drafted: true,
     completedStages: [
@@ -771,7 +769,6 @@ test("chapter quality review and repair facts are scoped to the active auto exec
   const reviewCompletion = await qualityReviewModule.inspectCompletion(context);
   const repairCompletion = await repairModule.inspectCompletion(context);
   const repairProgress = await repairModule.inspectProgress(context);
-  const qualityRepairCompletion = await qualityRepairModule.inspectCompletion(context);
 
   assert.equal(reviewCompletion.completed, true);
   assert.equal(reviewCompletion.evidence.draftedChapterCount, 2);
@@ -781,10 +778,6 @@ test("chapter quality review and repair facts are scoped to the active auto exec
   assert.equal(repairCompletion.evidence.reviewedChapterCount, 2);
   assert.equal(repairCompletion.evidence.needsRepairChapters, 1);
   assert.equal(repairProgress.nextAction, "repair_chapter");
-  assert.equal(qualityRepairCompletion.completed, false);
-  assert.equal(qualityRepairCompletion.evidence.draftedChapterCount, 2);
-  assert.equal(qualityRepairCompletion.evidence.reviewedChapterCount, 2);
-  assert.equal(qualityRepairCompletion.evidence.needsRepairChapters, 1);
 });
 
 test("workflow step fact inspections support novel-only manual context", async (t) => {
@@ -876,14 +869,10 @@ test("manual chapter repair runs through the workflow step runner", async (t) =>
 test("quality repair template starts from repair step and preserves policy action", () => {
   const plan = buildChapterPipelineWorkflowTemplate("quality_repair");
   const repairModule = getDirectorExecutionStepModule("chapter_repair");
-  const qualityRepairModule = getDirectorExecutionStepModule("quality_repair");
 
   assert.equal(plan.steps[0].stepId, "chapter.draft.repair");
   assert.equal(plan.steps[0].nodeKey, "chapter_repair_node");
   assert.equal(repairModule.policyAction, "repair");
-  assert.equal(qualityRepairModule.id, "chapter.quality.repair");
-  assert.equal(qualityRepairModule.nodeKey, "chapter_repair_node");
-  assert.equal(qualityRepairModule.policyAction, "repair");
   assert.deepEqual(
     getDirectorExecutionStepModuleSequence("quality_repair").map((module) => module.id),
     [

@@ -832,49 +832,4 @@ export const DIRECTOR_EXECUTION_STEP_MODULES: Record<
       };
     },
   }),
-  quality_repair: createFactOnlyExecutionModule({
-    descriptor: createWorkflowStepDescriptorFromDirectorAdapter({
-      id: DIRECTOR_EXECUTION_STEP_IDS.quality_repair,
-      stage: "quality_repair",
-      adapter: getDirectorExecutionNodeAdapter("quality_repair"),
-    }),
-    inspectFacts: async (context) => {
-      const progressSummary = await inspectScopedChapterExecutionProgress(context);
-      const draftedChapterCount = progressSummary?.draftedChapterCount ?? 0;
-      const reviewedChapterCount = progressSummary?.chapters?.filter((chapter) => chapterHasCompletedStage(chapter, "audit_completed")).length ?? 0;
-      const needsRepairChapters = progressSummary?.needsRepairChapters ?? 0;
-      const hasRepairContext = reviewedChapterCount > 0 || needsRepairChapters > 0;
-      const progress = {
-        needsRepairChapters: hasRepairContext ? needsRepairChapters : 1,
-        totalChapters: Math.max(draftedChapterCount, 1),
-      };
-      return {
-        readiness: draftedChapterCount === 0
-          ? blockedState("Draft chapters are required before quality repair.", {
-            code: "missing_chapter_drafts",
-            nextAction: "continue_chapter_execution",
-          })
-          : hasRepairContext
-            ? readyState({ evidence: { draftedChapterCount, reviewedChapterCount, needsRepairChapters } })
-            : blockedState("Quality review facts must exist before quality repair.", {
-              code: "missing_quality_review_facts",
-              evidence: { draftedChapterCount, reviewedChapterCount, needsRepairChapters },
-              nextAction: "run_quality_review",
-            }),
-        completion: hasRepairContext && needsRepairChapters === 0
-          ? completedFact(DIRECTOR_EXECUTION_STEP_IDS.quality_repair, { evidence: { draftedChapterCount, reviewedChapterCount, needsRepairChapters: 0 } })
-          : pendingFact(DIRECTOR_EXECUTION_STEP_IDS.quality_repair, {
-            ratio: hasRepairContext ? Math.max(0, 1 - (needsRepairChapters / Math.max(draftedChapterCount, 1))) : 0,
-            evidence: { draftedChapterCount, reviewedChapterCount, needsRepairChapters, totalChapters: draftedChapterCount },
-          }),
-        progress: buildSimpleProgress({
-          status: draftedChapterCount === 0 ? "blocked" : hasRepairContext ? ((progress?.needsRepairChapters ?? 0) === 0 ? "completed" : "needs_review") : "not_started",
-          ratio: hasRepairContext ? Math.max(0, 1 - (needsRepairChapters / Math.max(draftedChapterCount, 1))) : 0,
-          label: (progress?.needsRepairChapters ?? 0) === 0 ? "质量修复链已收敛" : "仍有章节等待质量修复",
-          evidence: { draftedChapterCount, reviewedChapterCount, needsRepairChapters },
-          nextAction: draftedChapterCount === 0 ? "continue_chapter_execution" : hasRepairContext ? ((progress?.needsRepairChapters ?? 0) === 0 ? "continue_chapter_execution" : "repair_chapter") : "run_quality_review",
-        }),
-      };
-    },
-  }),
 };

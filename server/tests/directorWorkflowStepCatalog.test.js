@@ -165,7 +165,7 @@ test("workflow step catalog resolves legacy node aliases and checkpoints", () =>
   );
   assert.equal(
     findWorkflowStepCatalogEntryByNodeKey("chapter_quality_repair_node")?.id,
-    "chapter.quality.repair",
+    "chapter.draft.repair",
   );
   assert.equal(
     resolveWorkflowDisplayStage({ factStepId: "volume.chapter_detail_bundle.generate" }),

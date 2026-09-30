@@ -237,7 +237,7 @@ const DIRECTOR_NODE_DISPLAY_LABELS: Record<string, string> = {
   chapter_quality_review_node: "章节质量检查",
   chapter_repair: "章节问题修复",
   chapter_repair_node: "章节问题修复",
-  quality_repair: "章节质量修复",
+  quality_repair: "章节问题修复",
   chapter_state_commit: "更新章节状态",
   chapter_state_commit_node: "更新章节状态",
   payoff_ledger_sync: "同步伏笔与读者承诺",
