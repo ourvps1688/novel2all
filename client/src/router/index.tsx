@@ -35,6 +35,7 @@ const WorldList = lazy(() => import("@/pages/worlds/WorldList"));
 const WorldWorkspace = lazy(() => import("@/pages/worlds/WorldWorkspace"));
 const WritingFormulaPage = lazy(() => import("@/pages/writingFormula/WritingFormulaPage"));
 const CharacterLibrary = lazy(() => import("@/pages/characters/CharacterLibrary"));
+const AssetHubPage = lazy(() => import("@/pages/assets/AssetHubPage"));
 
 const routes: RouteObject[] = [
   {
@@ -58,6 +59,7 @@ const routes: RouteObject[] = [
       { path: "market-radar", element: <MarketRadarPage /> },
       { path: "tasks", element: <TaskCenterPage /> },
       { path: "knowledge", element: <KnowledgePage /> },
+      { path: "assets", element: <AssetHubPage /> },
       { path: "genres", element: <GenreManagementPage /> },
       { path: "story-modes", element: <StoryModeManagementPage /> },
       { path: "titles", element: <TitleStudioPage /> },
