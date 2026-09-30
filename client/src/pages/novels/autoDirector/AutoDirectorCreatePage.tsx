@@ -34,6 +34,7 @@ import StageIdea from "./StageIdea";
 import StageModelRun from "./StageModelRun";
 import StageSummaryCard from "./StageSummaryCard";
 import StageWorldStyle from "./StageWorldStyle";
+import MarketRadarInlinePanel from "./MarketRadarInlinePanel";
 import {
   fillMissingCreationFoundation,
   fillMissingMarketCreativeFraming,
@@ -98,7 +99,13 @@ function getDraftStorage(): Storage | null {
 
 function AutoDirectorCreatePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [radarPanelOpen, setRadarPanelOpen] = useState(false);
+  const handleRadarBriefCreated = (briefId: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("marketBriefId", briefId);
+    setSearchParams(next);
+  };
   const reducedMotion = useReducedMotion();
   const queryClient = useQueryClient();
   const llm = useLLMStore();
@@ -663,8 +670,14 @@ function AutoDirectorCreatePage() {
                 {marketBriefQuery.data?.data?.summary || (marketBriefQuery.isPending ? "正在读取市场创作简报。" : "市场简报暂时无法读取，仍可继续按你的想法开书。")}
               </p>
             </div>
-            <Button type="button" variant="ghost" size="sm" className="shrink-0" asChild>
-              <Link to="/market-radar">调整雷达信号</Link>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setRadarPanelOpen((value) => !value)}
+            >
+              {radarPanelOpen ? "收起雷达面板" : "调整雷达信号"}
             </Button>
           </div>
 
@@ -737,9 +750,16 @@ function AutoDirectorCreatePage() {
           <span className="text-muted-foreground">也可以从一部参考小说或近期热门方向开始。</span>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={() => setReferenceStartOpen(true)}>照着一本书写</Button>
-            <Button type="button" variant="outline" size="sm" asChild><Link to="/market-radar">参考热门题材</Link></Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setRadarPanelOpen((value) => !value)}>参考热门题材</Button>
           </div>
         </div>
+      ) : null}
+      {radarPanelOpen ? (
+        <MarketRadarInlinePanel
+          brief={marketBriefQuery.data?.data ?? null}
+          onBriefCreated={handleRadarBriefCreated}
+          onClose={() => setRadarPanelOpen(false)}
+        />
       ) : null}
 
       <AnimatePresence mode="wait">
