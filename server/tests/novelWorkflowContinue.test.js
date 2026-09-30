@@ -159,7 +159,7 @@ test("novel workflow continue route accepts range and full-book continuation mod
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        continuationMode: "full_book_autopilot",
+        continuationMode: "skip_quality_repair",
       }),
     });
     assert.equal(fullBookResponse.status, 202);
@@ -173,7 +173,7 @@ test("novel workflow continue route accepts range and full-book continuation mod
       {
         taskId: "workflow-auto-exec",
         input: {
-          continuationMode: "full_book_autopilot",
+          continuationMode: "skip_quality_repair",
         },
       },
     ]);

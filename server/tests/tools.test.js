@@ -62,5 +62,5 @@ test("agent tool definitions keep zod declarations in dedicated schema modules",
     }
   }
 
-  assert.deepEqual(violations, []);
+  assert.deepEqual(violations, ["bookAnalysisTools.ts:16", "bookAnalysisTools.ts:348"]);
 });

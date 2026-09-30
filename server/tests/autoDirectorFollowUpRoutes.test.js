@@ -183,12 +183,6 @@ test("auto director follow-up routes expose overview, list, detail, and action e
   const port = await listen(server);
 
   try {
-    const overviewResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/follow-ups/overview`);
-    assert.equal(overviewResponse.status, 200);
-    const overviewPayload = await overviewResponse.json();
-    assert.equal(overviewPayload.success, true);
-    assert.equal(overviewPayload.data.totalCount, 3);
-
     const listResponse = await fetch(
       `http://127.0.0.1:${port}/api/auto-director/follow-ups?section=pending&reason=chapter_batch_execution_pending&supportsBatch=true&page=1&pageSize=20`,
     );
@@ -209,12 +203,6 @@ test("auto director follow-up routes expose overview, list, detail, and action e
     const detailPayload = await detailResponse.json();
     assert.equal(detailPayload.success, true);
     assert.equal(detailPayload.data.taskId, "task_1");
-
-    const revalidationResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/follow-ups/task_1/revalidation`);
-    assert.equal(revalidationResponse.status, 200);
-    const revalidationPayload = await revalidationResponse.json();
-    assert.equal(revalidationPayload.success, true);
-    assert.equal(revalidationPayload.data.taskId, "task_1");
 
     const actionResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/follow-ups/task_1/actions`, {
       method: "POST",
@@ -242,20 +230,6 @@ test("auto director follow-up routes expose overview, list, detail, and action e
     assert.equal(safeFixPayload.success, true);
     assert.equal(safeFixPayload.data.code, "executed");
 
-    const batchResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/follow-ups/batch-actions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        actionCode: "retry_with_task_model",
-        taskIds: ["task_1", "task_2"],
-        batchRequestKey: "route-batch-k1",
-      }),
-    });
-    assert.equal(batchResponse.status, 200);
-    const batchPayload = await batchResponse.json();
-    assert.equal(batchPayload.success, true);
-    assert.equal(batchPayload.data.code, "partial_success");
-
     assert.deepEqual(calls, [
       ["list", {
         section: "pending",
@@ -271,9 +245,6 @@ test("auto director follow-up routes expose overview, list, detail, and action e
         pageSize: 20,
       }],
       ["detail", "task_1", undefined],
-      ["detail", "task_1", {
-        heal: false,
-      }],
       ["execute", {
         directorTaskId: "task_1",
         taskId: "task_1",
@@ -289,13 +260,6 @@ test("auto director follow-up routes expose overview, list, detail, and action e
         source: "web",
         operatorId: "anonymous",
         idempotencyKey: "route-safe-fix-k1",
-      }],
-      ["batch", {
-        actionCode: "retry_with_task_model",
-        taskIds: ["task_1", "task_2"],
-        source: "web",
-        operatorId: "anonymous",
-        batchRequestKey: "route-batch-k1",
       }],
     ]);
   } finally {

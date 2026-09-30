@@ -312,13 +312,22 @@ export class NovelCreateResourceRecommendationService {
     }
 
     const powerSystemPreference = input.powerSystemPreference ?? "ai_recommend";
-    const aiRecommendation = selectedGenre && selectedPrimary && selectedSecondary && powerSystemPreference !== "ai_recommend"
-      ? null
-      : await this.recommendFromOptions(input, options);
+    const canSkipRecommendation =
+      Boolean(selectedGenre && selectedPrimary && selectedSecondary) && powerSystemPreference !== "ai_recommend";
+    let aiRecommendation: NovelCreateResourceRecommendation | null = null;
+    if (!canSkipRecommendation) {
+      try {
+        aiRecommendation = await this.recommendFromOptions(input, options);
+      } catch {
+        aiRecommendation = null;
+      }
+    }
     const genre = selectedGenre
-      ?? options.genres.find((item) => item.id === aiRecommendation?.genre.id);
+      ?? options.genres.find((item) => item.id === aiRecommendation?.genre.id)
+      ?? options.genres[0];
     const primary = selectedPrimary
-      ?? options.storyModes.find((item) => item.id === aiRecommendation?.primaryStoryMode.id);
+      ?? options.storyModes.find((item) => item.id === aiRecommendation?.primaryStoryMode.id)
+      ?? options.storyModes[0];
     const secondary = selectedSecondary
       ?? (!input.secondaryStoryModeId && aiRecommendation?.secondaryStoryMode
         ? options.storyModes.find((item) => (

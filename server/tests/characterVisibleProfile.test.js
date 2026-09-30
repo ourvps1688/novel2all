@@ -6,8 +6,8 @@ const {
   pickApplicableVisibleProfileFields,
 } = require("../dist/services/novel/characterProfile/CharacterVisibleProfileService");
 const {
-  buildCharactersContextText,
-} = require("../dist/services/novel/runtime/runtimeContextBlocks");
+  buildDynamicCharacterGuidance,
+} = require("../dist/prompting/prompts/novel/chapterLayeredContextCharacters");
 const {
   characterVisibleProfileCompletionPrompt,
 } = require("../dist/prompting/prompts/novel/characterVisibleProfile.prompts");
@@ -51,22 +51,45 @@ test("visible profile validator treats generic prose as vague", () => {
 });
 
 test("chapter character context includes compact visible profile summary", () => {
-  const text = buildCharactersContextText([
-    {
-      name: "林照",
-      role: "主角",
-      personality: "谨慎但不退让",
-      appearance: "眼尾狭长，额前总有被火燎卷的碎发",
-      physique: "少年感偏瘦，肩背却很稳",
-      signatureDetail: "思考时会用拇指摩挲旧铜戒",
-      voiceTexture: "声音偏低，短句多，越危险越慢",
+  const contextPackage = {
+    chapter: { order: 1 },
+    characterRoster: [
+      {
+        id: "character-1",
+        name: "林照",
+        role: "主角",
+        appearance: "眼尾狭长，额前总有被火燎卷的碎发",
+        physique: "少年感偏瘦，肩背却很稳",
+        signatureDetail: "思考时会用拇指摩挲旧铜戒",
+        voiceTexture: "声音偏低，短句多，越危险越慢",
+      },
+    ],
+    characterDynamics: {
+      characters: [
+        {
+          characterId: "character-1",
+          name: "林照",
+          role: "主角",
+          isCoreInVolume: true,
+          plannedChapterOrders: [1],
+          absenceRisk: "none",
+        },
+      ],
+      relations: [],
+      candidates: [],
     },
-  ]);
+    characterMindStates: [],
+    characterDialogueGuidances: [],
+    plan: { participants: [] },
+    openConflicts: [],
+  };
 
-  assert.match(text, /外显/);
-  assert.match(text, /样貌\/体态=/);
-  assert.match(text, /标志=/);
-  assert.match(text, /声音=/);
+  const guides = buildDynamicCharacterGuidance(contextPackage).characterBehaviorGuides;
+  assert.equal(guides.length, 1);
+  const summary = guides[0].visibleProfileSummary;
+  assert.match(summary, /样貌\/体态=/);
+  assert.match(summary, /标志=/);
+  assert.match(summary, /声音=/);
 });
 
 test("visible profile prompt carries author guidance into the request", () => {
