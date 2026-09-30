@@ -174,7 +174,7 @@ export class VolumeChapterSyncService {
         },
       });
       await persistActiveVolumeWorkspace(tx, novelId, linkedDocument, versionId);
-    });
+    }, { novelId });
 
     if (options.emitEvent !== false) {
       this.deps.emitVolumeUpdated(novelId, options.volumeUpdateReason ?? "chapter_sync");

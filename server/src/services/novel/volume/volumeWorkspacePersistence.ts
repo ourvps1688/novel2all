@@ -15,10 +15,49 @@ import {
 
 export const VOLUME_WORKSPACE_TRANSACTION_TIMEOUT_MS = 60_000;
 
+/**
+ * Per-novel mutual exclusion chain for volume-workspace transactions.
+ *
+ * The volume workspace writer (`persistActiveVolumeWorkspace`) relies on a
+ * snapshot-consistent read of the existing rows to decide whether order
+ * parking is required. Under SQLite WAL, two concurrent transactions for the
+ * same `novelId` can read a stale snapshot and then attempt to write colliding
+ * `(volumeId, chapterOrder)` rows, surfacing as a raw Prisma `P2002`
+ * (unique constraint failed) instead of a retried busy error.
+ *
+ * Serializing every volume-workspace transaction by `novelId` (across the
+ * transaction open -> commit boundary) guarantees that the second tranche
+ * starts its snapshot only after the first has committed, eliminating the
+ * race. This is deterministic input-orchestration, not a keyword branch.
+ */
+const volumeWorkspaceNovelLocks = new Map<string, Promise<void>>();
+
+async function withNovelVolumeWorkspaceLock<T>(
+  novelId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const previous = volumeWorkspaceNovelLocks.get(novelId) ?? Promise.resolve();
+  let release: () => void = () => undefined;
+  const next = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  volumeWorkspaceNovelLocks.set(novelId, next);
+  try {
+    await previous;
+    return await work();
+  } finally {
+    release();
+    if (volumeWorkspaceNovelLocks.get(novelId) === next) {
+      volumeWorkspaceNovelLocks.delete(novelId);
+    }
+  }
+}
+
 export function runVolumeWorkspaceTransaction<T>(
   runner: (tx: Prisma.TransactionClient) => Promise<T> | T,
+  options?: { novelId?: string },
 ): Promise<T> {
-  return withSqliteRetry(
+  const run = () => withSqliteRetry(
     () => prisma.$transaction(async (tx) => runner(tx), {
       timeout: VOLUME_WORKSPACE_TRANSACTION_TIMEOUT_MS,
     }),
@@ -27,6 +66,54 @@ export function runVolumeWorkspaceTransaction<T>(
       retryDelaysMs: [500, 1500, 3000, 6000],
     },
   );
+  if (options?.novelId) {
+    return withNovelVolumeWorkspaceLock(options.novelId, run);
+  }
+  return run();
+}
+
+/**
+ * Deterministic pre-flight invariant check for a volume-workspace document.
+ *
+ * Every caller is expected to hand in a normalized document (via
+ * `normalizeVolumeDraftInput` / `normalizeVolumeWorkspaceDocument` /
+ * `mergeVolumeWorkspaceInput`), which guarantees globally-unique `chapterOrder`
+ * and `sortOrder`. If a document still carries a duplicate `(volumeId,
+ * chapterOrder)` or `(novelId, sortOrder)` slot, the downstream
+ * `persistActiveVolumeWorkspace` loop would fail inside the transaction with a
+ * raw Prisma `P2002`. We fail fast here with an actionable Chinese error that
+ * names the conflicting values, so the log points straight at the offending
+ * document instead of a bare constraint violation.
+ *
+ * This is deterministic post-validation of already-structured AI output and
+ * therefore allowed under the AI-first guideline; it adds no keyword branch.
+ */
+export function assertVolumeWorkspaceDocumentInvariants(
+  novelId: string,
+  document: VolumePlanDocument,
+): void {
+  const seenSortOrders = new Set<number>();
+  for (const volume of document.volumes) {
+    if (seenSortOrders.has(volume.sortOrder)) {
+      throw new Error(
+        `卷工作台文档不变量校验失败：小说 ${novelId} 存在重复的卷排序值 sortOrder=${volume.sortOrder}`
+        + `，无法安全写入卷工作台。请检查传入文档是否经过归一化。`,
+      );
+    }
+    seenSortOrders.add(volume.sortOrder);
+
+    const seenChapterOrders = new Set<number>();
+    for (const chapter of volume.chapters) {
+      if (seenChapterOrders.has(chapter.chapterOrder)) {
+        throw new Error(
+          `卷工作台文档不变量校验失败：小说 ${novelId} 卷 ${volume.id} 存在重复的章节槽位 `
+          + `(volumeId=${volume.id}, chapterOrder=${chapter.chapterOrder})，`
+          + `无法安全写入卷工作台。请检查传入文档是否经过归一化。`,
+        );
+      }
+      seenChapterOrders.add(chapter.chapterOrder);
+    }
+  }
 }
 
 export async function listActiveVolumeRows(novelId: string, db: DbClient = prisma): Promise<VolumePlan[]> {
@@ -400,6 +487,7 @@ export async function persistActiveVolumeWorkspace(
   document: VolumePlanDocument,
   sourceVersionId: string | null,
 ): Promise<void> {
+  assertVolumeWorkspaceDocumentInvariants(novelId, document);
   const existingVolumes = await tx.volumePlan.findMany({
     where: { novelId },
     select: {
@@ -534,7 +622,7 @@ export async function ensureVolumeWorkspaceDocument(params: {
     if (activeRows.length === 0 && fallbackDocument.volumes.length > 0) {
       await runVolumeWorkspaceTransaction(async (tx) => {
         await persistActiveVolumeWorkspace(tx, novelId, fallbackDocument, activeVersion.id);
-      });
+      }, { novelId });
     }
     return fallbackDocument;
   }
@@ -563,7 +651,7 @@ export async function ensureVolumeWorkspaceDocument(params: {
           });
         }
         await persistActiveVolumeWorkspace(tx, novelId, document, latestVersion.id);
-      });
+      }, { novelId });
       return document;
     }
   }
@@ -600,7 +688,7 @@ export async function ensureVolumeWorkspaceDocument(params: {
       activeVersionId: version.id,
     }, version.id);
     return version;
-  });
+  }, { novelId });
 
   return {
     ...legacyDocument,

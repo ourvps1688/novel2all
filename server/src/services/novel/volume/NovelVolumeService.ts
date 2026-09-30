@@ -256,7 +256,7 @@ export class NovelVolumeService {
       };
       await persistActiveVolumeWorkspace(tx, novelId, nextDocument, versionId);
       return nextDocument;
-    });
+    }, { novelId });
     logMemoryUsage({
       event: "after_write",
       component: "persistWorkspaceDocument",
@@ -535,7 +535,7 @@ export class NovelVolumeService {
         },
       });
       await persistActiveVolumeWorkspace(tx, novelId, activatedDocument, target.id);
-    });
+    }, { novelId });
     const refreshed = await prisma.volumePlanVersion.findUnique({ where: { id: target.id } });
     if (!refreshed) {
       throw new Error("卷级版本激活失败。");

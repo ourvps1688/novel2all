@@ -223,7 +223,7 @@ export class ChapterExecutionContractService {
         ...updatedChapter,
         styleContract,
       };
-    });
+    }, { novelId });
 
     this.deps.emitVolumeUpdated(novelId, "chapter_execution_contract_refined");
     return persistedChapter;
