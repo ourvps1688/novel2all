@@ -2414,7 +2414,7 @@ export default function NovelEdit() {
   });
 
   const renderTakeoverEntry = (
-    step: "basic" | "story_macro" | "world" | "character" | "outline" | "structured" | "chapter" | "pipeline",
+    step: NovelWorkspaceFlowTab,
     variant: "default" | "outline" | "secondary" = "default",
   ) => {
     const takeoverContextTaskId = resolveTakeoverDialogContextTaskId({

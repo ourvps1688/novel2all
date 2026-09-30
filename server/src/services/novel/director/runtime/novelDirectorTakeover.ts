@@ -15,7 +15,7 @@ import type {
   DirectorTakeoverStrategy,
   DirectorTakeoverCheckpointSnapshot,
 } from "@ai-novel/shared/types/novelDirector";
-import type { NovelWorkflowStage, BookContract } from "@ai-novel/shared/types/novelWorkflow";
+import type { NovelWorkspaceFlowTab, NovelWorkflowStage, BookContract } from "@ai-novel/shared/types/novelWorkflow";
 import type { StoryMacroPlan } from "@ai-novel/shared/types/storyMacro";
 import { DIRECTOR_TAKEOVER_ENTRY_STEPS } from "@ai-novel/shared/types/novelDirector";
 import { normalizeDirectorTargetChapterCount } from "./novelDirectorHelpers";
@@ -75,7 +75,7 @@ export interface DirectorTakeoverResolvedPlan {
   effectiveStep: DirectorTakeoverEntryStep;
   effectiveStage: NovelWorkflowStage;
   startPhase: DirectorTakeoverStartPhase;
-  resumeStage: "basic" | "story_macro" | "world" | "character" | "outline" | "structured" | "chapter" | "pipeline";
+  resumeStage: NovelWorkspaceFlowTab;
   skipSteps: DirectorTakeoverEntryStep[];
   summary: string;
   effectSummary: string;

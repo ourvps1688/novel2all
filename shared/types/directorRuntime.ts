@@ -1,5 +1,5 @@
 import type { LLMProvider } from "./llm";
-import type { NovelWorkflowStage } from "./novelWorkflow";
+import type { NovelWorkspaceTab, NovelWorkflowStage } from "./novelWorkflow";
 import type { WorkflowStepCatalogDisplayStage } from "./directorWorkflowStepCatalogData";
 import type {
   DirectorCircuitBreakerState,
@@ -653,7 +653,7 @@ export interface DirectorBookAutomationActionTarget {
   novelId?: string | null;
   taskId?: string | null;
   chapterId?: string | null;
-  tab?: "basic" | "story_macro" | "world" | "outline" | "structured" | "chapter" | "pipeline" | "character" | "history" | null;
+  tab?: NovelWorkspaceTab | null;
   href?: string | null;
 }
 

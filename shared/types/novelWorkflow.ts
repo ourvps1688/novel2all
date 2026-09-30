@@ -77,6 +77,23 @@ export const DIRECTOR_API_STAGE_VALUES = [
   "quality_repair",
 ] as const;
 
+// Workspace flow tabs — the single canonical Tab namespace shared by the
+// director lock scope, takeover entry step, and workspace navigation (T3-5b).
+export const NOVEL_WORKSPACE_FLOW_TABS = [
+  "basic",
+  "story_macro",
+  "world",
+  "character",
+  "outline",
+  "structured",
+  "chapter",
+  "pipeline",
+] as const;
+
+export type NovelWorkspaceFlowTab = typeof NOVEL_WORKSPACE_FLOW_TABS[number];
+
+export type NovelWorkspaceTab = NovelWorkspaceFlowTab | "history";
+
 export type NovelWorkflowMilestoneType =
   | NovelWorkflowCheckpoint
   | "rewrite_snapshot_created";
@@ -92,7 +109,7 @@ export interface NovelWorkflowResumeTarget {
   novelId?: string | null;
   taskId?: string | null;
   lane: NovelWorkflowLane;
-  stage?: "basic" | "story_macro" | "world" | "character" | "outline" | "structured" | "chapter" | "pipeline";
+  stage?: NovelWorkspaceFlowTab;
   chapterId?: string | null;
   volumeId?: string | null;
   mode?: "director" | null;

@@ -12,7 +12,7 @@ import type {
 import type { LLMProvider } from "./llm";
 import type { ArtifactSyncMode } from "./novel";
 import type { BookAnalysisSectionKey } from "./bookAnalysis";
-import type { NovelWorkflowResumeTarget, NovelWorkflowStage } from "./novelWorkflow";
+import { NOVEL_WORKSPACE_FLOW_TABS, type NovelWorkflowResumeTarget, type NovelWorkflowStage } from "./novelWorkflow";
 import type { WritingPlatformPreference } from "./writingPlatform";
 import type {
   NovelCreateResourceRecommendation,
@@ -329,16 +329,7 @@ export const DIRECTOR_TAKEOVER_START_PHASES = [
 
 export type DirectorTakeoverStartPhase = typeof DIRECTOR_TAKEOVER_START_PHASES[number];
 
-export const DIRECTOR_TAKEOVER_ENTRY_STEPS = [
-  "basic",
-  "story_macro",
-  "world",
-  "character",
-  "outline",
-  "structured",
-  "chapter",
-  "pipeline",
-] as const;
+export const DIRECTOR_TAKEOVER_ENTRY_STEPS = NOVEL_WORKSPACE_FLOW_TABS;
 
 export type DirectorTakeoverEntryStep = typeof DIRECTOR_TAKEOVER_ENTRY_STEPS[number];
 
@@ -349,16 +340,7 @@ export const DIRECTOR_TAKEOVER_STRATEGIES = [
 
 export type DirectorTakeoverStrategy = typeof DIRECTOR_TAKEOVER_STRATEGIES[number];
 
-export const DIRECTOR_LOCK_SCOPES = [
-  "basic",
-  "story_macro",
-  "world",
-  "character",
-  "outline",
-  "structured",
-  "chapter",
-  "pipeline",
-] as const;
+export const DIRECTOR_LOCK_SCOPES = NOVEL_WORKSPACE_FLOW_TABS;
 
 export type DirectorLockScope = typeof DIRECTOR_LOCK_SCOPES[number];
 

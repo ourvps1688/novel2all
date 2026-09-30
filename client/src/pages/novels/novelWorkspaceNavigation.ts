@@ -1,17 +1,8 @@
 import type { DirectorDisplayStageKey } from "@ai-novel/shared/types/directorRuntime";
 import type { DirectorLockScope } from "@ai-novel/shared/types/novelDirector";
+import type { NovelWorkspaceFlowTab, NovelWorkspaceTab } from "@ai-novel/shared/types/novelWorkflow";
 
-export type NovelWorkspaceFlowTab =
-  | "basic"
-  | "story_macro"
-  | "world"
-  | "character"
-  | "outline"
-  | "structured"
-  | "chapter"
-  | "pipeline";
-
-export type NovelWorkspaceTab = NovelWorkspaceFlowTab | "history";
+export type { NovelWorkspaceFlowTab, NovelWorkspaceTab };
 
 export const NOVEL_WORKSPACE_FLOW_STEPS: Array<{ key: NovelWorkspaceFlowTab; label: string }> = [
   { key: "basic", label: "项目设定" },
