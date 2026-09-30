@@ -1,28 +1,28 @@
 import type { DirectorDisplayStageKey } from "@ai-novel/shared/types/directorRuntime";
 import type { DirectorLockScope } from "@ai-novel/shared/types/novelDirector";
+import type { NovelWorkspaceFlowTab, NovelWorkspaceTab, NovelWorkflowStage } from "@ai-novel/shared/types/novelWorkflow";
+import { NOVEL_WORKSPACE_FLOW_TABS, NOVEL_WORKFLOW_STAGE_LABELS } from "@ai-novel/shared/types/novelWorkflow";
+import { resolveWorkflowTabFromDisplayStage } from "@ai-novel/shared/types/directorWorkflowStepCatalog";
 
-export type NovelWorkspaceFlowTab =
-  | "basic"
-  | "story_macro"
-  | "world"
-  | "character"
-  | "outline"
-  | "structured"
-  | "chapter"
-  | "pipeline";
+export type { NovelWorkspaceFlowTab, NovelWorkspaceTab };
 
-export type NovelWorkspaceTab = NovelWorkspaceFlowTab | "history";
+// Each workspace tab maps to one canonical workflow stage; labels are derived
+// from NOVEL_WORKFLOW_STAGE_LABELS (T3-5c) so they cannot drift.
+const NOVEL_WORKSPACE_FLOW_TAB_STAGE: Record<NovelWorkspaceFlowTab, NovelWorkflowStage> = {
+  basic: "project_setup",
+  story_macro: "story_macro",
+  world: "world_setup",
+  character: "character_setup",
+  outline: "volume_strategy",
+  structured: "structured_outline",
+  chapter: "chapter_execution",
+  pipeline: "quality_repair",
+};
 
-export const NOVEL_WORKSPACE_FLOW_STEPS: Array<{ key: NovelWorkspaceFlowTab; label: string }> = [
-  { key: "basic", label: "项目设定" },
-  { key: "story_macro", label: "故事宏观规划" },
-  { key: "world", label: "世界观准备" },
-  { key: "character", label: "角色准备" },
-  { key: "outline", label: "卷战略 / 卷骨架" },
-  { key: "structured", label: "节奏 / 拆章" },
-  { key: "chapter", label: "章节执行" },
-  { key: "pipeline", label: "质量修复" },
-];
+export const NOVEL_WORKSPACE_FLOW_STEPS: Array<{ key: NovelWorkspaceFlowTab; label: string }> = NOVEL_WORKSPACE_FLOW_TABS.map((tab) => ({
+  key: tab,
+  label: NOVEL_WORKFLOW_STAGE_LABELS[NOVEL_WORKSPACE_FLOW_TAB_STAGE[tab]],
+}));
 
 export const NOVEL_WORKSPACE_TOOL_TABS: Array<{ key: Extract<NovelWorkspaceTab, "history">; label: string }> = [
   { key: "history", label: "版本历史" },
@@ -115,26 +115,7 @@ export function tabFromWorkflowStageName(stage: string | null | undefined): Nove
 }
 
 export function tabFromDirectorDisplayStage(stage: DirectorDisplayStageKey | null | undefined): NovelWorkspaceFlowTab | null {
-  switch (stage) {
-    case "project_setup":
-      return "basic";
-    case "story_planning":
-      return "story_macro";
-    case "world_setup":
-      return "world";
-    case "character_setup":
-      return "character";
-    case "volume_strategy":
-      return "outline";
-    case "structured_outline":
-      return "structured";
-    case "chapter_execution":
-      return "chapter";
-    case "quality_repair":
-      return "pipeline";
-    default:
-      return null;
-  }
+  return resolveWorkflowTabFromDisplayStage(stage);
 }
 
 export function tabFromDirectorProgress(input: {

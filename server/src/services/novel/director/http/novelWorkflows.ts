@@ -1,5 +1,10 @@
 import { Router } from "express";
 import type { ApiResponse } from "@ai-novel/shared/types/api";
+import {
+  DIRECTOR_API_STAGE_VALUES,
+  NOVEL_WORKFLOW_CHECKPOINT_VALUES,
+  NOVEL_WORKFLOW_LANE_VALUES,
+} from "@ai-novel/shared/types/novelWorkflow";
 import { z } from "zod";
 import { authMiddleware } from "../../../../middleware/auth";
 import { validate } from "../../../../middleware/validate";
@@ -14,34 +19,14 @@ const workflowAdapter = new NovelWorkflowTaskAdapter();
 const directorCommandService = new DirectorCommandService(workflowService);
 const productionExperienceService = new DirectorProductionExperienceService(directorCommandService);
 
-const stageSchema = z.enum([
-  "project_setup",
-  "auto_director",
-  "story_macro",
-  "world_setup",
-  "character_setup",
-  "volume_strategy",
-  "structured_outline",
-  "chapter_execution",
-  "quality_repair",
-]);
+const stageSchema = z.enum(DIRECTOR_API_STAGE_VALUES);
 
-const checkpointSchema = z.enum([
-  "candidate_selection_required",
-  "book_contract_ready",
-  "character_setup_required",
-  "volume_strategy_ready",
-  "production_experience_required",
-  "chapter_batch_ready",
-  "step_review_required",
-  "replan_required",
-  "workflow_completed",
-]);
+const checkpointSchema = z.enum(NOVEL_WORKFLOW_CHECKPOINT_VALUES);
 
 const bootstrapSchema = z.object({
   workflowTaskId: z.string().trim().optional(),
   novelId: z.string().trim().optional(),
-  lane: z.enum(["manual_create", "auto_director"]),
+  lane: z.enum(NOVEL_WORKFLOW_LANE_VALUES),
   title: z.string().trim().optional(),
   seedPayload: z.record(z.string(), z.unknown()).optional(),
 });

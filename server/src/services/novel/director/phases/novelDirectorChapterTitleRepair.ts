@@ -1,5 +1,4 @@
 import type { DirectorConfirmRequest } from "@ai-novel/shared/types/novelDirector";
-import { buildNovelEditResumeTarget } from "../../workflow/novelWorkflow.shared";
 import { getChapterTitleDiversityIssue } from "../../volume/chapterTitleDiversity";
 import { resolveVolumeChapterBeatKey } from "../../volume/volumeGenerationHelpers";
 import type { NovelVolumeService } from "../../volume/NovelVolumeService";
@@ -78,12 +77,6 @@ export async function repairDirectorChapterTitles(input: {
     throw new Error("当前任务对应的目标卷不存在，无法继续 AI 修复章节标题。");
   }
 
-  const resumeTarget = buildNovelEditResumeTarget({
-    novelId: input.novelId,
-    taskId: input.taskId,
-    stage: "structured",
-    volumeId: targetVolume.id,
-  });
   const currentTask = await loadWorkflowTaskForTitleRepair(input.workflowService, input.taskId);
   let workingWorkspace = currentWorkspace;
   const hasTargetBeatSheet = workingWorkspace.beatSheets.some((sheet) => (
@@ -171,7 +164,6 @@ export async function repairDirectorChapterTitles(input: {
     clearCheckpoint: true,
     seedPayload: input.buildDirectorSeedPayload(input.request, input.novelId, {
       directorSession: pausedSession,
-      resumeTarget,
       taskNotice: titleDiversityIssue
         ? buildChapterTitleDiversityTaskNotice({
           issue: titleDiversityIssue,

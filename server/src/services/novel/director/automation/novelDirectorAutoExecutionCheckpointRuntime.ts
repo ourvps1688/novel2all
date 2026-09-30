@@ -6,7 +6,6 @@ import type {
 import { isDirectorAutoExecutionRunMode, isFullBookAutopilotRunMode } from "@ai-novel/shared/types/novelDirector";
 import type { PipelineJobStatus } from "@ai-novel/shared/types/novel";
 import type { NovelWorkflowCheckpoint } from "@ai-novel/shared/types/novelWorkflow";
-import { buildNovelEditResumeTarget } from "../../workflow/novelWorkflow.shared";
 import {
   buildDirectorAutoExecutionCompletedLabel,
   buildDirectorAutoExecutionCompletedSummary,
@@ -82,22 +81,15 @@ export async function syncAutoExecutionTaskState(
     phase: "chapter_execution",
     isBackgroundRunning: input.isBackgroundRunning,
   });
-  const resumeTarget = buildNovelEditResumeTarget({
-    novelId: input.novelId,
-    taskId: input.taskId,
-    stage: input.resumeStage ?? "pipeline",
-    chapterId: input.autoExecution.nextChapterId ?? input.range.firstChapterId,
-  });
   await deps.workflowService.bootstrapTask({
     workflowTaskId: input.taskId,
     novelId: input.novelId,
     lane: "auto_director",
     title: input.request.candidate.workingTitle,
-    seedPayload: deps.buildDirectorSeedPayload(input.request, input.novelId, {
-      directorSession,
-      resumeTarget,
-      autoExecution: input.autoExecution,
-    }),
+      seedPayload: deps.buildDirectorSeedPayload(input.request, input.novelId, {
+        directorSession,
+        autoExecution: input.autoExecution,
+      }),
   });
 }
 
@@ -127,14 +119,8 @@ export async function recordCompletedCheckpoint(
           runMode: input.request.runMode,
           phase: "structured_outline",
           isBackgroundRunning: false,
-        }),
-        resumeTarget: buildNovelEditResumeTarget({
-          novelId: input.novelId,
-          taskId: input.taskId,
-          stage: "structured",
-          chapterId: completedState.firstChapterId ?? input.range.firstChapterId,
-        }),
-        autoExecution: completedState,
+          }),
+          autoExecution: completedState,
       }),
     });
     return;
@@ -156,14 +142,8 @@ export async function recordCompletedCheckpoint(
         runMode: input.request.runMode,
         phase: "chapter_execution",
         isBackgroundRunning: false,
-      }),
-      resumeTarget: buildNovelEditResumeTarget({
-        novelId: input.novelId,
-        taskId: input.taskId,
-        stage: "pipeline",
-        chapterId: completedState.firstChapterId ?? input.range.firstChapterId,
-      }),
-      autoExecution: completedState,
+        }),
+        autoExecution: completedState,
     }),
   });
 }
@@ -204,12 +184,6 @@ export async function recordQualityRepairCheckpoint(
         runMode: input.request.runMode,
         phase: "chapter_execution",
         isBackgroundRunning: false,
-      }),
-      resumeTarget: buildNovelEditResumeTarget({
-        novelId: input.novelId,
-        taskId: input.taskId,
-        stage: "pipeline",
-        chapterId: checkpointState.nextChapterId ?? input.range.firstChapterId,
       }),
       autoExecution: checkpointState,
     }),

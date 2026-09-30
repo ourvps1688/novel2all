@@ -9,8 +9,10 @@ import type {
 import {
   getWorkflowCheckpointLabel,
   resolveWorkflowStageFromCheckpoint,
+  resolveWorkflowStageTab,
 } from "@ai-novel/shared/types/directorWorkflowStepCatalog";
-import { NOVEL_WORKFLOW_STAGE_LABELS, NOVEL_WORKFLOW_STAGE_PROGRESS, parseResumeTarget, parseSeedPayload } from "./novelWorkflow.shared";
+import { NOVEL_WORKFLOW_STAGE_LABELS, NOVEL_WORKFLOW_STAGE_PROGRESS } from "@ai-novel/shared/types/novelWorkflow";
+import { parseResumeTarget, parseSeedPayload } from "./novelWorkflow.shared";
 import type { DirectorWorkflowSeedPayload } from "../director/runtime/novelDirectorHelpers";
 import type { TaskStatus } from "@ai-novel/shared/types/task";
 
@@ -191,14 +193,29 @@ export function isChapterBatchCheckpointRow(
 }
 
 export function mapStageToTab(stage: NovelWorkflowStage): NovelWorkflowResumeTarget["stage"] {
-  if (stage === "story_macro") return "story_macro";
-  if (stage === "world_setup") return "world";
-  if (stage === "character_setup") return "character";
-  if (stage === "volume_strategy") return "outline";
-  if (stage === "structured_outline") return "structured";
-  if (stage === "chapter_execution") return "chapter";
-  if (stage === "quality_repair") return "pipeline";
-  return "basic";
+  return resolveWorkflowStageTab(stage);
+}
+
+export function normalizeResumeStage(
+  stage: NovelWorkflowStage | "book_contract" | null | undefined,
+): NovelWorkflowResumeTarget["stage"] {
+  if (!stage) {
+    return "basic";
+  }
+  if (stage === "book_contract") {
+    return "story_macro";
+  }
+  return mapStageToTab(stage);
+}
+
+export function parseResumeTargetLike(value: unknown): ReturnType<typeof parseResumeTarget> {
+  if (typeof value === "string") {
+    return parseResumeTarget(value);
+  }
+  if (value && typeof value === "object") {
+    return value as NonNullable<ReturnType<typeof parseResumeTarget>>;
+  }
+  return null;
 }
 
 export function defaultProgressForStage(stage: NovelWorkflowStage): number {

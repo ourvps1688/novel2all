@@ -1,5 +1,6 @@
 import type {
   NovelWorkflowCheckpoint,
+  NovelWorkspaceFlowTab,
   NovelWorkflowMilestoneType,
   NovelWorkflowStage,
 } from "./novelWorkflow";
@@ -30,6 +31,76 @@ const WORKFLOW_STAGE_TO_DISPLAY_STAGE: Partial<Record<NovelWorkflowStage | strin
   chapter_execution: "chapter_execution",
   quality_repair: "quality_repair",
 };
+
+// Canonical stage ↔ tab ↔ displayStage resolvers (T3-5d).
+// Derived ONCE from WORKFLOW_STEP_CATALOG — each workflowStage has a single
+// consistent tab/displayStage across its entries, replacing the old hand-copied
+// stage→tab / displayStage→tab translation tables.
+const STAGE_TO_TAB: Partial<Record<NovelWorkflowStage, NovelWorkspaceFlowTab>> = {};
+const DISPLAY_TO_TAB: Partial<Record<WorkflowStepCatalogDisplayStage, NovelWorkspaceFlowTab>> = {};
+for (const entry of WORKFLOW_STEP_CATALOG) {
+  STAGE_TO_TAB[entry.workflowStage] ??= entry.tab as NovelWorkspaceFlowTab;
+  DISPLAY_TO_TAB[entry.displayStage] ??= entry.tab as NovelWorkspaceFlowTab;
+}
+
+// Mirror of server mapStageToTab (R4 recovery path). Unknown stages → "basic".
+export function resolveWorkflowStageTab(stage: NovelWorkflowStage | string | null | undefined): NovelWorkspaceFlowTab {
+  const s = (stage ?? "") as NovelWorkflowStage;
+  return STAGE_TO_TAB[s] ?? "basic";
+}
+
+// Mirror of server mapTabToStage (R4 recovery path). "basic" / unknown → null.
+export function resolveTabWorkflowStageForRecovery(tab: NovelWorkspaceFlowTab | string | null | undefined): NovelWorkflowStage | null {
+  switch (tab) {
+    case "story_macro":  return "story_macro";
+    case "world":        return "world_setup";
+    case "character":    return "character_setup";
+    case "outline":      return "volume_strategy";
+    case "structured":   return "structured_outline";
+    case "chapter":      return "chapter_execution";
+    case "pipeline":     return "quality_repair";
+    default:             return null;
+  }
+}
+
+// displayStage → workspace tab (mirror of client tabFromDirectorDisplayStage).
+export function resolveWorkflowTabFromDisplayStage(ds: WorkflowStepCatalogDisplayStage | string | null | undefined): NovelWorkspaceFlowTab | null {
+  const k = (ds ?? "") as WorkflowStepCatalogDisplayStage;
+  return DISPLAY_TO_TAB[k] ?? null;
+}
+
+// T3-5e: canonical node-display-label authority derived ONCE from the catalog.
+// Supersedes the overlapping hand-copied entries previously kept in
+// DIRECTOR_NODE_DISPLAY_LABELS (shared/types/directorRuntime.ts): when a
+// nodeKey or label matches a catalog nodeKey / display-stage key, the catalog
+// label wins. This is the single source of truth for the 29 catalog keys; the
+// slimmed DIRECTOR_NODE_DISPLAY_LABELS table only covers the 42 catalog-only
+// fallback keys that remain.
+const DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const stage of WORKFLOW_DISPLAY_STAGES) {
+    map[stage.key] = stage.label;
+  }
+  for (const entry of WORKFLOW_STEP_CATALOG) {
+    map[entry.nodeKey] = entry.label;
+  }
+  return map;
+})();
+
+export function resolveDirectorNodeDisplayLabel(input: {
+  label?: string | null;
+  nodeKey?: string | null;
+}): string | null {
+  const label = input.label?.trim();
+  const nodeKey = input.nodeKey?.trim();
+  if (label && DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[label]) {
+    return DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[label];
+  }
+  if (nodeKey && DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[nodeKey]) {
+    return DIRECTOR_NODE_DISPLAY_LABELS_AUTHORITY[nodeKey];
+  }
+  return null;
+}
 
 function buildStepAliasMap(aliasKey: "nodeKeys" | "currentItemKeys"): Map<string, WorkflowStepCatalogEntry> {
   const result = new Map<string, WorkflowStepCatalogEntry>();

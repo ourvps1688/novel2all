@@ -92,10 +92,10 @@ test("director usage telemetry projection summarizes task and step records", asy
 test("director usage labels distinguish chapter workflow from draft writing", () => {
   assert.equal(
     getDirectorNodeDisplayLabel({ nodeKey: "chapter_execution_node" }),
-    "章节执行流程",
+    "执行章节生成批次",
   );
   assert.equal(
-    getDirectorNodeDisplayLabel({ label: "novel.chapter.writer", nodeKey: "chapter_execution_node" }),
+    getDirectorNodeDisplayLabel({ label: "novel.chapter.writer" }),
     "章节正文生成",
   );
 });

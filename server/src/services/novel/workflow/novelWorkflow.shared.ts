@@ -1,64 +1,15 @@
 import type {
-  NovelWorkflowCheckpoint,
   NovelWorkflowLane,
   NovelWorkflowMilestone,
   NovelWorkflowMilestoneType,
   NovelWorkflowResumeTarget,
-  NovelWorkflowStage,
 } from "@ai-novel/shared/types/novelWorkflow";
 import { getNovelWorkflowLaneDescriptor } from "@ai-novel/shared/types/novelWorkflow";
-
-export const NOVEL_WORKFLOW_STAGE_LABELS: Record<NovelWorkflowStage, string> = {
-  project_setup: "项目设定",
-  creation_intent: "理解创作想法",
-  short_story_plan: "规划短篇",
-  short_story_draft: "生成完整作品",
-  short_story_review: "全篇审校",
-  auto_director: "AI 自动导演",
-  story_macro: "故事宏观规划",
-  world_setup: "世界观准备",
-  character_setup: "角色准备",
-  volume_strategy: "卷战略 / 卷骨架",
-  structured_outline: "节奏 / 拆章",
-  chapter_execution: "章节执行",
-  quality_repair: "质量修复",
-};
-
-export const NOVEL_WORKFLOW_STAGE_PROGRESS: Record<NovelWorkflowStage, number> = {
-  project_setup: 0.08,
-  creation_intent: 0.08,
-  short_story_plan: 0.2,
-  short_story_draft: 0.35,
-  short_story_review: 0.9,
-  auto_director: 0.15,
-  story_macro: 0.26,
-  world_setup: 0.34,
-  character_setup: 0.42,
-  volume_strategy: 0.5,
-  structured_outline: 0.68,
-  chapter_execution: 0.84,
-  quality_repair: 0.94,
-};
-
-export const NOVEL_WORKFLOW_STAGE_STEPS = [
-  { key: "project_setup", label: "项目设定" },
-  { key: "creation_intent", label: "理解创作想法" },
-  { key: "short_story_plan", label: "规划短篇" },
-  { key: "short_story_draft", label: "生成完整作品" },
-  { key: "short_story_review", label: "全篇审校" },
-  { key: "auto_director", label: "自动导演" },
-  { key: "story_macro", label: "故事宏观规划" },
-  { key: "world_setup", label: "世界观准备" },
-  { key: "character_setup", label: "角色准备" },
-  { key: "volume_strategy", label: "卷战略 / 卷骨架" },
-  { key: "structured_outline", label: "节奏 / 拆章" },
-  { key: "chapter_execution", label: "章节执行" },
-  { key: "quality_repair", label: "质量修复" },
-] as const;
 
 export function buildNovelCreateResumeTarget(taskId: string, mode: "director" | null = null): NovelWorkflowResumeTarget {
   return {
     route: "/novels/create",
+    lane: mode === "director" ? "auto_director" : "manual_create",
     taskId,
     mode,
   };
@@ -89,14 +40,43 @@ export function buildNovelEditResumeTarget(params: {
   chapterId?: string | null;
   volumeId?: string | null;
 }): NovelWorkflowResumeTarget {
-  return {
-    route: "/novels/:id/edit",
+  return composeResumeTarget({
+    lane: params.lane ?? "auto_director",
     novelId: params.novelId,
-    taskId: params.taskId ?? null,
-    lane: params.lane ?? null,
+    taskId: params.taskId,
     stage: params.stage,
-    chapterId: params.chapterId ?? null,
-    volumeId: params.volumeId ?? null,
+    chapterId: params.chapterId,
+    volumeId: params.volumeId,
+  });
+}
+
+export function composeResumeTarget(input: {
+  lane: NovelWorkflowLane;
+  route?: NovelWorkflowResumeTarget["route"];
+  novelId?: string | null;
+  taskId?: string | null;
+  workspaceTaskId?: string | null;
+  directorTaskId?: string | null;
+  stage?: NovelWorkflowResumeTarget["stage"] | null;
+  chapterId?: string | null;
+  volumeId?: string | null;
+  mode?: "director" | null;
+}): NovelWorkflowResumeTarget {
+  const descriptor = getNovelWorkflowLaneDescriptor(input.lane);
+  const taskId =
+    input.taskId
+    ?? (descriptor.taskQueryKey === "workspaceTaskId" ? input.workspaceTaskId : null)
+    ?? (descriptor.taskQueryKey === "directorTaskId" ? input.directorTaskId : null)
+    ?? null;
+  return {
+    route: input.route ?? "/novels/:id/edit",
+    lane: input.lane,
+    novelId: input.novelId ?? null,
+    taskId,
+    stage: input.stage ?? undefined,
+    chapterId: input.chapterId ?? null,
+    volumeId: input.volumeId ?? null,
+    mode: input.mode ?? null,
   };
 }
 

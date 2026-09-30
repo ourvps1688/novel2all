@@ -5,7 +5,7 @@ import type { DirectorPolicyRequest } from "../runtime/DirectorPolicyEngine";
 export type DirectorExecutionFlow = "chapter_execution" | "quality_repair";
 
 export type DirectorExecutionStage =
-  | DirectorExecutionFlow
+  | "chapter_execution"
   | "chapter_quality_review"
   | "chapter_repair"
   | "chapter_state_commit"
@@ -136,23 +136,6 @@ export const DIRECTOR_EXECUTION_NODE_ADAPTERS: Record<
     mayModifyUserContent: false,
     requiresApprovalByDefault: false,
     supportsAutoRetry: false,
-    waitingState: QUALITY_REPAIR_WAITING_STATE,
-  },
-  quality_repair: {
-    nodeKey: "chapter_repair_node",
-    label: "执行章节质量修复",
-    targetType: "novel",
-    reads: [
-      "chapter_draft",
-      "audit_report",
-      "repair_ticket",
-      "chapter_retention_contract",
-    ],
-    writes: ["chapter_draft", "audit_report", "repair_ticket"],
-    policyAction: "repair",
-    mayModifyUserContent: true,
-    requiresApprovalByDefault: false,
-    supportsAutoRetry: true,
     waitingState: QUALITY_REPAIR_WAITING_STATE,
   },
 };

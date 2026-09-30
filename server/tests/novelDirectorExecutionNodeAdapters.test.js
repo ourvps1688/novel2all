@@ -15,7 +15,6 @@ test("director chapter execution adapters expose standard runtime contracts", ()
     "chapter_state_commit",
     "character_resource_sync",
     "payoff_ledger_sync",
-    "quality_repair",
   ].sort());
 
   for (const [stage, adapter] of Object.entries(DIRECTOR_EXECUTION_NODE_ADAPTERS)) {
@@ -84,6 +83,4 @@ test("quality repair flow starts with the dedicated repair node", () => {
     "payoff_ledger_sync_node",
     "character_resource_sync_node",
   ]);
-
-  assert.equal(getDirectorExecutionNodeAdapter("quality_repair").nodeKey, "chapter_repair_node");
 });

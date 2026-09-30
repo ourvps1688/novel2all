@@ -3,6 +3,7 @@ import type {
   UnifiedTaskStep,
   UnifiedTaskSummary,
 } from "@ai-novel/shared/types/task";
+import { NOVEL_WORKFLOW_STAGE_LABELS, type NovelWorkflowStage } from "@ai-novel/shared/types/novelWorkflow";
 
 export interface ListTasksFilters {
   kind?: "book_analysis" | "novel_pipeline" | "knowledge_document" | "image_generation" | "agent_run" | "novel_workflow" | "style_extraction";
@@ -70,16 +71,24 @@ export const STYLE_EXTRACTION_TASK_STEPS = [
   { key: "finalizing", label: "收尾" },
 ] as const;
 
-export const NOVEL_WORKFLOW_STAGE_STEPS = [
-  { key: "project_setup", label: "项目设定" },
-  { key: "auto_director", label: "自动导演" },
-  { key: "story_macro", label: "故事宏观规划" },
-  { key: "character_setup", label: "角色准备" },
-  { key: "volume_strategy", label: "卷战略 / 卷骨架" },
-  { key: "structured_outline", label: "节奏 / 拆章" },
-  { key: "chapter_execution", label: "章节执行" },
-  { key: "quality_repair", label: "质量修复" },
-] as const;
+// The ordered stages shown in the novel-workflow task step bar (director lane).
+// Labels are derived from the canonical NOVEL_WORKFLOW_STAGE_LABELS (T3-5c) so
+// they cannot drift from the stage label table.
+const DIRECTOR_WORKFLOW_STAGE_ORDER: readonly NovelWorkflowStage[] = [
+  "project_setup",
+  "auto_director",
+  "story_macro",
+  "character_setup",
+  "volume_strategy",
+  "structured_outline",
+  "chapter_execution",
+  "quality_repair",
+];
+
+export const NOVEL_WORKFLOW_STAGE_STEPS = DIRECTOR_WORKFLOW_STAGE_ORDER.map((stage) => ({
+  key: stage,
+  label: NOVEL_WORKFLOW_STAGE_LABELS[stage],
+}));
 
 export function normalizeKeyword(value: string | undefined): string | undefined {
   const keyword = value?.trim();

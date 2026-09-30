@@ -616,7 +616,7 @@ export function buildDirectorWorkflowSeedPayload(
         ? (extra as { candidateStage?: unknown }).candidateStage
         : undefined);
 
-  return buildWorkflowSeedPayload(input, {
+  const seedPayload = buildWorkflowSeedPayload(input, {
     novelId,
     candidate: input.candidate,
     batch: {
@@ -627,6 +627,12 @@ export function buildDirectorWorkflowSeedPayload(
     ...extra,
     candidateStage: nextCandidateStage,
   });
+  // The resumeTarget previously mirrored the authoritative resumeTargetJson column.
+  // Stop persisting it so the two sources can no longer diverge (Phase 3 mirror elimination).
+  if ("resumeTarget" in seedPayload) {
+    delete (seedPayload as Record<string, unknown>).resumeTarget;
+  }
+  return seedPayload;
 }
 
 export function getDirectorInputFromSeedPayload(

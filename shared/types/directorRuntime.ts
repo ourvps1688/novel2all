@@ -1,5 +1,7 @@
 import type { LLMProvider } from "./llm";
-import type { NovelWorkflowStage } from "./novelWorkflow";
+import type { NovelWorkspaceTab, NovelWorkflowStage } from "./novelWorkflow";
+import type { WorkflowStepCatalogDisplayStage } from "./directorWorkflowStepCatalogData";
+import { resolveDirectorNodeDisplayLabel } from "./directorWorkflowStepCatalog.js";
 import type {
   DirectorCircuitBreakerState,
   DirectorQualityLoopBudgetNextAction,
@@ -195,25 +197,13 @@ export interface DirectorPromptUsageSummary extends DirectorLlmUsageSummary {
   attributionStatus: DirectorUsageAttributionStatus | string;
 }
 
+// T3-5e: slimmed to the 42 catalog-only fallback keys. The 23 entries that
+// overlapped a catalog nodeKey / display-stage key were removed because
+// resolveDirectorNodeDisplayLabel (derived from the catalog) now owns them.
 const DIRECTOR_NODE_DISPLAY_LABELS: Record<string, string> = {
-  candidate_generation: "生成书级方向",
-  candidate_refine: "细化书级方向",
-  candidate_patch: "修正书级方向",
-  candidate_title_refine: "优化书名",
-  novel_create: "创建小说项目",
-  takeover_execution: "接管已有项目",
   story_macro: "故事宏观规划",
-  story_macro_phase: "故事宏观规划",
   book_contract: "书级创作约定",
-  book_contract_phase: "书级创作约定",
-  world_setup: "世界观准备",
-  world_setup_phase: "世界观准备",
-  character_setup: "角色阵容准备",
-  character_setup_phase: "角色阵容准备",
-  volume_strategy: "分卷策略",
-  volume_strategy_phase: "分卷策略",
   "volume_strategy.volume_generation": "生成分卷策略",
-  structured_outline: "拆章与任务单",
   structured_outline_phase: "拆章与任务单",
   "structured_outline.beat_sheet": "生成节奏板",
   "structured_outline.chapter_list": "生成章节列表",
@@ -230,19 +220,11 @@ const DIRECTOR_NODE_DISPLAY_LABELS: Record<string, string> = {
   "character.cast.prepare": "角色阵容准备",
   "volume.strategy.plan": "分卷策略",
   "chapter.task_sheet.plan": "拆章与任务单",
-  chapter_execution: "章节执行流程",
-  chapter_execution_node: "章节执行流程",
   chapter_quality_review: "章节质量检查",
-  chapter_quality_review_node: "章节质量检查",
   chapter_repair: "章节问题修复",
-  chapter_repair_node: "章节问题修复",
-  quality_repair: "章节质量修复",
   chapter_state_commit: "更新章节状态",
-  chapter_state_commit_node: "更新章节状态",
   payoff_ledger_sync: "同步伏笔与读者承诺",
-  payoff_ledger_sync_node: "同步伏笔与读者承诺",
   character_resource_sync: "同步角色状态",
-  character_resource_sync_node: "同步角色状态",
   "chapter.draft.write": "章节正文生成",
   "planner.chapter.plan": "章节规划",
   "novel.chapter.writer": "章节正文生成",
@@ -272,6 +254,10 @@ export function getDirectorNodeDisplayLabel(input: {
   nodeKey?: string | null;
   fallback?: string;
 }): string {
+  const resolved = resolveDirectorNodeDisplayLabel(input);
+  if (resolved) {
+    return resolved;
+  }
   const label = input.label?.trim() ?? "";
   const nodeKey = input.nodeKey?.trim() ?? "";
   const mappedLabel = label ? DIRECTOR_NODE_DISPLAY_LABELS[label] : null;
@@ -652,7 +638,7 @@ export interface DirectorBookAutomationActionTarget {
   novelId?: string | null;
   taskId?: string | null;
   chapterId?: string | null;
-  tab?: "basic" | "story_macro" | "world" | "outline" | "structured" | "chapter" | "pipeline" | "character" | "history" | null;
+  tab?: NovelWorkspaceTab | null;
   href?: string | null;
 }
 
@@ -858,15 +844,9 @@ export interface DirectorTaskShell {
   cancelRequestedAt?: string | null;
 }
 
-export type DirectorDisplayStageKey =
-  | "project_setup"
-  | "story_planning"
-  | "world_setup"
-  | "character_setup"
-  | "volume_strategy"
-  | "structured_outline"
-  | "chapter_execution"
-  | "quality_repair";
+// 展示阶段枚举统一为单一权威源 WorkflowStepCatalogDisplayStage（directorWorkflowStepCatalogData.ts），
+// DirectorDisplayStageKey 仅作兼容别名，避免两处重复声明（C21）。
+export type DirectorDisplayStageKey = WorkflowStepCatalogDisplayStage;
 
 export type DirectorDisplayMode =
   | "idle"

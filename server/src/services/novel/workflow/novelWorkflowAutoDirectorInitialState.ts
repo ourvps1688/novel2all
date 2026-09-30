@@ -4,7 +4,9 @@ import type {
   NovelWorkflowStage,
 } from "@ai-novel/shared/types/novelWorkflow";
 import { DIRECTOR_PROGRESS } from "../director/projections/novelDirectorProgress";
-import { NOVEL_WORKFLOW_STAGE_PROGRESS, parseResumeTarget } from "./novelWorkflow.shared";
+import { NOVEL_WORKFLOW_STAGE_PROGRESS } from "@ai-novel/shared/types/novelWorkflow";
+import { parseResumeTarget } from "./novelWorkflow.shared";
+import { resolveTabWorkflowStageForRecovery } from "@ai-novel/shared/types/directorWorkflowStepCatalog";
 
 export interface AutoDirectorBootstrapInitialState {
   stage: NovelWorkflowStage;
@@ -16,14 +18,7 @@ export interface AutoDirectorBootstrapInitialState {
 }
 
 function mapTabToStage(stage: NovelWorkflowResumeTarget["stage"] | null | undefined): NovelWorkflowStage | null {
-  if (stage === "story_macro") return "story_macro";
-  if (stage === "world") return "world_setup";
-  if (stage === "character") return "character_setup";
-  if (stage === "outline") return "volume_strategy";
-  if (stage === "structured") return "structured_outline";
-  if (stage === "chapter") return "chapter_execution";
-  if (stage === "pipeline") return "quality_repair";
-  return null;
+  return resolveTabWorkflowStageForRecovery(stage);
 }
 
 function defaultProgressForStage(stage: NovelWorkflowStage): number {

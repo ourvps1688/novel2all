@@ -3,45 +3,17 @@ import { getChapterTitleDiversityIssue, isChapterTitleDiversityIssue } from "../
 import type { NovelVolumeService } from "../../volume/NovelVolumeService";
 import type { NovelWorkflowService } from "../../workflow/NovelWorkflowService";
 import {
-  buildNovelEditResumeTarget,
   parseSeedPayload,
   parseResumeTarget,
 } from "../../workflow/novelWorkflow.shared";
+import {
+  mergeResumeTargets,
+  parseResumeTargetLike,
+} from "../../workflow/novelWorkflow.helpers";
 import { getDirectorInputFromSeedPayload, getDirectorLlmOptionsFromSeedPayload, type DirectorWorkflowSeedPayload } from "../runtime/novelDirectorHelpers";
 import { buildDirectorSessionState } from "../runtime/novelDirectorHelpers";
 import { repairDirectorChapterTitles } from "./novelDirectorChapterTitleRepair";
 import { DIRECTOR_PROGRESS } from "../projections/novelDirectorProgress";
-
-function parseResumeTargetLike(value: unknown) {
-  if (typeof value === "string") {
-    return parseResumeTarget(value);
-  }
-  if (value && typeof value === "object") {
-    return value as NonNullable<ReturnType<typeof parseResumeTarget>>;
-  }
-  return null;
-}
-
-function mergeResumeTargets(
-  primary: ReturnType<typeof parseResumeTarget>,
-  fallback: ReturnType<typeof parseResumeTarget>,
-) {
-  if (!primary) {
-    return fallback;
-  }
-  if (!fallback) {
-    return primary;
-  }
-  return {
-    ...fallback,
-    ...primary,
-    stage: primary.stage === "basic" && fallback.stage !== "basic"
-      ? fallback.stage
-      : primary.stage,
-    chapterId: primary.chapterId ?? fallback.chapterId ?? null,
-    volumeId: primary.volumeId ?? fallback.volumeId ?? null,
-  };
-}
 
 export class NovelDirectorChapterTitleRepairRuntime {
   constructor(private readonly deps: {
@@ -110,12 +82,6 @@ export class NovelDirectorChapterTitleRepairRuntime {
       phase: "structured_outline",
       isBackgroundRunning: true,
     });
-    const resumeTargetForRepair = buildNovelEditResumeTarget({
-      novelId,
-      taskId,
-      stage: "structured",
-      volumeId: targetVolume.id,
-    });
     await this.deps.workflowService.bootstrapTask({
       workflowTaskId: taskId,
       novelId,
@@ -123,7 +89,6 @@ export class NovelDirectorChapterTitleRepairRuntime {
       title: repairRequest.candidate.workingTitle,
       seedPayload: this.deps.buildDirectorSeedPayload(repairRequest, novelId, {
         directorSession,
-        resumeTarget: resumeTargetForRepair,
         taskNotice: null,
       }),
     });
@@ -133,6 +98,7 @@ export class NovelDirectorChapterTitleRepairRuntime {
       itemLabel: `正在 AI 修复第 ${targetVolume.sortOrder} 卷章节标题`,
       progress: DIRECTOR_PROGRESS.chapterList,
       clearCheckpoint: true,
+      volumeId: targetVolume.id,
     });
     this.deps.scheduleBackgroundRun(taskId, async () => {
       await repairDirectorChapterTitles({

@@ -18,7 +18,7 @@ import { buildManualProductionControlPolicy } from "../production/ChapterExecuti
 import { registerChapterPreparationStageRunner } from "../production/ChapterPreparationStageRunner";
 import { novelProductionOrchestrator } from "../production/NovelProductionOrchestrator";
 import { registerQualityRepairStageRunner } from "../production/QualityRepairStageRunner";
-import { ChapterRuntimeCoordinator } from "../runtime/ChapterRuntimeCoordinator";
+import { ChapterRuntimeCoordinator, sharedChapterRuntimeCoordinator } from "../runtime/ChapterRuntimeCoordinator";
 import { NovelVolumeService } from "../volume/NovelVolumeService";
 import { NovelChapterEditorService } from "../chapterEditor/NovelChapterEditorService";
 import { ChapterEditorWorkspaceService } from "../chapterEditor/ChapterEditorWorkspaceService";
@@ -56,10 +56,8 @@ export class DefaultNovelApplicationServices {
   private readonly volumeService = new NovelVolumeService();
   private readonly chapterEditorWorkspaceService = new ChapterEditorWorkspaceService();
   private readonly chapterEditorService = new NovelChapterEditorService();
-  private readonly chapterRuntimeCoordinator = new ChapterRuntimeCoordinator();
-  private readonly qualityRepairCoordinator = new ChapterRuntimeCoordinator({
-    resolveAuditIssues: (novelId, issueIds) => this.core.resolveAuditIssues(novelId, issueIds),
-  });
+  private readonly chapterRuntimeCoordinator = sharedChapterRuntimeCoordinator;
+  private readonly qualityRepairCoordinator = sharedChapterRuntimeCoordinator;
 
   constructor() {
     registerChapterExecutionStageRunner({

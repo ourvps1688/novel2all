@@ -192,3 +192,5 @@ export class ChapterRuntimeCoordinator {
     }
   }
 }
+
+export const sharedChapterRuntimeCoordinator = new ChapterRuntimeCoordinator();
