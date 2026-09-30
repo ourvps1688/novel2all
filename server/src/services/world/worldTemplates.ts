@@ -35,7 +35,7 @@ export const LAYER_FIELD_MAP: Record<
   conflict: ["conflicts", "description"],
 };
 
-export const WORLD_TEMPLATES: WorldTemplate[] = [
+const WORLD_TEMPLATES: WorldTemplate[] = [
   {
     key: "xuanhuan_eastern",
     name: "东方玄幻",
