@@ -26,6 +26,57 @@ export type NovelWorkflowCheckpoint =
   | "replan_required"
   | "workflow_completed";
 
+// Runtime value arrays — single source of truth for the enums above.
+// zod schemas and other runtime consumers derive from these instead of
+// re-listing literals (T3-5: collapse hand-copied translation tables).
+export const NOVEL_WORKFLOW_STAGE_VALUES = [
+  "project_setup",
+  "creation_intent",
+  "short_story_plan",
+  "short_story_draft",
+  "short_story_review",
+  "auto_director",
+  "story_macro",
+  "world_setup",
+  "character_setup",
+  "volume_strategy",
+  "structured_outline",
+  "chapter_execution",
+  "quality_repair",
+] as const;
+
+export const NOVEL_WORKFLOW_CHECKPOINT_VALUES = [
+  "candidate_selection_required",
+  "book_contract_ready",
+  "character_setup_required",
+  "volume_strategy_ready",
+  "production_experience_required",
+  "chapter_batch_ready",
+  "step_review_required",
+  "replan_required",
+  "workflow_completed",
+] as const;
+
+export const NOVEL_WORKFLOW_LANE_VALUES = [
+  "manual_create",
+  "auto_director",
+  "creation_studio",
+] as const;
+
+// The director HTTP API only accepts this subset of workflow stages.
+// Keep in sync with the route surface in novelWorkflows.ts.
+export const DIRECTOR_API_STAGE_VALUES = [
+  "project_setup",
+  "auto_director",
+  "story_macro",
+  "world_setup",
+  "character_setup",
+  "volume_strategy",
+  "structured_outline",
+  "chapter_execution",
+  "quality_repair",
+] as const;
+
 export type NovelWorkflowMilestoneType =
   | NovelWorkflowCheckpoint
   | "rewrite_snapshot_created";
