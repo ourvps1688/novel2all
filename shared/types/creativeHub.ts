@@ -1,4 +1,4 @@
-import type { FailureDiagnostic } from "./agent";
+import type { FailureDiagnostic } from "./agent.js";
 
 export type CreativeHubThreadStatus = "idle" | "busy" | "interrupted" | "error";
 export type CreativeHubTurnStatus = "running" | "succeeded" | "interrupted" | "failed" | "cancelled";

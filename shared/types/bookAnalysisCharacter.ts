@@ -1,6 +1,6 @@
-import type { BookAnalysisEvidenceItem } from "./bookAnalysis";
-import type { CharacterProfile } from "./characterProfile";
-import type { ImageAsset } from "./image";
+import type { BookAnalysisEvidenceItem } from "./bookAnalysis.js";
+import type { CharacterProfile } from "./characterProfile.js";
+import type { ImageAsset } from "./image.js";
 
 export type BookAnalysisCharacterGenerationDepth = "brief" | "standard" | "deep" | "exhaustive";
 export type BookAnalysisCharacterStatus = "candidate" | "generating" | "generated" | "failed";

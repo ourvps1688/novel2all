@@ -1,11 +1,11 @@
-import type { NovelWorkflowCheckpoint } from "./novelWorkflow";
-import type { TaskStatus, UnifiedTaskDetail } from "./task";
+import type { NovelWorkflowCheckpoint } from "./novelWorkflow.js";
+import type { TaskStatus, UnifiedTaskDetail } from "./task.js";
 import type {
   AutoDirectorAffectedScope,
   AutoDirectorFollowUpSection,
   AutoDirectorValidationResult,
   AutoDirectorValidationRequiredAction,
-} from "./autoDirectorValidation";
+} from "./autoDirectorValidation.js";
 
 export const AUTO_DIRECTOR_FOLLOW_UP_REASONS = [
   "manual_recovery_required",

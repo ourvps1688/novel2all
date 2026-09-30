@@ -1,4 +1,4 @@
-import type { LLMProvider } from "./llm";
+import type { LLMProvider } from "./llm.js";
 
 export const BOOK_FRAMING_MAX_COMMERCIAL_TAGS = 6;
 export const BOOK_FRAMING_COMMERCIAL_TAG_MAX_LENGTH = 20;

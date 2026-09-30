@@ -1,5 +1,5 @@
-import type { CreativeHubInterrupt, CreativeHubMessage, CreativeHubTurnSummary } from "./creativeHub";
-import type { ChapterRuntimePackage } from "./chapterRuntime";
+import type { CreativeHubInterrupt, CreativeHubMessage, CreativeHubTurnSummary } from "./creativeHub.js";
+import type { ChapterRuntimePackage } from "./chapterRuntime.js";
 
 export interface ApiResponse<T> {
   success: boolean;

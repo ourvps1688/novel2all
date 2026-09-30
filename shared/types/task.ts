@@ -1,8 +1,8 @@
-import type { ResourceRef } from "./agent";
+import type { ResourceRef } from "./agent.js";
 import type {
   NovelWorkflowCheckpoint,
   NovelWorkflowResumeTarget,
-} from "./novelWorkflow";
+} from "./novelWorkflow.js";
 
 export type TaskKind =
   | "book_analysis"

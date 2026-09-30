@@ -6,7 +6,7 @@ import type {
   WorldLocation,
   WorldRule,
   WorldStructuredData,
-} from "./world";
+} from "./world.js";
 
 export type WorldOptionRefinementLevel = "basic" | "standard" | "detailed";
 export type WorldReferenceMode = "extract_base" | "adapt_world" | "tone_rebuild";
