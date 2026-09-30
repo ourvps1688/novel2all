@@ -5,7 +5,7 @@ import type {
 import type { TaskStatus } from "@ai-novel/shared/types/task";
 import { isAutoDirectorRecoveryInProgress } from "../novel/workflow/novelWorkflowRecoveryHeuristics";
 import { normalizeFailureSummary } from "./taskSupport";
-import { NOVEL_WORKFLOW_STAGE_LABELS } from "../novel/workflow/novelWorkflow.shared";
+import { NOVEL_WORKFLOW_STAGE_LABELS } from "@ai-novel/shared/types/novelWorkflow";
 
 interface WorkflowExplainabilityInput {
   status: TaskStatus;

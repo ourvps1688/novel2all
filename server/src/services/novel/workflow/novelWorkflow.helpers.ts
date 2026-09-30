@@ -10,7 +10,8 @@ import {
   getWorkflowCheckpointLabel,
   resolveWorkflowStageFromCheckpoint,
 } from "@ai-novel/shared/types/directorWorkflowStepCatalog";
-import { NOVEL_WORKFLOW_STAGE_LABELS, NOVEL_WORKFLOW_STAGE_PROGRESS, parseResumeTarget, parseSeedPayload } from "./novelWorkflow.shared";
+import { NOVEL_WORKFLOW_STAGE_LABELS, NOVEL_WORKFLOW_STAGE_PROGRESS } from "@ai-novel/shared/types/novelWorkflow";
+import { parseResumeTarget, parseSeedPayload } from "./novelWorkflow.shared";
 import type { DirectorWorkflowSeedPayload } from "../director/runtime/novelDirectorHelpers";
 import type { TaskStatus } from "@ai-novel/shared/types/task";
 

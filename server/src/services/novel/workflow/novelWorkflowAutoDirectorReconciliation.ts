@@ -19,8 +19,8 @@ import {
   buildNovelEditResumeTarget,
   parseSeedPayload,
   stringifyResumeTarget,
-  NOVEL_WORKFLOW_STAGE_LABELS,
 } from "./novelWorkflow.shared";
+import { NOVEL_WORKFLOW_STAGE_LABELS } from "@ai-novel/shared/types/novelWorkflow";
 
 export interface AutoDirectorChapterBatchReconciliation {
   autoExecution: DirectorAutoExecutionState;

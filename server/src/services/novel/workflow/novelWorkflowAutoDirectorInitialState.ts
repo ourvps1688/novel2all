@@ -4,7 +4,8 @@ import type {
   NovelWorkflowStage,
 } from "@ai-novel/shared/types/novelWorkflow";
 import { DIRECTOR_PROGRESS } from "../director/projections/novelDirectorProgress";
-import { NOVEL_WORKFLOW_STAGE_PROGRESS, parseResumeTarget } from "./novelWorkflow.shared";
+import { NOVEL_WORKFLOW_STAGE_PROGRESS } from "@ai-novel/shared/types/novelWorkflow";
+import { parseResumeTarget } from "./novelWorkflow.shared";
 
 export interface AutoDirectorBootstrapInitialState {
   stage: NovelWorkflowStage;
