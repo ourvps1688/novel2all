@@ -4,10 +4,6 @@ import type {
   WorldStructuredData,
   WorldStructureSectionKey,
 } from "@ai-novel/shared/types/world";
-import type {
-  WorldOptionRefinementLevel,
-  WorldReferenceMode,
-} from "@ai-novel/shared/types/worldWizard";
 import { WORLD_LAYER_ORDER } from "./worldTemplates";
 import { normalizeWorldStructuredData } from "./worldStructure";
 
@@ -185,21 +181,6 @@ export interface RefineWorldInput {
   refinementLevel: "light" | "deep";
   mode?: RefineMode;
   alternativesCount?: number;
-  provider?: LLMProvider;
-  model?: string;
-}
-
-export interface InspirationInput {
-  input?: string;
-  mode?: "free" | "reference" | "random";
-  worldType?: string;
-  knowledgeDocumentIds?: string[];
-  referenceMode?: WorldReferenceMode;
-  preserveElements?: string[];
-  allowedChanges?: string[];
-  forbiddenElements?: string[];
-  refinementLevel?: WorldOptionRefinementLevel;
-  optionsCount?: number;
   provider?: LLMProvider;
   model?: string;
 }

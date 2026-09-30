@@ -12,7 +12,6 @@ import {
   layerGenerateSchema,
   layerParamsSchema,
   layerUpdateSchema,
-  requireWorldWizard,
   structureBackfillSchema,
   structureGenerateSchema,
   structureUpdateSchema,
@@ -23,7 +22,7 @@ import {
 } from "./worldHttpContext";
 
 export function registerStructureWorldRoutes(router: Router): void {
-  router.get("/:id/structure", requireWorldWizard, validate({ params: worldIdSchema }), async (req, res, next) => {
+  router.get("/:id/structure", validate({ params: worldIdSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const data = await worldService.getStructure(id);
@@ -39,7 +38,6 @@ export function registerStructureWorldRoutes(router: Router): void {
 
   router.put(
     "/:id/structure",
-    requireWorldWizard,
     validate({ params: worldIdSchema, body: structureUpdateSchema }),
     async (req, res, next) => {
       try {
@@ -58,7 +56,6 @@ export function registerStructureWorldRoutes(router: Router): void {
 
   router.post(
     "/:id/structure/backfill",
-    requireWorldWizard,
     validate({ params: worldIdSchema, body: structureBackfillSchema }),
     async (req, res, next) => {
       try {
@@ -77,7 +74,6 @@ export function registerStructureWorldRoutes(router: Router): void {
 
   router.post(
     "/:id/structure/generate",
-    requireWorldWizard,
     validate({ params: worldIdSchema, body: structureGenerateSchema }),
     async (req, res, next) => {
       try {
@@ -96,7 +92,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     },
   );
 
-  router.post("/:id/axioms/suggest", requireWorldWizard, validate({ params: worldIdSchema, body: suggestAxiomsSchema }), async (req, res, next) => {
+  router.post("/:id/axioms/suggest", validate({ params: worldIdSchema, body: suggestAxiomsSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const data = await worldService.suggestAxioms(id, req.body as z.infer<typeof suggestAxiomsSchema>);
@@ -110,7 +106,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     }
   });
 
-  router.put("/:id/axioms", requireWorldWizard, validate({ params: worldIdSchema, body: updateAxiomsSchema }), async (req, res, next) => {
+  router.put("/:id/axioms", validate({ params: worldIdSchema, body: updateAxiomsSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const { axioms } = req.body as z.infer<typeof updateAxiomsSchema>;
@@ -127,7 +123,6 @@ export function registerStructureWorldRoutes(router: Router): void {
 
   router.post(
     "/:id/layers/generate-all",
-    requireWorldWizard,
     validate({ params: worldIdSchema, body: layerGenerateSchema }),
     async (req, res, next) => {
       try {
@@ -146,7 +141,6 @@ export function registerStructureWorldRoutes(router: Router): void {
 
   router.post(
     "/:id/layers/:layerKey/generate",
-    requireWorldWizard,
     validate({ params: layerParamsSchema, body: layerGenerateSchema }),
     async (req, res, next) => {
       try {
@@ -167,7 +161,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     },
   );
 
-  router.put("/:id/layers/:layerKey", requireWorldWizard, validate({ params: layerParamsSchema, body: layerUpdateSchema }), async (req, res, next) => {
+  router.put("/:id/layers/:layerKey", validate({ params: layerParamsSchema, body: layerUpdateSchema }), async (req, res, next) => {
     try {
       const { id, layerKey } = req.params as z.infer<typeof layerParamsSchema>;
       const data = await worldService.updateLayer(
@@ -185,7 +179,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     }
   });
 
-  router.post("/:id/layers/:layerKey/confirm", requireWorldWizard, validate({ params: layerParamsSchema }), async (req, res, next) => {
+  router.post("/:id/layers/:layerKey/confirm", validate({ params: layerParamsSchema }), async (req, res, next) => {
     try {
       const { id, layerKey } = req.params as z.infer<typeof layerParamsSchema>;
       const data = await worldService.confirmLayer(id, layerKey as WorldLayerKey);
@@ -199,7 +193,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     }
   });
 
-  router.post("/:id/deepening/questions", requireWorldWizard, validate({ params: worldIdSchema, body: deepeningQuestionSchema }), async (req, res, next) => {
+  router.post("/:id/deepening/questions", validate({ params: worldIdSchema, body: deepeningQuestionSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const data = await worldService.createDeepeningQuestions(id, req.body as z.infer<typeof deepeningQuestionSchema>);
@@ -213,7 +207,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     }
   });
 
-  router.post("/:id/deepening/answers", requireWorldWizard, validate({ params: worldIdSchema, body: deepeningAnswerSchema }), async (req, res, next) => {
+  router.post("/:id/deepening/answers", validate({ params: worldIdSchema, body: deepeningAnswerSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const { answers } = req.body as z.infer<typeof deepeningAnswerSchema>;
@@ -228,7 +222,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     }
   });
 
-  router.post("/:id/consistency/check", requireWorldWizard, validate({ params: worldIdSchema, body: consistencyCheckSchema }), async (req, res, next) => {
+  router.post("/:id/consistency/check", validate({ params: worldIdSchema, body: consistencyCheckSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const data = await worldService.checkConsistency(id, req.body as z.infer<typeof consistencyCheckSchema>);
@@ -244,7 +238,6 @@ export function registerStructureWorldRoutes(router: Router): void {
 
   router.patch(
     "/:id/consistency/issues/:issueId",
-    requireWorldWizard,
     validate({ params: issueIdSchema, body: consistencyIssuePatchSchema }),
     async (req, res, next) => {
       try {
@@ -262,7 +255,7 @@ export function registerStructureWorldRoutes(router: Router): void {
     },
   );
 
-  router.get("/:id/overview", requireWorldWizard, validate({ params: worldIdSchema }), async (req, res, next) => {
+  router.get("/:id/overview", validate({ params: worldIdSchema }), async (req, res, next) => {
     try {
       const { id } = req.params as z.infer<typeof worldIdSchema>;
       const data = await worldService.getOverview(id);

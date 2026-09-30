@@ -9,17 +9,6 @@ import { WorldService } from "../../../../services/world/WorldService";
 export const worldService = new WorldService();
 export const knowledgeService = new KnowledgeService();
 
-export const requireWorldWizard: RequestHandler = (_req, res, next) => {
-  if (featureFlags.worldWizardEnabled) {
-    next();
-    return;
-  }
-  res.status(404).json({
-    success: false,
-    error: "World wizard feature is disabled.",
-  } satisfies ApiResponse<null>);
-};
-
 export const requireWorldVisualization: RequestHandler = (_req, res, next) => {
   if (featureFlags.worldVisEnabled) {
     next();
@@ -56,59 +45,6 @@ export const snapshotRestoreParamsSchema = z.object({
   snapshotId: z.string().trim().min(1),
 });
 
-export const worldGenerateSchema = z.object({
-  name: z.string().trim().min(1),
-  description: z.string().trim().min(1),
-  worldType: z.string().trim().min(1),
-  complexity: z.enum(["simple", "standard", "detailed"]),
-  dimensions: z.object({
-    geography: z.boolean(),
-    culture: z.boolean(),
-    magicSystem: z.boolean(),
-    technology: z.boolean(),
-    history: z.boolean(),
-  }),
-  provider: providerSchema.optional(),
-  model: z.string().optional(),
-});
-
-export const inspirationSchema = z.object({
-  input: z.string().max(2_000_000).optional(),
-  mode: z.enum(["free", "reference", "random"]).optional(),
-  worldType: z.string().optional(),
-  knowledgeDocumentIds: z.array(z.string().trim().min(1)).optional(),
-  referenceMode: z.enum(["extract_base", "adapt_world", "tone_rebuild"]).optional(),
-  preserveElements: z.array(z.string().trim().min(1)).optional(),
-  allowedChanges: z.array(z.string().trim().min(1)).optional(),
-  forbiddenElements: z.array(z.string().trim().min(1)).optional(),
-  refinementLevel: z.enum(["basic", "standard", "detailed"]).optional(),
-  optionsCount: z.number().int().min(4).max(8).optional(),
-  provider: providerSchema.optional(),
-  model: z.string().optional(),
-});
-
-const skeletonPresetSchema = z.enum(["light", "standard", "epic"]);
-
-export const worldSkeletonGenerateSchema = z.object({
-  idea: z.string().trim().min(1).max(20_000),
-  worldType: z.string().trim().optional(),
-  template: z.string().trim().optional(),
-  referenceContext: z.unknown().optional(),
-  blueprint: z.unknown().optional(),
-  options: z.object({
-    preset: skeletonPresetSchema,
-    counts: z.object({
-      rules: z.number().int().min(3).max(6),
-      factionGroups: z.number().int().min(2).max(5),
-      forces: z.number().int().min(3).max(9),
-      locations: z.number().int().min(3).max(10),
-      conflicts: z.number().int().min(2).max(8),
-      storyEntrySuggestions: z.number().int().min(1).max(5),
-    }),
-  }).optional(),
-  provider: providerSchema.optional(),
-  model: z.string().optional(),
-});
 
 export const knowledgeBindingsSchema = z.object({
   documentIds: z.array(z.string().trim().min(1)).default([]),

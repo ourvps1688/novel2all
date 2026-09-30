@@ -525,17 +525,9 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
       key: "writingFormula.apply.generate.stream@v1",
       load: () => require("../prompts/writingFormula/writingFormulaStream.prompts").writingFormulaApplyGenerateStreamPrompt as UnknownPromptAsset,
     },
-    {
-      key: "world.reference.inspiration@v1",
-    load: () => require("../prompts/world/world.prompts").worldReferenceInspirationPrompt as UnknownPromptAsset,
-  },
   {
     key: "world.draft.generate@v1",
     load: () => require("../prompts/world/worldDraft.prompts").worldDraftGenerationPrompt as UnknownPromptAsset,
-  },
-  {
-    key: "world.skeleton.generate@v2",
-    load: () => require("../prompts/world/worldDraft.prompts").worldSkeletonGenerationPrompt as UnknownPromptAsset,
   },
   {
     key: "world.draft.refine@v1",
@@ -544,18 +536,6 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
   {
     key: "world.draft.refine_alternatives@v1",
     load: () => require("../prompts/world/worldDraft.prompts").worldDraftRefineAlternativesPrompt as UnknownPromptAsset,
-  },
-  {
-    key: "world.inspiration.concept_card@v1",
-    load: () => require("../prompts/world/world.prompts").worldInspirationConceptCardPrompt as UnknownPromptAsset,
-  },
-  {
-    key: "world.inspiration.localize_concept_card@v1",
-    load: () => require("../prompts/world/world.prompts").worldInspirationConceptCardLocalizationPrompt as UnknownPromptAsset,
-  },
-  {
-    key: "world.property_options.generate@v1",
-    load: () => require("../prompts/world/world.prompts").worldPropertyOptionsPrompt as UnknownPromptAsset,
   },
   {
     key: "world.deepening.questions@v1",

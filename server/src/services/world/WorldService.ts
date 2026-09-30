@@ -10,7 +10,7 @@ import type {
 import { prisma } from "../../db/prisma";
 import { runStructuredPrompt } from "../../prompting/core/promptRunner";
 import { worldAxiomSuggestionPrompt } from "../../prompting/prompts/world/world.prompts";
-import { getTemplateByKey, LAYER_FIELD_MAP, WORLD_LAYER_ORDER, WORLD_TEMPLATES } from "./worldTemplates";
+import { getTemplateByKey, LAYER_FIELD_MAP, WORLD_LAYER_ORDER } from "./worldTemplates";
 import { buildConsistencySummary, localizeConsistencyIssue } from "./worldConsistency";
 import {
   applyStructuredWorldToLegacyFields,
@@ -27,7 +27,6 @@ import {
 import { buildWorldVisualizationPayload } from "./worldVisualization";
 import { applyGeneratedWorldFields, buildWorldBlueprintPromptBlock } from "./worldGenerationBlueprint";
 import { createWorldDraftGenerateStream, createWorldDraftRefineStream } from "./worldDraftGeneration";
-import { analyzeWorldInspiration } from "./worldInspirationService";
 import {
   answerWorldDeepeningQuestions,
   checkWorldConsistency,
@@ -52,7 +51,6 @@ import {
 import {
   type DeepeningAnswerInput,
   type ImportWorldInput,
-  type InspirationInput,
   type LayerGenerateInput,
   type LayerStateMap,
   type LayerUpdateInput,
@@ -70,7 +68,6 @@ import {
   nowISO,
   safeParseJSON,
 } from "./worldServiceShared";
-import { generateWorldSkeleton, type WorldSkeletonGenerateInput } from "./worldSkeletonGeneration";
 import { exportWorldData, importWorldData } from "./worldTransfer";
 import { ragServices } from "../rag";
 import type { RagOwnerType } from "../rag/types";
@@ -156,10 +153,6 @@ export class WorldService {
     });
   }
 
-  async getTemplates() {
-    return WORLD_TEMPLATES;
-  }
-
   private queueRagUpsert(ownerType: RagOwnerType, ownerId: string): void {
     void ragServices.ragIndexService.enqueueUpsert(ownerType, ownerId).catch(() => {
       // keep primary workflow resilient even when rag queueing fails
@@ -170,14 +163,6 @@ export class WorldService {
     void ragServices.ragIndexService.enqueueDelete(ownerType, ownerId).catch(() => {
       // keep primary workflow resilient even when rag queueing fails
     });
-  }
-
-  async analyzeInspiration(input: InspirationInput, onProgress?: (message: string) => void) {
-    return analyzeWorldInspiration(input, onProgress);
-  }
-
-  async generateSkeleton(input: WorldSkeletonGenerateInput) {
-    return generateWorldSkeleton(input);
   }
 
   async getWorldById(id: string) {
