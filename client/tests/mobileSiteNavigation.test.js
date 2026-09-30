@@ -64,21 +64,9 @@ test("mobile primary nav keeps core beginner actions visible", () => {
 test("mobile more menu contains all non-primary registered pages", () => {
   const morePaths = getMobileMoreNavGroups().flatMap((group) => group.items.map((item) => item.to));
 
-  assert.deepEqual(
-    morePaths,
-    [
-      "/book-analysis",
-      "/market-radar",
-      "/chat-legacy",
-      "/knowledge",
-      "/genres",
-      "/story-modes",
-      "/titles",
-      "/style-engine",
-      "/anti-ai-rules",
-      "/base-characters",
-      "/worlds",
-      "/settings",
-    ],
-  );
+  // The more menu is intentionally consolidated: legacy chat under 创作辅助,
+  // the unified asset hub (/assets) under 资产库, and system settings.
+  // Older feature pages (拆书/题材雷达/知识库等) were consolidated into the
+  // asset hub and are no longer separate more-menu entries.
+  assert.deepEqual(morePaths, ["/chat-legacy", "/assets", "/settings"]);
 });
