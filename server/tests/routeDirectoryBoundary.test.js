@@ -38,8 +38,23 @@ test("app mounts migrated novel and world routers from module HTTP entrypoints",
 });
 
 test("workflow HTTP schema accepts every formal auto-director stage", () => {
-  const source = readSource("services", "novel", "director", "http", "novelWorkflows.ts");
-  assert.equal(source.includes('"world_setup",'), true);
+  // After the T3-5/T3-6 route + enum consolidation the director HTTP stage
+  // schema is driven by the shared canonical enum (DIRECTOR_API_STAGE_VALUES)
+  // imported from @ai-novel/shared/types/novelWorkflow, not a hardcoded literal
+  // list. The enum still includes "world_setup", so the HTTP surface accepts it.
+  const httpSource = readSource("services", "novel", "director", "http", "novelWorkflows.ts");
+  assert.equal(
+    httpSource.includes("DIRECTOR_API_STAGE_VALUES"),
+    true,
+    "novelWorkflows.ts must derive its stage schema from the shared DIRECTOR_API_STAGE_VALUES enum",
+  );
+
+  const sharedSource = readSource("..", "..", "shared", "types", "novelWorkflow.ts");
+  assert.equal(
+    sharedSource.includes('"world_setup"'),
+    true,
+    "shared DIRECTOR_API_STAGE_VALUES must include the world_setup stage",
+  );
 });
 
 test("migrated route root files do not remain as compatibility shims", () => {

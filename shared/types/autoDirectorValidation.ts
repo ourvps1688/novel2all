@@ -1,12 +1,12 @@
 import type {
   AutoDirectorMutationActionCode,
-} from "./autoDirectorFollowUp";
+} from "./autoDirectorFollowUp.js";
 import type {
   DirectorTakeoverEntryStep,
   DirectorTakeoverRequest,
-} from "./novelDirector";
-import type { NovelWorkflowCheckpoint } from "./novelWorkflow";
-import type { TaskStatus } from "./task";
+} from "./novelDirector.js";
+import type { NovelWorkflowCheckpoint } from "./novelWorkflow.js";
+import type { TaskStatus } from "./task.js";
 
 export type AutoDirectorValidationSource =
   | "takeover"

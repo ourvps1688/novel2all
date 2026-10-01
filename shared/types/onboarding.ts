@@ -1,7 +1,7 @@
-import type { LLMProvider } from "./llm";
-import type { ModelRouteTaskType } from "./novel";
-import type { NovelWorkflowCheckpoint } from "./novelWorkflow";
-import type { TaskStatus } from "./task";
+import type { LLMProvider } from "./llm.js";
+import type { ModelRouteTaskType } from "./novel.js";
+import type { NovelWorkflowCheckpoint } from "./novelWorkflow.js";
+import type { TaskStatus } from "./task.js";
 
 export interface QuickSetupProviderOption {
   id: LLMProvider;

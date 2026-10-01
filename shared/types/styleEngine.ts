@@ -1,4 +1,4 @@
-import type { LLMProvider } from "./llm";
+import type { LLMProvider } from "./llm.js";
 
 export type StyleSourceType =
   | "manual"

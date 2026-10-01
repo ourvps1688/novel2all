@@ -1,4 +1,4 @@
-import type { NovelWorkflowCheckpoint } from "./novelWorkflow";
+import type { NovelWorkflowCheckpoint } from "./novelWorkflow.js";
 import { resolveWorkflowApprovalPointForCheckpoint } from "./directorWorkflowStepCatalog.js";
 
 export const DIRECTOR_AUTO_APPROVAL_GROUPS = [

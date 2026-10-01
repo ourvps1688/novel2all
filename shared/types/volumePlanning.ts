@@ -3,7 +3,7 @@ import type {
   VolumeCountGuidance,
   VolumeCountRange,
   VolumeScaleProfile,
-} from "./novel";
+} from "./novel.js";
 
 export const MIN_TOTAL_CHAPTER_BUDGET = 12;
 export const MAX_VOLUME_COUNT = 24;

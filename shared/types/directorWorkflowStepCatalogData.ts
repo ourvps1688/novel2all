@@ -3,7 +3,7 @@ import type {
   NovelWorkflowMilestoneType,
   NovelWorkflowResumeTarget,
   NovelWorkflowStage,
-} from "./novelWorkflow";
+} from "./novelWorkflow.js";
 
 export type WorkflowStepCatalogDisplayStage =
   | "project_setup"

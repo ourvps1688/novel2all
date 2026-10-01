@@ -1,4 +1,4 @@
-import type { LLMProvider } from "./llm";
+import type { LLMProvider } from "./llm.js";
 
 export const DEFAULT_BOOK_ANALYSIS_BUDGET_TOKENS = 200_000;
 

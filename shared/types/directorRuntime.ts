@@ -1,12 +1,12 @@
-import type { LLMProvider } from "./llm";
-import type { NovelWorkspaceTab, NovelWorkflowStage } from "./novelWorkflow";
-import type { WorkflowStepCatalogDisplayStage } from "./directorWorkflowStepCatalogData";
+import type { LLMProvider } from "./llm.js";
+import type { NovelWorkspaceTab, NovelWorkflowStage } from "./novelWorkflow.js";
+import type { WorkflowStepCatalogDisplayStage } from "./directorWorkflowStepCatalogData.js";
 import { resolveDirectorNodeDisplayLabel } from "./directorWorkflowStepCatalog.js";
 import type {
   DirectorCircuitBreakerState,
   DirectorQualityLoopBudgetNextAction,
   DirectorStartupPreparation,
-} from "./novelDirector";
+} from "./novelDirector.js";
 
 export const DIRECTOR_POLICY_MODES = [
   "suggest_only",
@@ -365,8 +365,8 @@ export interface DirectorRuntimeProjectionEvent {
   severity?: DirectorEvent["severity"];
   occurredAt: string;
   usage?: DirectorLlmUsageSummary | null;
-  issue?: import("./directorIssue").DirectorIssueOccurrence | null;
-  issueDecision?: import("./directorIssue").DirectorIssueDecision | null;
+  issue?: import("./directorIssue.js").DirectorIssueOccurrence | null;
+  issueDecision?: import("./directorIssue.js").DirectorIssueDecision | null;
 }
 
 export type DirectorAutopilotRecoveryDecision =
@@ -572,9 +572,9 @@ export interface DirectorRuntimeProjection {
   progressBreakdown?: DirectorRuntimeProgressBreakdown;
   chapterExecutionProgress?: DirectorChapterExecutionProgressSummary | null;
   visibleRiskBadges?: DirectorRuntimeVisibleRiskBadge[];
-  latestRiskAssessment?: import("./directorRisk").DirectorRiskAssessment | null;
+  latestRiskAssessment?: import("./directorRisk.js").DirectorRiskAssessment | null;
   /** Scored issues recorded for this task, newest first. */
-  riskHistory?: import("./directorRisk").DirectorRiskHistoryItem[];
+  riskHistory?: import("./directorRisk.js").DirectorRiskHistoryItem[];
   riskHistoryTotal?: number;
   rootCauseCode?: "none" | "draft_generation_failed" | "draft_obligation_unmet" | "draft_repair_exhausted" | "replan_required" | null;
   blockingObligations?: Array<{
@@ -593,8 +593,8 @@ export interface DirectorRuntimeProjection {
   promptUsage?: DirectorPromptUsageSummary[];
   circuitBreaker?: DirectorCircuitBreakerState | null;
   recentIssues?: Array<{
-    occurrence: import("./directorIssue").DirectorIssueOccurrence;
-    decision?: import("./directorIssue").DirectorIssueDecision | null;
+    occurrence: import("./directorIssue.js").DirectorIssueOccurrence;
+    decision?: import("./directorIssue.js").DirectorIssueDecision | null;
   }>;
 }
 

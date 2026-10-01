@@ -1,5 +1,5 @@
-import type { WritingPlatform, WritingPlatformPreference } from "./writingPlatform";
-import type { NovelCreateResourceRecommendation } from "./novelResourceRecommendation";
+import type { WritingPlatform, WritingPlatformPreference } from "./writingPlatform.js";
+import type { NovelCreateResourceRecommendation } from "./novelResourceRecommendation.js";
 
 export type NarrativeForm = "short_story" | "long_novel";
 

@@ -2,21 +2,21 @@ import { z } from "zod";
 import {
   chapterScenePlanSchema,
   lengthBudgetContractSchema,
-} from "./chapterLengthControl";
+} from "./chapterLengthControl.js";
 import {
   canonicalStateSnapshotSchema,
   chapterStateGoalSchema,
   chapterPayoffDirectiveSchema,
   generationNextActionSchema,
-} from "./canonicalState";
-import { characterResourceContextSchema } from "./characterResource";
-import { storyWorldSliceSchema } from "./storyWorldSlice";
-import { timelineCheckResultSchema, timelineContextForChapterSchema } from "./timeline";
+} from "./canonicalState.js";
+import { characterResourceContextSchema } from "./characterResource.js";
+import { storyWorldSliceSchema } from "./storyWorldSlice.js";
+import { timelineCheckResultSchema, timelineContextForChapterSchema } from "./timeline.js";
 import {
   EMPTY_READER_EXPERIENCE_CONTRACT,
   readerExperienceContractSchema,
-} from "./novel/readerExperience";
-import type { LLMProvider } from "./llm";
+} from "./novel/readerExperience.js";
+import type { LLMProvider } from "./llm.js";
 import {
   dynamicCharacterRiskLevelSchema,
   runtimeDynamicCharacterOverviewSchema,

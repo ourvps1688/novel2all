@@ -1,12 +1,12 @@
-import type { BookAnalysisSectionKey } from "./bookAnalysis";
-import type { BookContract } from "./novelWorkflow";
-import type { NovelWorkflowCheckpoint } from "./novelWorkflow";
-import type { NovelStoryMode } from "./storyMode";
-import type { TaskStatus, TaskTokenUsageSummary } from "./task";
-import type { NarrativeForm } from "./creationStudio";
-import type { WritingPlatform } from "./writingPlatform";
-import type { DirectorRiskHistoryItem } from "./directorRisk";
-import type { ChapterQualityDebtDetails } from "./chapterQualityLoop";
+import type { BookAnalysisSectionKey } from "./bookAnalysis.js";
+import type { BookContract } from "./novelWorkflow.js";
+import type { NovelWorkflowCheckpoint } from "./novelWorkflow.js";
+import type { NovelStoryMode } from "./storyMode.js";
+import type { TaskStatus, TaskTokenUsageSummary } from "./task.js";
+import type { NarrativeForm } from "./creationStudio.js";
+import type { WritingPlatform } from "./writingPlatform.js";
+import type { DirectorRiskHistoryItem } from "./directorRisk.js";
+import type { ChapterQualityDebtDetails } from "./chapterQualityLoop.js";
 export type {
   BaseCharacter,
   Character,
@@ -37,17 +37,17 @@ export type {
   SupplementalCharacterGenerationResult,
   SupplementalCharacterRelation,
   SupplementalCharacterTargetCastRole,
-} from "./novelCharacter";
+} from "./novelCharacter.js";
 export type {
   NovelStoryMode,
   StoryModeConflictCeiling,
   StoryModeProfile,
-} from "./storyMode";
+} from "./storyMode.js";
 export type {
   ChapterSceneCard,
   ChapterScenePlan,
   LengthBudgetContract,
-} from "./chapterLengthControl";
+} from "./chapterLengthControl.js";
 export type NovelStatus = "draft" | "published";
 export type NovelWritingMode = "original" | "continuation";
 export type ProjectMode = "ai_led" | "co_pilot" | "draft_mode" | "auto_pipeline";
@@ -87,7 +87,7 @@ export type {
   CharacterResourceStatus,
   CharacterResourceType,
   CharacterResourceUpdatePayload,
-} from "./characterResource";
+} from "./characterResource.js";
 
 export type {
   PayoffLedgerItem,
@@ -96,7 +96,7 @@ export type {
   PayoffLedgerSourceRef,
   PayoffLedgerStatus,
   PayoffLedgerSummary,
-} from "./payoffLedger";
+} from "./payoffLedger.js";
 
 export type ChapterStatus =
   | "unplanned"
@@ -428,7 +428,7 @@ export interface ChapterEditorAiRevisionRequest {
   selection?: ChapterEditorTargetRange;
   context?: ChapterEditorContextWindow;
   constraints: ChapterEditorRewriteConstraints;
-  provider?: import("./llm").LLMProvider;
+  provider?: import("./llm.js").LLMProvider;
   model?: string;
   temperature?: number;
 }
@@ -451,7 +451,7 @@ export interface ChapterEditorRewritePreviewRequest {
   context: ChapterEditorContextWindow;
   chapterContext: ChapterEditorContextSummary;
   constraints: ChapterEditorRewriteConstraints;
-  provider?: import("./llm").LLMProvider;
+  provider?: import("./llm.js").LLMProvider;
   model?: string;
   temperature?: number;
 }
@@ -1146,7 +1146,7 @@ export type {
   ChapterRuntimePackage,
   ChapterRuntimeRequest,
   GenerationContextPackage,
-} from "./chapterRuntime";
+} from "./chapterRuntime.js";
 export type {
   StoryWorldSlice,
   StoryWorldSliceBuilderMode,
@@ -1158,4 +1158,4 @@ export type {
   StoryWorldSliceOverrides,
   StoryWorldSliceRule,
   StoryWorldSliceView,
-} from "./storyWorldSlice";
+} from "./storyWorldSlice.js";

@@ -1,4 +1,4 @@
-import type { NarrativeForm } from "./creationStudio";
+import type { NarrativeForm } from "./creationStudio.js";
 
 export type WritingPlatform = "fanqie_free" | "qidian_male" | "jinjiang_female" | "zhihu_story";
 export type WritingPlatformPreference = "ai_recommend" | WritingPlatform;
