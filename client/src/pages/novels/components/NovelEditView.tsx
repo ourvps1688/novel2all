@@ -14,7 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import KnowledgeBindingPanel from "@/components/knowledge/KnowledgeBindingPanel";
-import AITakeoverContainer from "@/components/workflow/AITakeoverContainer";
+import DirectorAttentionBanner from "@/components/autoDirector/DirectorAttentionBanner";
 import ChapterManagementTab from "./ChapterManagementTab";
 import DirectorFactDebugDialog from "./DirectorFactDebugDialog";
 import NovelCharacterPanel from "./NovelCharacterPanel";
@@ -387,22 +387,8 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
       ) : null}
 
       <div className="space-y-4 pt-1">
-        {takeover ? (
-          <AITakeoverContainer
-            mode={takeover.mode}
-            title={takeover.title}
-            description={takeover.description}
-            progress={takeover.progress}
-            currentAction={takeover.currentAction}
-            checkpointLabel={takeover.checkpointLabel}
-            taskId={takeover.taskId}
-            actions={takeover.actions}
-          >
-            {renderActivePanel()}
-          </AITakeoverContainer>
-        ) : (
-          renderActivePanel()
-        )}
+        <DirectorAttentionBanner novelId={id} />
+        {renderActivePanel()}
       </div>
 
       {taskDrawer ? <NovelTaskDrawer {...taskDrawer} /> : null}
