@@ -40,9 +40,6 @@ Open-source AI novel writing assistant and long-form production studio.
 - 从源码运行：先确认 Node.js 和 pnpm 版本满足仓库要求，再执行 `pnpm install` 与 `pnpm dev`。
 - 公开介绍站：[GitHub Pages 介绍站](https://ourvps1688.github.io/novel2all/) 提供功能预览、模块文档和使用指南。
 
-## 用 Codex 持续创作长篇：Ani Book Skill
-
-如果你希望直接在 Codex 的本地工作区推进小说，可以使用 [Ani Book Skill](https://github.com/ExplosiveCoderflome/ani-book-skill)。它将方向判断、故事发动机、章节推进、审校修复和连续性管理组织为一条可恢复、可追溯的长篇创作流程。
 
 这是一条与本项目互补的创作入口：
 
