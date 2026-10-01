@@ -6,13 +6,13 @@ import { llmProviderSchema } from "../llm/providerSchema";
 import { authMiddleware } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { recoveryTaskService } from "../services/task/RecoveryTaskService";
-import { AutoDirectorFollowUpActionExecutor } from "../services/task/autoDirectorFollowUps/AutoDirectorFollowUpActionExecutor";
-import { AutoDirectorFollowUpService } from "../services/task/autoDirectorFollowUps/AutoDirectorFollowUpService";
+import { AutoDirectorAttentionActionExecutor } from "../services/task/autoDirectorAttentions/AutoDirectorAttentionActionExecutor";
+import { AutoDirectorAttentionService } from "../services/task/autoDirectorAttentions/AutoDirectorAttentionService";
 import { taskCenterService } from "../services/task/TaskCenterService";
 
 const router = Router();
-const autoDirectorFollowUpService = new AutoDirectorFollowUpService();
-const autoDirectorFollowUpActionExecutor = new AutoDirectorFollowUpActionExecutor();
+const autoDirectorAttentionService = new AutoDirectorAttentionService();
+const autoDirectorAttentionActionExecutor = new AutoDirectorAttentionActionExecutor();
 
 const kindSchema = z.enum(["book_analysis", "novel_pipeline", "knowledge_document", "image_generation", "agent_run", "novel_workflow", "style_extraction"]);
 const statusSchema = z.enum(["queued", "running", "waiting_approval", "succeeded", "failed", "cancelled"]);
@@ -47,11 +47,11 @@ const recoveryTaskParamsSchema = z.object({
   id: z.string().trim().min(1),
 });
 
-const autoDirectorFollowUpParamsSchema = z.object({
+const autoDirectorAttentionParamsSchema = z.object({
   taskId: z.string().trim().min(1),
 });
 
-const autoDirectorFollowUpActionBodySchema = z.object({
+const autoDirectorAttentionActionBodySchema = z.object({
   actionCode: z.enum([
     "continue_auto_execution",
     "continue_generic",
@@ -117,38 +117,38 @@ router.post("/recovery-candidates/:kind/:id/resume", validate({ params: recovery
   }
 });
 
-router.get("/auto-director-follow-ups/:taskId", validate({ params: autoDirectorFollowUpParamsSchema }), async (req, res, next) => {
+router.get("/auto-director-attentions/:taskId", validate({ params: autoDirectorAttentionParamsSchema }), async (req, res, next) => {
   try {
-    const { taskId } = req.params as z.infer<typeof autoDirectorFollowUpParamsSchema>;
+    const { taskId } = req.params as z.infer<typeof autoDirectorAttentionParamsSchema>;
     const readonly = req.query.revalidate === "true";
-    const data = await autoDirectorFollowUpService.getDetail(taskId, {
+    const data = await autoDirectorAttentionService.getDetail(taskId, {
       heal: !readonly,
     });
     if (!data) {
       res.status(404).json({
         success: false,
-        error: "Auto director follow-up not found.",
+        error: "Auto director attention not found.",
       } satisfies ApiResponse<null>);
       return;
     }
     res.status(200).json({
       success: true,
       data,
-      message: "Auto director follow-up loaded.",
+      message: "Auto director attention loaded.",
     } satisfies ApiResponse<typeof data>);
   } catch (error) {
     next(error);
   }
 });
 
-router.post("/auto-director-follow-ups/:taskId/actions", validate({
-  params: autoDirectorFollowUpParamsSchema,
-  body: autoDirectorFollowUpActionBodySchema,
+router.post("/auto-director-attentions/:taskId/actions", validate({
+  params: autoDirectorAttentionParamsSchema,
+  body: autoDirectorAttentionActionBodySchema,
 }), async (req, res, next) => {
   try {
-    const { taskId } = req.params as z.infer<typeof autoDirectorFollowUpParamsSchema>;
-    const body = req.body as z.infer<typeof autoDirectorFollowUpActionBodySchema>;
-    const data = await autoDirectorFollowUpActionExecutor.execute({
+    const { taskId } = req.params as z.infer<typeof autoDirectorAttentionParamsSchema>;
+    const body = req.body as z.infer<typeof autoDirectorAttentionActionBodySchema>;
+    const data = await autoDirectorAttentionActionExecutor.execute({
       directorTaskId: taskId,
       taskId,
       actionCode: body.actionCode,

@@ -1,14 +1,14 @@
 import type {
   AutoDirectorAction,
   AutoDirectorActionCode,
-  AutoDirectorFollowUpReason,
-  AutoDirectorFollowUpResolverInput,
+  AutoDirectorAttentionReason,
+  AutoDirectorAttentionResolverInput,
   AutoDirectorMutationActionCode,
-  AutoDirectorResolvedFollowUpReason,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+  AutoDirectorResolvedAttentionReason,
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import { buildWorkflowResumeAction } from "../novelWorkflowExplainability";
 
-const REASON_LABELS: Record<AutoDirectorFollowUpReason, string> = {
+const REASON_LABELS: Record<AutoDirectorAttentionReason, string> = {
   manual_recovery_required: "人工恢复待处理",
   runtime_failed: "失败待重试",
   candidate_selection_required: "待确认书级方向",
@@ -52,16 +52,16 @@ function navigationAction(input: {
   };
 }
 
-function getContinueLabel(input: AutoDirectorFollowUpResolverInput, fallback: string): string {
+function getContinueLabel(input: AutoDirectorAttentionResolverInput, fallback: string): string {
   return buildWorkflowResumeAction(input.status, input.checkpointType ?? null, input.executionScopeLabel) ?? fallback;
 }
 
 function finalizeResolvedReason(input: {
-  reason: AutoDirectorFollowUpReason;
-  priority: AutoDirectorResolvedFollowUpReason["priority"];
+  reason: AutoDirectorAttentionReason;
+  priority: AutoDirectorResolvedAttentionReason["priority"];
   availableActions: AutoDirectorAction[];
   batchActionCodes?: AutoDirectorMutationActionCode[];
-}): AutoDirectorResolvedFollowUpReason {
+}): AutoDirectorResolvedAttentionReason {
   const batchActionCodes = input.batchActionCodes ?? [];
 
   return {
@@ -74,9 +74,9 @@ function finalizeResolvedReason(input: {
   };
 }
 
-export function resolveAutoDirectorFollowUpReason(
-  input: AutoDirectorFollowUpResolverInput,
-): AutoDirectorResolvedFollowUpReason | null {
+export function resolveAutoDirectorAttentionReason(
+  input: AutoDirectorAttentionResolverInput,
+): AutoDirectorResolvedAttentionReason | null {
   if (input.validationResult && !input.validationResult.allowed) {
     const hasStructuredBackfill = input.validationResult.requiredActions.some((action) => (
       action.code === "auto_backfill_structured_outline"

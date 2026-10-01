@@ -86,7 +86,7 @@
 ### Part 3：入口切换与旧弹窗退役
 
 - `client/src/pages/novels/NovelCreate.tsx`：改为轻量入口（灵感输入直通路由页，或直接跳转）；移除 `NovelAutoDirectorDialog` 挂载。
-- 其他打开该弹窗的入口（若有恢复入口在导演跟进/任务中心）改为带 `taskId` 跳转路由页。
+- 其他打开该弹窗的入口（若有恢复入口在应用内注意力提醒/任务中心）改为带 `taskId` 跳转路由页。
 - `NovelAutoDirectorDialog.tsx` / `NovelAutoDirectorCandidateDialog.tsx` / `NovelAutoDirectorDialogHeader.tsx` 在全部入口切换完成后删除。
 
 ### Part 4：动效与收尾

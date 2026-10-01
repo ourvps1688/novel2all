@@ -16,7 +16,7 @@ import {
   normalizeDirectorAutoApprovalConfig,
   shouldAutoApproveDirectorCheckpoint,
 } from "@ai-novel/shared/types/autoDirectorApproval";
-import { recordAutoDirectorAutoApproval } from "../../../task/autoDirectorFollowUps/autoDirectorAutoApprovalAudit";
+import { recordAutoDirectorAutoApproval } from "../../../task/autoDirectorAttentions/autoDirectorAutoApprovalAudit";
 import { runDirectorTrackedStep } from "../projections/directorProgressTracker";
 import type { DirectorPhaseCallbacks, DirectorPhaseDependencies } from "./novelDirectorPhaseTypes";
 export { runDirectorStructuredOutlinePhase } from "./novelDirectorStructuredOutlinePhase";

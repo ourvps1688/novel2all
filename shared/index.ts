@@ -26,7 +26,7 @@ export * from "./types/novelDirector.js";
 export * from "./types/directorRuntime.js";
 export * from "./types/directorIssue.js";
 export * from "./types/autoDirectorApproval.js";
-export * from "./types/autoDirectorFollowUp.js";
+export * from "./types/autoDirectorAttention.js";
 export * from "./types/autoDirectorValidation.js";
 export * from "./types/marketRadar.js";
 export * from "./types/novelWorkflow.js";

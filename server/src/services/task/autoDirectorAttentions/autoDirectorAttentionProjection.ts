@@ -1,20 +1,20 @@
 import type {
   AutoDirectorAction,
-  AutoDirectorFollowUpItem,
-  AutoDirectorFollowUpListInput,
-  AutoDirectorFollowUpListResponse,
-  AutoDirectorFollowUpMilestone,
-  AutoDirectorFollowUpOverview,
-  AutoDirectorFollowUpValidationSummary,
-  AutoDirectorResolvedFollowUpReason,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+  AutoDirectorAttentionItem,
+  AutoDirectorAttentionListInput,
+  AutoDirectorAttentionListResponse,
+  AutoDirectorAttentionMilestone,
+  AutoDirectorAttentionOverview,
+  AutoDirectorAttentionValidationSummary,
+  AutoDirectorResolvedAttentionReason,
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import {
-  AUTO_DIRECTOR_FOLLOW_UP_REASONS,
-  type AutoDirectorFollowUpReason,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+  AUTO_DIRECTOR_ATTENTION_REASONS,
+  type AutoDirectorAttentionReason,
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import {
-  AUTO_DIRECTOR_FOLLOW_UP_SECTIONS,
-  type AutoDirectorFollowUpSection,
+  AUTO_DIRECTOR_ATTENTION_SECTIONS,
+  type AutoDirectorAttentionSection,
 } from "@ai-novel/shared/types/autoDirectorValidation";
 import type { NovelWorkflowCheckpoint } from "@ai-novel/shared/types/novelWorkflow";
 import type { TaskStatus } from "@ai-novel/shared/types/task";
@@ -23,23 +23,23 @@ import {
   type DirectorWorkflowSeedPayload,
 } from "../../novel/director/runtime/novelDirectorHelpers";
 import {
-  compareAutoDirectorFollowUpSections,
-  resolveAutoDirectorFollowUpSection,
+  compareAutoDirectorAttentionSections,
+  resolveAutoDirectorAttentionSection,
 } from "../../novel/director/runtime/autoDirectorValidationService";
 import {
   parseMilestones,
   parseSeedPayload,
 } from "../../novel/workflow/novelWorkflow.shared";
 import { buildWorkflowExplainability } from "../novelWorkflowExplainability";
-import { resolveAutoDirectorFollowUpReason } from "./autoDirectorFollowUpReasonResolver";
+import { resolveAutoDirectorAttentionReason } from "./autoDirectorAttentionReasonResolver";
 import {
   extractBlockedAutoDirectorValidationResult,
   summarizeAutoDirectorValidationResult,
-} from "./autoDirectorFollowUpValidationResult";
+} from "./autoDirectorAttentionValidationResult";
 import type { AutoDirectorAutoApprovalRecordRow } from "./autoDirectorAutoApprovalAudit";
 
 function resolveAutoApprovalRecordReason(checkpointType: string | null | undefined): {
-  reason: AutoDirectorFollowUpReason;
+  reason: AutoDirectorAttentionReason;
   reasonLabel: string;
 } {
   if (checkpointType === "replan_required") {
@@ -54,7 +54,7 @@ function resolveAutoApprovalRecordReason(checkpointType: string | null | undefin
   };
 }
 
-export interface RawFollowUpWorkflowRow {
+export interface RawAttentionWorkflowRow {
   id: string;
   novelId: string | null;
   lane: string;
@@ -78,7 +78,7 @@ export interface RawFollowUpWorkflowRow {
   } | null;
 }
 
-export interface FollowUpWorkflowRow {
+export interface AttentionWorkflowRow {
   id: string;
   novelId: string | null;
   lane: "auto_director";
@@ -108,13 +108,13 @@ export interface AutoApprovalRecordProjectionInput extends AutoDirectorAutoAppro
   } | null;
 }
 
-const PRIORITY_RANK: Record<AutoDirectorFollowUpItem["priority"], number> = {
+const PRIORITY_RANK: Record<AutoDirectorAttentionItem["priority"], number> = {
   P0: 0,
   P1: 1,
   P2: 2,
 };
 
-const SECTION_BATCH_ACTIONS: Partial<Record<AutoDirectorFollowUpSection, AutoDirectorFollowUpItem["batchActionCodes"]>> = {
+const SECTION_BATCH_ACTIONS: Partial<Record<AutoDirectorAttentionSection, AutoDirectorAttentionItem["batchActionCodes"]>> = {
   pending: ["continue_auto_execution"],
   exception: ["retry_with_task_model"],
 };
@@ -151,7 +151,7 @@ function normalizeCheckpointType(value: string | null): NovelWorkflowCheckpoint 
     : null;
 }
 
-export function normalizeWorkflowRow(row: RawFollowUpWorkflowRow): FollowUpWorkflowRow | null {
+export function normalizeWorkflowRow(row: RawAttentionWorkflowRow): AttentionWorkflowRow | null {
   if (row.lane !== "auto_director" || !isTaskStatus(row.status)) {
     return null;
   }
@@ -163,16 +163,16 @@ export function normalizeWorkflowRow(row: RawFollowUpWorkflowRow): FollowUpWorkf
   };
 }
 
-function buildEmptyCounters(): AutoDirectorFollowUpOverview["countersByReason"] {
+function buildEmptyCounters(): AutoDirectorAttentionOverview["countersByReason"] {
   return Object.fromEntries(
-    AUTO_DIRECTOR_FOLLOW_UP_REASONS.map((reason) => [reason, 0]),
-  ) as AutoDirectorFollowUpOverview["countersByReason"];
+    AUTO_DIRECTOR_ATTENTION_REASONS.map((reason) => [reason, 0]),
+  ) as AutoDirectorAttentionOverview["countersByReason"];
 }
 
-function buildEmptySectionCounters(): AutoDirectorFollowUpOverview["countersBySection"] {
+function buildEmptySectionCounters(): AutoDirectorAttentionOverview["countersBySection"] {
   return Object.fromEntries(
-    AUTO_DIRECTOR_FOLLOW_UP_SECTIONS.map((section) => [section, 0]),
-  ) as AutoDirectorFollowUpOverview["countersBySection"];
+    AUTO_DIRECTOR_ATTENTION_SECTIONS.map((section) => [section, 0]),
+  ) as AutoDirectorAttentionOverview["countersBySection"];
 }
 
 function parseWorkflowSeedPayload(seedPayloadJson: string | null | undefined): DirectorWorkflowSeedPayload | null {
@@ -205,7 +205,7 @@ function getKnownReplacementTaskId(seedPayloadJson: string | null | undefined, k
   return replacementTaskId && knownTaskIds.has(replacementTaskId) ? replacementTaskId : null;
 }
 
-function buildSyntheticValidationSummary(row: FollowUpWorkflowRow): AutoDirectorFollowUpValidationSummary | null {
+function buildSyntheticValidationSummary(row: AttentionWorkflowRow): AutoDirectorAttentionValidationSummary | null {
   if (row.pendingManualRecovery || row.status === "failed" || row.status === "cancelled") {
     return {
       blockingReasons: [buildBlockingReason(row) ?? "任务状态需要重新校验后再继续。"],
@@ -227,9 +227,9 @@ function buildSyntheticValidationSummary(row: FollowUpWorkflowRow): AutoDirector
 }
 
 function filterBatchActionCodes(
-  section: AutoDirectorFollowUpSection,
-  resolved: AutoDirectorResolvedFollowUpReason,
-): AutoDirectorFollowUpItem["batchActionCodes"] {
+  section: AutoDirectorAttentionSection,
+  resolved: AutoDirectorResolvedAttentionReason,
+): AutoDirectorAttentionItem["batchActionCodes"] {
   const allowedBySection = SECTION_BATCH_ACTIONS[section] ?? [];
   return resolved.batchActionCodes.filter((code) => allowedBySection.includes(code));
 }
@@ -247,11 +247,11 @@ function getLatestMilestoneAt(milestonesJson: string | null | undefined): string
   }, null);
 }
 
-function getNovelTitle(row: Pick<FollowUpWorkflowRow, "novel" | "title">): string {
+function getNovelTitle(row: Pick<AttentionWorkflowRow, "novel" | "title">): string {
   return row.novel?.title?.trim() || row.title.trim() || "AI 自动导演";
 }
 
-function buildBlockingReason(row: FollowUpWorkflowRow): string | null {
+function buildBlockingReason(row: AttentionWorkflowRow): string | null {
   return buildWorkflowExplainability({
     status: row.status,
     currentStage: row.currentStage,
@@ -262,9 +262,9 @@ function buildBlockingReason(row: FollowUpWorkflowRow): string | null {
   }).blockingReason;
 }
 
-function buildFollowUpSummary(
-  row: FollowUpWorkflowRow,
-  resolved: AutoDirectorResolvedFollowUpReason,
+function buildAttentionSummary(
+  row: AttentionWorkflowRow,
+  resolved: AutoDirectorResolvedAttentionReason,
 ): string {
   const checkpointSummary = row.checkpointSummary?.trim();
   if (checkpointSummary) {
@@ -277,14 +277,14 @@ function buildFollowUpSummary(
   return buildBlockingReason(row) ?? resolved.reasonLabel;
 }
 
-export function projectFollowUpItem(
-  row: FollowUpWorkflowRow,
+export function projectAttentionItem(
+  row: AttentionWorkflowRow,
   knownTaskIds: ReadonlySet<string>,
-): AutoDirectorFollowUpItem | null {
+): AutoDirectorAttentionItem | null {
   const executionScopeLabel = getExecutionScopeLabel(row.seedPayloadJson);
   const replacementTaskId = getKnownReplacementTaskId(row.seedPayloadJson, knownTaskIds);
   const validationResult = extractBlockedAutoDirectorValidationResult(row.seedPayloadJson);
-  const resolved = resolveAutoDirectorFollowUpReason({
+  const resolved = resolveAutoDirectorAttentionReason({
     status: row.status,
     checkpointType: row.checkpointType,
     pendingManualRecovery: row.pendingManualRecovery,
@@ -298,7 +298,7 @@ export function projectFollowUpItem(
   const validationSummary = validationResult
     ? summarizeAutoDirectorValidationResult(validationResult)
     : buildSyntheticValidationSummary(row);
-  const section = resolveAutoDirectorFollowUpSection({
+  const section = resolveAutoDirectorAttentionSection({
     status: row.status,
     checkpointType: row.checkpointType,
     pendingManualRecovery: row.pendingManualRecovery,
@@ -322,7 +322,7 @@ export function projectFollowUpItem(
     section,
     reasonLabel: resolved.reasonLabel,
     priority: resolved.priority,
-    followUpSummary: buildFollowUpSummary(row, resolved),
+    attentionSummary: buildAttentionSummary(row, resolved),
     blockingReason: buildBlockingReason(row),
     validationSummary,
     executionScope: executionScopeLabel,
@@ -338,8 +338,8 @@ export function projectFollowUpItem(
 
 export function projectAutoApprovalRecordItem(
   row: AutoApprovalRecordProjectionInput,
-  taskById: ReadonlyMap<string, FollowUpWorkflowRow>,
-): AutoDirectorFollowUpItem {
+  taskById: ReadonlyMap<string, AttentionWorkflowRow>,
+): AutoDirectorAttentionItem {
   const task = taskById.get(row.taskId);
   const resolvedReason = resolveAutoApprovalRecordReason(row.checkpointType);
   return {
@@ -358,7 +358,7 @@ export function projectAutoApprovalRecordItem(
     section: "auto_progress",
     reasonLabel: resolvedReason.reasonLabel,
     priority: "P2",
-    followUpSummary: row.summary,
+    attentionSummary: row.summary,
     blockingReason: null,
     validationSummary: null,
     executionScope: row.scopeLabel ?? getExecutionScopeLabel(task?.seedPayloadJson) ?? null,
@@ -379,7 +379,7 @@ export function projectAutoApprovalRecordItem(
   };
 }
 
-export function matchesItemFilters(item: AutoDirectorFollowUpItem, input: AutoDirectorFollowUpListInput): boolean {
+export function matchesItemFilters(item: AutoDirectorAttentionItem, input: AutoDirectorAttentionListInput): boolean {
   if (input.section && item.section !== input.section) {
     return false;
   }
@@ -398,7 +398,7 @@ export function matchesItemFilters(item: AutoDirectorFollowUpItem, input: AutoDi
   return true;
 }
 
-export function matchesRowScopeFilters(row: FollowUpWorkflowRow, input: AutoDirectorFollowUpListInput): boolean {
+export function matchesRowScopeFilters(row: AttentionWorkflowRow, input: AutoDirectorAttentionListInput): boolean {
   if (input.status && row.status !== input.status) {
     return false;
   }
@@ -408,8 +408,8 @@ export function matchesRowScopeFilters(row: FollowUpWorkflowRow, input: AutoDire
   return true;
 }
 
-export function compareFollowUpItems(left: AutoDirectorFollowUpItem, right: AutoDirectorFollowUpItem): number {
-  const sectionDiff = compareAutoDirectorFollowUpSections(left.section, right.section);
+export function compareAttentionItems(left: AutoDirectorAttentionItem, right: AutoDirectorAttentionItem): number {
+  const sectionDiff = compareAutoDirectorAttentionSections(left.section, right.section);
   if (sectionDiff !== 0) {
     return sectionDiff;
   }
@@ -424,21 +424,21 @@ export function compareFollowUpItems(left: AutoDirectorFollowUpItem, right: Auto
   return right.directorTaskId.localeCompare(left.directorTaskId);
 }
 
-export function buildAvailableReasons(items: AutoDirectorFollowUpItem[]): AutoDirectorFollowUpListResponse["availableFilters"]["reasons"] {
+export function buildAvailableReasons(items: AutoDirectorAttentionItem[]): AutoDirectorAttentionListResponse["availableFilters"]["reasons"] {
   const reasons = new Set(items.map((item) => item.reason));
-  return AUTO_DIRECTOR_FOLLOW_UP_REASONS.filter((reason) => reasons.has(reason));
+  return AUTO_DIRECTOR_ATTENTION_REASONS.filter((reason) => reasons.has(reason));
 }
 
-export function buildAvailableSections(items: AutoDirectorFollowUpItem[]): AutoDirectorFollowUpListResponse["availableFilters"]["sections"] {
+export function buildAvailableSections(items: AutoDirectorAttentionItem[]): AutoDirectorAttentionListResponse["availableFilters"]["sections"] {
   const sections = new Set(items.map((item) => item.section));
-  return AUTO_DIRECTOR_FOLLOW_UP_SECTIONS.filter((section) => sections.has(section));
+  return AUTO_DIRECTOR_ATTENTION_SECTIONS.filter((section) => sections.has(section));
 }
 
-export function buildAvailableStatuses(items: AutoDirectorFollowUpItem[]): AutoDirectorFollowUpListResponse["availableFilters"]["statuses"] {
+export function buildAvailableStatuses(items: AutoDirectorAttentionItem[]): AutoDirectorAttentionListResponse["availableFilters"]["statuses"] {
   return Array.from(new Set(items.map((item) => item.status)));
 }
 
-export function buildCounters(items: AutoDirectorFollowUpItem[]): AutoDirectorFollowUpListResponse["countersByReason"] {
+export function buildCounters(items: AutoDirectorAttentionItem[]): AutoDirectorAttentionListResponse["countersByReason"] {
   const counters = buildEmptyCounters();
   for (const item of items) {
     counters[item.reason] += 1;
@@ -446,7 +446,7 @@ export function buildCounters(items: AutoDirectorFollowUpItem[]): AutoDirectorFo
   return counters;
 }
 
-export function buildSectionCounters(items: AutoDirectorFollowUpItem[]): AutoDirectorFollowUpListResponse["countersBySection"] {
+export function buildSectionCounters(items: AutoDirectorAttentionItem[]): AutoDirectorAttentionListResponse["countersBySection"] {
   const counters = buildEmptySectionCounters();
   for (const item of items) {
     counters[item.section] += 1;
@@ -464,7 +464,7 @@ function buildMilestoneLabel(milestone: ReturnType<typeof parseMilestones>[numbe
   }).displayStatus ?? milestone.summary;
 }
 
-export function buildMilestones(row: Pick<FollowUpWorkflowRow, "milestonesJson" | "status">): AutoDirectorFollowUpMilestone[] {
+export function buildMilestones(row: Pick<AttentionWorkflowRow, "milestonesJson" | "status">): AutoDirectorAttentionMilestone[] {
   return parseMilestones(row.milestonesJson).map((milestone) => ({
     label: buildMilestoneLabel(milestone),
     at: milestone.createdAt,
@@ -474,9 +474,9 @@ export function buildMilestones(row: Pick<FollowUpWorkflowRow, "milestonesJson" 
 }
 
 export function buildSummaryCounters(
-  rows: FollowUpWorkflowRow[],
-  actionableItems: AutoDirectorFollowUpItem[],
-): AutoDirectorFollowUpListResponse["summaryCounters"] {
+  rows: AttentionWorkflowRow[],
+  actionableItems: AutoDirectorAttentionItem[],
+): AutoDirectorAttentionListResponse["summaryCounters"] {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayStartAt = todayStart.getTime();

@@ -10,9 +10,9 @@ import type {
 } from "@ai-novel/shared/types/task";
 import type {
   AutoDirectorActionExecutionResult,
-  AutoDirectorFollowUpDetail,
+  AutoDirectorAttentionDetail,
   AutoDirectorMutationActionCode,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import type { DirectorLLMOptions } from "@ai-novel/shared/types/novelDirector";
 import { apiClient, type ApiHttpError } from "./client";
 
@@ -91,9 +91,9 @@ export async function archiveTask(kind: TaskKind, id: string) {
   return data;
 }
 
-export async function getAutoDirectorFollowUpDetail(taskId: string, options?: { revalidate?: boolean }) {
+export async function getAutoDirectorAttentionDetail(taskId: string, options?: { revalidate?: boolean }) {
   try {
-    const { data } = await apiClient.get<ApiResponse<AutoDirectorFollowUpDetail | null>>(`/tasks/auto-director-follow-ups/${taskId}`, {
+    const { data } = await apiClient.get<ApiResponse<AutoDirectorAttentionDetail | null>>(`/tasks/auto-director-attentions/${taskId}`, {
       params: options?.revalidate ? { revalidate: "true" } : undefined,
       silentErrorStatuses: [404],
     });
@@ -104,14 +104,14 @@ export async function getAutoDirectorFollowUpDetail(taskId: string, options?: { 
       return {
         success: true,
         data: null,
-        message: "Auto director follow-up not found.",
-      } satisfies ApiResponse<AutoDirectorFollowUpDetail | null>;
+        message: "Auto director attention not found.",
+      } satisfies ApiResponse<AutoDirectorAttentionDetail | null>;
     }
     throw error;
   }
 }
 
-export async function executeAutoDirectorFollowUpAction(
+export async function executeAutoDirectorAttentionAction(
   taskId: string,
   input: {
     actionCode: AutoDirectorMutationActionCode;
@@ -119,7 +119,7 @@ export async function executeAutoDirectorFollowUpAction(
   },
 ) {
   const { data } = await apiClient.post<ApiResponse<AutoDirectorActionExecutionResult>>(
-    `/tasks/auto-director-follow-ups/${taskId}/actions`,
+    `/tasks/auto-director-attentions/${taskId}/actions`,
     input,
   );
   return data;

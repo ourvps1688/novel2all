@@ -5,7 +5,7 @@
 import type { DirectorBookAutomationAction } from "@ai-novel/shared/types/directorRuntime";
 import type { TaskStatus } from "@ai-novel/shared/types/task";
 import type { CharacterResourceProposalSummary } from "@ai-novel/shared/types/characterResource";
-import type { AutoDirectorAction } from "@ai-novel/shared/types/autoDirectorFollowUp";
+import type { AutoDirectorAction } from "@ai-novel/shared/types/autoDirectorAttention";
 import AICockpit from "@/components/autoDirector/AICockpit";
 import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
 import LLMSelector from "@/components/common/LLMSelector";
@@ -148,11 +148,11 @@ function formatProposalSource(proposal: CharacterResourceProposalSummary): strin
   return proposal.sourceType === "chapter_background_sync" ? "自动同步发现" : "手动复查发现";
 }
 
-function followUpActionVariant(action: AutoDirectorAction): "default" | "outline" {
+function attentionActionVariant(action: AutoDirectorAction): "default" | "outline" {
   return action.kind === "mutation" && action.riskLevel !== "high" ? "default" : "outline";
 }
 
-function formatFollowUpPriority(priority: "P0" | "P1" | "P2"): string {
+function formatAttentionPriority(priority: "P0" | "P1" | "P2"): string {
   if (priority === "P0") {
     return "P0 立即处理";
   }
@@ -265,9 +265,9 @@ export default function NovelTaskDrawer({
   onRejectResourceProposal,
   confirmingResourceProposalId = "",
   rejectingResourceProposalId = "",
-  followUp,
-  onFollowUpAction,
-  executingFollowUpAction = false,
+  attention,
+  onAttentionAction,
+  executingAttentionAction = false,
   runtimeHardBlocked = false,
   runtimeBlockedReason = null,
   overrideModel,
@@ -312,7 +312,7 @@ export default function NovelTaskDrawer({
   const canShowRuntimePolicy = capabilities?.canAdjustRuntimePolicy !== false && Boolean(task?.id && runtimeSnapshot);
   const canShowManualImpact = capabilities?.canInspectManualEditImpact !== false && Boolean(task);
   const canShowRetryWithOverrideModel = capabilities?.canRetryWithOverrideModel === true;
-  const canShowFollowUp = capabilities?.availableFollowUps !== false && Boolean(followUp);
+  const canShowAttention = capabilities?.availableAttentions !== false && Boolean(attention);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -413,21 +413,21 @@ export default function NovelTaskDrawer({
                 ) : null}
               </section>
 
-              {canShowFollowUp && followUp ? (
+              {canShowAttention && attention ? (
                 <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="text-sm font-medium text-foreground">当前需要处理的动作</div>
-                    <Badge variant="outline">{followUp.reasonLabel}</Badge>
-                    <Badge variant={followUp.priority === "P0" ? "destructive" : "secondary"}>
-                      {formatFollowUpPriority(followUp.priority)}
+                    <Badge variant="outline">{attention.reasonLabel}</Badge>
+                    <Badge variant={attention.priority === "P0" ? "destructive" : "secondary"}>
+                      {formatAttentionPriority(attention.priority)}
                     </Badge>
                   </div>
-                  <div className="text-sm leading-6 text-muted-foreground">{followUp.followUpSummary}</div>
-                  {followUp.blockingReason ? (
-                    <div className="text-sm text-muted-foreground">阻止动作的原因：{followUp.blockingReason}</div>
+                  <div className="text-sm leading-6 text-muted-foreground">{attention.attentionSummary}</div>
+                  {attention.blockingReason ? (
+                    <div className="text-sm text-muted-foreground">阻止动作的原因：{attention.blockingReason}</div>
                   ) : null}
-                  {followUp.currentModel ? (
-                    <div className="text-sm text-muted-foreground">当前任务模型：{followUp.currentModel}</div>
+                  {attention.currentModel ? (
+                    <div className="text-sm text-muted-foreground">当前任务模型：{attention.currentModel}</div>
                   ) : null}
                   {runtimeHardBlocked && runtimeBlockedReason ? (
                     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -435,14 +435,14 @@ export default function NovelTaskDrawer({
                     </div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
-                    {followUp.availableActions.map((action) => (
+                    {attention.availableActions.map((action) => (
                       <Button
                         key={action.code}
                         type="button"
                         size="sm"
-                        variant={followUpActionVariant(action)}
-                        onClick={() => onFollowUpAction?.(action)}
-                        disabled={executingFollowUpAction || (runtimeHardBlocked && action.kind !== "navigation")}
+                        variant={attentionActionVariant(action)}
+                        onClick={() => onAttentionAction?.(action)}
+                        disabled={executingAttentionAction || (runtimeHardBlocked && action.kind !== "navigation")}
                       >
                         {action.label}
                       </Button>

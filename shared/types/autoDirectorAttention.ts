@@ -2,12 +2,12 @@ import type { NovelWorkflowCheckpoint } from "./novelWorkflow.js";
 import type { TaskStatus, UnifiedTaskDetail } from "./task.js";
 import type {
   AutoDirectorAffectedScope,
-  AutoDirectorFollowUpSection,
+  AutoDirectorAttentionSection,
   AutoDirectorValidationResult,
   AutoDirectorValidationRequiredAction,
 } from "./autoDirectorValidation.js";
 
-export const AUTO_DIRECTOR_FOLLOW_UP_REASONS = [
+export const AUTO_DIRECTOR_ATTENTION_REASONS = [
   "manual_recovery_required",
   "runtime_failed",
   "candidate_selection_required",
@@ -21,9 +21,9 @@ export const AUTO_DIRECTOR_FOLLOW_UP_REASONS = [
   "validation_required",
 ] as const;
 
-export type AutoDirectorFollowUpReason = (typeof AUTO_DIRECTOR_FOLLOW_UP_REASONS)[number];
+export type AutoDirectorAttentionReason = (typeof AUTO_DIRECTOR_ATTENTION_REASONS)[number];
 
-export type AutoDirectorFollowUpPriority = "P0" | "P1" | "P2";
+export type AutoDirectorAttentionPriority = "P0" | "P1" | "P2";
 
 export type AutoDirectorActionRiskLevel = "low" | "medium" | "high";
 
@@ -53,7 +53,7 @@ export interface AutoDirectorAction {
   deepLink?: string;
 }
 
-export interface AutoDirectorFollowUpResolverInput {
+export interface AutoDirectorAttentionResolverInput {
   status: TaskStatus;
   checkpointType?: NovelWorkflowCheckpoint | null;
   pendingManualRecovery?: boolean;
@@ -62,20 +62,20 @@ export interface AutoDirectorFollowUpResolverInput {
   validationResult?: AutoDirectorValidationResult | null;
 }
 
-export interface AutoDirectorResolvedFollowUpReason {
-  reason: AutoDirectorFollowUpReason;
+export interface AutoDirectorResolvedAttentionReason {
+  reason: AutoDirectorAttentionReason;
   reasonLabel: string;
-  priority: AutoDirectorFollowUpPriority;
+  priority: AutoDirectorAttentionPriority;
   availableActions: AutoDirectorAction[];
   batchActionCodes: AutoDirectorMutationActionCode[];
   supportsBatch: boolean;
 }
 
-export type AutoDirectorCountersByReason = Record<AutoDirectorFollowUpReason, number>;
+export type AutoDirectorCountersByReason = Record<AutoDirectorAttentionReason, number>;
 
-export type AutoDirectorCountersBySection = Record<AutoDirectorFollowUpSection, number>;
+export type AutoDirectorCountersBySection = Record<AutoDirectorAttentionSection, number>;
 
-export interface AutoDirectorFollowUpValidationSummary {
+export interface AutoDirectorAttentionValidationSummary {
   blockingReasons: string[];
   warnings: string[];
   requiredActions: AutoDirectorValidationRequiredAction[];
@@ -83,10 +83,10 @@ export interface AutoDirectorFollowUpValidationSummary {
   nextAction: string | null;
 }
 
-export interface AutoDirectorFollowUpItem {
+export interface AutoDirectorAttentionItem {
   itemType: "task" | "auto_approval_record";
   directorTaskId: string;
-  /** @deprecated Use directorTaskId for auto director follow-up state. */
+  /** @deprecated Use directorTaskId for auto director attention state. */
   taskId: string;
   autoApprovalRecordId?: string;
   novelId: string | null;
@@ -96,13 +96,13 @@ export interface AutoDirectorFollowUpItem {
   status: TaskStatus;
   currentStage: string | null;
   checkpointType: NovelWorkflowCheckpoint | null;
-  reason: AutoDirectorFollowUpReason;
-  section: AutoDirectorFollowUpSection;
+  reason: AutoDirectorAttentionReason;
+  section: AutoDirectorAttentionSection;
   reasonLabel: string;
-  priority: AutoDirectorFollowUpPriority;
-  followUpSummary: string;
+  priority: AutoDirectorAttentionPriority;
+  attentionSummary: string;
   blockingReason: string | null;
-  validationSummary?: AutoDirectorFollowUpValidationSummary | null;
+  validationSummary?: AutoDirectorAttentionValidationSummary | null;
   executionScope: string | null;
   currentModel: string | null;
   availableActions: AutoDirectorAction[];
@@ -113,69 +113,69 @@ export interface AutoDirectorFollowUpItem {
   updatedAt: string;
 }
 
-export interface AutoDirectorFollowUpMilestone {
+export interface AutoDirectorAttentionMilestone {
   label: string;
   at: string;
   status: TaskStatus;
   summary?: string | null;
 }
 
-export interface AutoDirectorFollowUpDetail {
+export interface AutoDirectorAttentionDetail {
   directorTaskId: string;
-  /** @deprecated Use directorTaskId for auto director follow-up state. */
+  /** @deprecated Use directorTaskId for auto director attention state. */
   taskId: string;
   reasonLabel: string;
-  priority: AutoDirectorFollowUpPriority;
-  followUpSummary: string;
+  priority: AutoDirectorAttentionPriority;
+  attentionSummary: string;
   checkpointSummary: string | null;
   blockingReason: string | null;
   nextStepSuggestion: string | null;
-  validationSummary: AutoDirectorFollowUpValidationSummary | null;
+  validationSummary: AutoDirectorAttentionValidationSummary | null;
   currentModel: string | null;
   riskNote: string | null;
   originDetailUrl: string;
   replanUrl: string | null;
   candidateSelectionUrl: string | null;
   availableActions: AutoDirectorAction[];
-  milestones: AutoDirectorFollowUpMilestone[];
+  milestones: AutoDirectorAttentionMilestone[];
   task: UnifiedTaskDetail;
 }
 
-export interface AutoDirectorFollowUpOverview {
+export interface AutoDirectorAttentionOverview {
   totalCount: number;
   countersByReason: AutoDirectorCountersByReason;
   countersBySection: AutoDirectorCountersBySection;
 }
 
-export interface AutoDirectorFollowUpSummaryCounters {
+export interface AutoDirectorAttentionSummaryCounters {
   recoveredToday: number;
   completedToday: number;
 }
 
-export interface AutoDirectorFollowUpAvailableFilters {
-  sections: AutoDirectorFollowUpSection[];
-  reasons: AutoDirectorFollowUpReason[];
+export interface AutoDirectorAttentionAvailableFilters {
+  sections: AutoDirectorAttentionSection[];
+  reasons: AutoDirectorAttentionReason[];
   statuses: TaskStatus[];
 }
 
-export interface AutoDirectorFollowUpPagination {
+export interface AutoDirectorAttentionPagination {
   page: number;
   pageSize: number;
   total: number;
 }
 
-export interface AutoDirectorFollowUpListResponse {
-  items: AutoDirectorFollowUpItem[];
+export interface AutoDirectorAttentionListResponse {
+  items: AutoDirectorAttentionItem[];
   countersByReason: AutoDirectorCountersByReason;
   countersBySection: AutoDirectorCountersBySection;
-  summaryCounters: AutoDirectorFollowUpSummaryCounters;
-  availableFilters: AutoDirectorFollowUpAvailableFilters;
-  pagination: AutoDirectorFollowUpPagination;
+  summaryCounters: AutoDirectorAttentionSummaryCounters;
+  availableFilters: AutoDirectorAttentionAvailableFilters;
+  pagination: AutoDirectorAttentionPagination;
 }
 
-export interface AutoDirectorFollowUpListInput {
-  section?: AutoDirectorFollowUpSection;
-  reason?: AutoDirectorFollowUpReason;
+export interface AutoDirectorAttentionListInput {
+  section?: AutoDirectorAttentionSection;
+  reason?: AutoDirectorAttentionReason;
   status?: TaskStatus;
   novelId?: string;
   supportsBatch?: boolean;

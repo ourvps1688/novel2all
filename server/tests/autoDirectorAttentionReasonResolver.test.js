@@ -2,15 +2,15 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
-  resolveAutoDirectorFollowUpReason,
-} = require("../dist/services/task/autoDirectorFollowUps/autoDirectorFollowUpReasonResolver.js");
+  resolveAutoDirectorAttentionReason,
+} = require("../dist/services/task/autoDirectorAttentions/autoDirectorAttentionReasonResolver.js");
 
 function actionCodes(result) {
   return result.availableActions.map((item) => item.code);
 }
 
-test("follow-up resolver prefers manual recovery over other signals", () => {
-  const result = resolveAutoDirectorFollowUpReason({
+test("attention resolver prefers manual recovery over other signals", () => {
+  const result = resolveAutoDirectorAttentionReason({
     status: "failed",
     checkpointType: "chapter_batch_ready",
     pendingManualRecovery: true,
@@ -23,8 +23,8 @@ test("follow-up resolver prefers manual recovery over other signals", () => {
   assert.equal(result.supportsBatch, false);
 });
 
-test("follow-up resolver returns candidate selection metadata", () => {
-  const result = resolveAutoDirectorFollowUpReason({
+test("attention resolver returns candidate selection metadata", () => {
+  const result = resolveAutoDirectorAttentionReason({
     status: "waiting_approval",
     checkpointType: "candidate_selection_required",
     pendingManualRecovery: false,
@@ -36,8 +36,8 @@ test("follow-up resolver returns candidate selection metadata", () => {
   assert.deepEqual(actionCodes(result), ["go_candidate_selection", "open_detail"]);
 });
 
-test("follow-up resolver returns replan metadata", () => {
-  const result = resolveAutoDirectorFollowUpReason({
+test("attention resolver returns replan metadata", () => {
+  const result = resolveAutoDirectorAttentionReason({
     status: "waiting_approval",
     checkpointType: "replan_required",
   });
@@ -48,8 +48,8 @@ test("follow-up resolver returns replan metadata", () => {
   assert.deepEqual(actionCodes(result), ["go_replan", "open_detail"]);
 });
 
-test("follow-up resolver exposes chapter-batch auto-execution metadata", () => {
-  const result = resolveAutoDirectorFollowUpReason({
+test("attention resolver exposes chapter-batch auto-execution metadata", () => {
+  const result = resolveAutoDirectorAttentionReason({
     status: "waiting_approval",
     checkpointType: "chapter_batch_ready",
     executionScopeLabel: "第 11-20 章",
@@ -68,8 +68,8 @@ test("follow-up resolver exposes chapter-batch auto-execution metadata", () => {
   assert.equal(result.supportsBatch, true);
 });
 
-test("follow-up resolver keeps waiting chapter batches in auto-execution continuation state", () => {
-  const result = resolveAutoDirectorFollowUpReason({
+test("attention resolver keeps waiting chapter batches in auto-execution continuation state", () => {
+  const result = resolveAutoDirectorAttentionReason({
     status: "waiting_approval",
     checkpointType: "chapter_batch_ready",
   });
@@ -79,8 +79,8 @@ test("follow-up resolver keeps waiting chapter batches in auto-execution continu
   assert.deepEqual(actionCodes(result), ["continue_auto_execution", "open_detail"]);
 });
 
-test("follow-up resolver exposes retry metadata for failed tasks", () => {
-  const result = resolveAutoDirectorFollowUpReason({
+test("attention resolver exposes retry metadata for failed tasks", () => {
+  const result = resolveAutoDirectorAttentionReason({
     status: "failed",
     checkpointType: "chapter_batch_ready",
   });

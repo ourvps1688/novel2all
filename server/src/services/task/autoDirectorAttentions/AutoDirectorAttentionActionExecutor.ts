@@ -4,8 +4,8 @@ import type {
   AutoDirectorBatchActionExecutionResult,
   AutoDirectorBatchActionRequest,
   AutoDirectorMutationActionCode,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
-import type { AutoDirectorFollowUpSection } from "@ai-novel/shared/types/autoDirectorValidation";
+} from "@ai-novel/shared/types/autoDirectorAttention";
+import type { AutoDirectorAttentionSection } from "@ai-novel/shared/types/autoDirectorValidation";
 import type { NovelWorkflowCheckpoint } from "@ai-novel/shared/types/novelWorkflow";
 import { prisma } from "../../../db/prisma";
 import { AppError } from "../../../middleware/errorHandler";
@@ -16,9 +16,9 @@ import type { DirectorWorkflowSeedPayload } from "../../novel/director/runtime/n
 import { NovelWorkflowService } from "../../novel/workflow/NovelWorkflowService";
 import { parseSeedPayload } from "../../novel/workflow/novelWorkflow.shared";
 import { NovelWorkflowTaskAdapter } from "../adapters/NovelWorkflowTaskAdapter";
-import { resolveAutoDirectorFollowUpReason } from "./autoDirectorFollowUpReasonResolver";
-import { resolveAutoDirectorFollowUpSection } from "../../novel/director/runtime/autoDirectorValidationService";
-import { extractBlockedAutoDirectorValidationResult } from "./autoDirectorFollowUpValidationResult";
+import { resolveAutoDirectorAttentionReason } from "./autoDirectorAttentionReasonResolver";
+import { resolveAutoDirectorAttentionSection } from "../../novel/director/runtime/autoDirectorValidationService";
+import { extractBlockedAutoDirectorValidationResult } from "./autoDirectorAttentionValidationResult";
 import {
   applyAutoDirectorSafeFix,
   buildAutoDirectorSafeFixPlan,
@@ -34,13 +34,13 @@ const BATCH_ALLOWED_ACTIONS = new Set<AutoDirectorMutationActionCode>([
   "retry_with_task_model",
 ]);
 
-const BATCH_SECTION_ACTIONS: Partial<Record<AutoDirectorFollowUpSection, AutoDirectorMutationActionCode>> = {
+const BATCH_SECTION_ACTIONS: Partial<Record<AutoDirectorAttentionSection, AutoDirectorMutationActionCode>> = {
   pending: "continue_auto_execution",
   exception: "retry_with_task_model",
 };
 
 function getAllowedBatchActionForRow(row: WorkflowTaskRow): AutoDirectorMutationActionCode | null {
-  const section = resolveAutoDirectorFollowUpSection({
+  const section = resolveAutoDirectorAttentionSection({
     status: row.status,
     checkpointType: toCheckpointType(row.checkpointType),
     pendingManualRecovery: row.pendingManualRecovery,
@@ -173,7 +173,7 @@ function summarizeBatchResult(input: {
   };
 }
 
-export class AutoDirectorFollowUpActionExecutor {
+export class AutoDirectorAttentionActionExecutor {
   readonly workflowService = new NovelWorkflowService();
 
   readonly directorCommandService = new DirectorCommandService(this.workflowService);
@@ -389,7 +389,7 @@ export class AutoDirectorFollowUpActionExecutor {
   }
 
   private getAllowedMutationActions(row: WorkflowTaskRow): Set<AutoDirectorMutationActionCode> | null {
-    const resolved = resolveAutoDirectorFollowUpReason({
+    const resolved = resolveAutoDirectorAttentionReason({
       status: row.status,
       checkpointType: toCheckpointType(row.checkpointType),
       pendingManualRecovery: row.pendingManualRecovery,
@@ -588,7 +588,7 @@ export class AutoDirectorFollowUpActionExecutor {
 
   private async findLoggedExecution(idempotencyKey: string) {
     try {
-      return await prisma.autoDirectorFollowUpActionLog.findUnique({
+      return await prisma.autoDirectorAttentionActionLog.findUnique({
         where: {
           idempotencyKey,
         },
@@ -606,7 +606,7 @@ export class AutoDirectorFollowUpActionExecutor {
     result: AutoDirectorActionExecutionResult,
   ): Promise<void> {
     try {
-      const existing = await prisma.autoDirectorFollowUpActionLog.findUnique({
+      const existing = await prisma.autoDirectorAttentionActionLog.findUnique({
         where: {
           idempotencyKey: input.idempotencyKey,
         },
@@ -614,7 +614,7 @@ export class AutoDirectorFollowUpActionExecutor {
       if (existing) {
         return;
       }
-      await prisma.autoDirectorFollowUpActionLog.create({
+      await prisma.autoDirectorAttentionActionLog.create({
         data: {
           taskId: input.taskId,
           actionCode: input.actionCode,

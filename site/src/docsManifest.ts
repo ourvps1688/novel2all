@@ -132,10 +132,10 @@ export const docsManifest: SiteDocCategory[] = [
         "docs/public/flow/knowledge-and-rag.md",
       ),
       doc(
-        "module-director-follow-up",
-        "导演跟进",
+        "module-director-attention",
+        "导演注意力",
         "查看自动导演 checkpoint、暂停原因、auto-approval 和恢复入口。",
-        "docs/public/modules/director-follow-up.md",
+        "docs/public/modules/director-attention.md",
       ),
     ],
   },

@@ -11,7 +11,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { loadProviderApiKeys } from "./llm/factory";
 import agentCatalogRouter from "./routes/agentCatalog";
 import agentRunsRouter from "./routes/agentRuns";
-import autoDirectorFollowUpsRouter from "./routes/autoDirectorFollowUps";
+import autoDirectorAttentionsRouter from "./routes/autoDirectorAttentions";
 import bookAnalysisRouter from "./routes/bookAnalysis";
 import characterRouter from "./routes/character";
 import characterConversationRouter from "./modules/characterConversation/http/characterConversationRoutes";
@@ -151,7 +151,7 @@ export function createApp() {
   app.use("/api/visual-assets", visualAssetRouter);
   app.use("/api/tasks", tasksRouter);
   app.use("/api/director-attentions", directorAttentionRouter);
-  app.use("/api/auto-director/follow-ups", autoDirectorFollowUpsRouter);
+  app.use("/api/auto-director/attentions", autoDirectorAttentionsRouter);
   app.use("/api/settings/auto-director", settingsAutoDirectorRouter);
   app.use("/api/settings", settingsRouter);
   app.use("/api", onboardingRoutes);

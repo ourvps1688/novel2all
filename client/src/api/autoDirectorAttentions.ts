@@ -1,25 +1,25 @@
 import type { ApiResponse } from "@ai-novel/shared/types/api";
 import type {
   AutoDirectorActionExecutionResult,
-  AutoDirectorFollowUpDetail,
-  AutoDirectorFollowUpListInput,
-  AutoDirectorFollowUpListResponse,
+  AutoDirectorAttentionDetail,
+  AutoDirectorAttentionListInput,
+  AutoDirectorAttentionListResponse,
   AutoDirectorMutationActionCode,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import type { ApiHttpError } from "./client";
 import { apiClient } from "./client";
 
-export async function listAutoDirectorFollowUps(params?: AutoDirectorFollowUpListInput) {
-  const { data } = await apiClient.get<ApiResponse<AutoDirectorFollowUpListResponse>>("/auto-director/follow-ups", {
+export async function listAutoDirectorAttentions(params?: AutoDirectorAttentionListInput) {
+  const { data } = await apiClient.get<ApiResponse<AutoDirectorAttentionListResponse>>("/auto-director/attentions", {
     params,
   });
   return data;
 }
 
-export async function getAutoDirectorFollowUpDetail(directorTaskId: string) {
+export async function getAutoDirectorAttentionDetail(directorTaskId: string) {
   try {
-    const { data } = await apiClient.get<ApiResponse<AutoDirectorFollowUpDetail | null>>(
-      `/auto-director/follow-ups/${directorTaskId}`,
+    const { data } = await apiClient.get<ApiResponse<AutoDirectorAttentionDetail | null>>(
+      `/auto-director/attentions/${directorTaskId}`,
       {
         silentErrorStatuses: [404],
       },
@@ -32,13 +32,13 @@ export async function getAutoDirectorFollowUpDetail(directorTaskId: string) {
         success: true,
         data: null,
         message: "Follow-up not found.",
-      } satisfies ApiResponse<AutoDirectorFollowUpDetail | null>;
+      } satisfies ApiResponse<AutoDirectorAttentionDetail | null>;
     }
     throw error;
   }
 }
 
-export async function executeAutoDirectorFollowUpAction(
+export async function executeAutoDirectorAttentionAction(
   directorTaskId: string,
   input: {
     actionCode: AutoDirectorMutationActionCode;
@@ -46,7 +46,7 @@ export async function executeAutoDirectorFollowUpAction(
   },
 ) {
   const { data } = await apiClient.post<ApiResponse<AutoDirectorActionExecutionResult>>(
-    `/auto-director/follow-ups/${directorTaskId}/actions`,
+    `/auto-director/attentions/${directorTaskId}/actions`,
     input,
   );
   return data;

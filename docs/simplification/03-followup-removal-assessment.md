@@ -1,4 +1,4 @@
-# T03 前置调研：导演跟进页 `/auto-director/follow-ups` 删除可行性评估
+# T03 前置调研：应用内注意力提醒页 `/auto-director/follow-ups` 删除可行性评估
 
 > 本文是**只读调研产物**。调研过程中未删除任何文件、未修改任何代码、未提交代码改动。
 > 调研对象：分支 `simplify/phase1-remove-dead-modules`（Phase 1 T01/T02/CSS 三个提交之后的代码状态）。
@@ -184,7 +184,7 @@ autoDirectorFollowUpValidationResult.ts
 - 回调入口 `POST /api/auto-director/channel-callbacks/{dingtalk,wecom}` 与 `GET /wecom/execute` 是 IM 卡片点按钮后的执行通道
 
 > **需用户确认**：用户是否实际在用钉钉 / 企微通知？本调研无法从代码判断运行时是否在用。
-> 但无论是否在用，**通知能力的删除不是 T03「删除导演跟进页」的必然结果**——架构上它属于通知渠道，只是物理上恰好同目录。建议按「保留」处理；如确要一并裁掉通知能力，应作为**独立议题**立项（涉及设置页、回调路由、3 个 notifier 文件、2 个测试共约 1,700 行）。
+> 但无论是否在用，**通知能力的删除不是 T03「删除应用内注意力提醒页」的必然结果**——架构上它属于通知渠道，只是物理上恰好同目录。建议按「保留」处理；如确要一并裁掉通知能力，应作为**独立议题**立项（涉及设置页、回调路由、3 个 notifier 文件、2 个测试共约 1,700 行）。
 
 ---
 
@@ -257,10 +257,10 @@ autoDirectorFollowUpValidationResult.ts
 | 位置 | 引用内容 | 处理方式 |
 | --- | --- | --- |
 | `client/src/api/autoDirectorFollowUps.ts` | `NovelEdit.tsx:29` 导入 `getAutoDirectorFollowUpDetail`、`executeAutoDirectorFollowUpAction` | **不能删整个文件**；最多删 `getAutoDirectorFollowUpOverview` / `listAutoDirectorFollowUps` / `revalidateAutoDirectorFollowUpDetail` / `executeAutoDirectorFollowUpBatchAction` 四个仅页面使用的函数 |
-| `client/src/components/layout/Sidebar.tsx:28,78,117,148` | 导航项「导演跟进」+ 未读计数 badge（`getAutoDirectorFollowUpOverview`） | 需改：摘除导航项 + badge 查询 |
+| `client/src/components/layout/Sidebar.tsx:28,78,117,148` | 导航项「应用内注意力提醒」+ 未读计数 badge（`getAutoDirectorFollowUpOverview`） | 需改：摘除导航项 + badge 查询 |
 | `client/src/pages/home/homeViewModel.ts:299-307` | 首页卡片「N 个创作流程等待处理」→ `/auto-director/follow-ups` | 需改：这是**缺口 A-1 的主要暴露点**，删前必须给它换落点 |
 | `client/src/components/autoDirector/AutoDirectorPauseNotificationWatcher.tsx:3,17` | 全局浏览器通知，轮询 `listAutoDirectorFollowUps`，`targetUrl` = `/auto-director/follow-ups?directorTaskId=…` | 需改：挂载在 `AppLayout.tsx:82,99,117,133`（4 处）。删页面会让它失去落点，且它依赖将被删的 `listAutoDirectorFollowUps` |
-| `client/src/components/layout/mobile/mobileSiteNavigation.ts:88` + 路由 pattern `:40` | 移动端「导演跟进」入口 | 需改（同 T01/T02 处理方式） |
+| `client/src/components/layout/mobile/mobileSiteNavigation.ts:88` + 路由 pattern `:40` | 移动端「应用内注意力提醒」入口 | 需改（同 T01/T02 处理方式） |
 | `client/src/mobile/autoDirector/mobileSupportContracts.ts:4` | `AUTO_DIRECTOR_MOBILE_ROUTE_PATTERNS` 含 `/auto-director/follow-ups` | 需改 |
 | `client/src/router/index.tsx:23,64,65,66` | 懒加载 + 3 条路由（含 2 条兼容重定向） | 需改 |
 | `client/src/api/queryKeys.ts:116-120` | `autoDirectorFollowUps` 命名空间 | 需改（保留 `detail`，`NovelEdit.tsx:822` 在用） |

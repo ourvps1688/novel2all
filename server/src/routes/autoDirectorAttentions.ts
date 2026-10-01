@@ -2,18 +2,18 @@ import { Router } from "express";
 import type { ApiResponse } from "@ai-novel/shared/types/api";
 import { z } from "zod";
 import {
-  AUTO_DIRECTOR_FOLLOW_UP_REASONS,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+  AUTO_DIRECTOR_ATTENTION_REASONS,
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import { authMiddleware } from "../middleware/auth";
 import { validate } from "../middleware/validate";
-import { AutoDirectorFollowUpActionExecutor } from "../services/task/autoDirectorFollowUps/AutoDirectorFollowUpActionExecutor";
-import { AutoDirectorFollowUpService } from "../services/task/autoDirectorFollowUps/AutoDirectorFollowUpService";
+import { AutoDirectorAttentionActionExecutor } from "../services/task/autoDirectorAttentions/AutoDirectorAttentionActionExecutor";
+import { AutoDirectorAttentionService } from "../services/task/autoDirectorAttentions/AutoDirectorAttentionService";
 
 const router = Router();
-const followUpService = new AutoDirectorFollowUpService();
-const actionExecutor = new AutoDirectorFollowUpActionExecutor();
+const attentionService = new AutoDirectorAttentionService();
+const actionExecutor = new AutoDirectorAttentionActionExecutor();
 
-const reasonSchema = z.enum(AUTO_DIRECTOR_FOLLOW_UP_REASONS);
+const reasonSchema = z.enum(AUTO_DIRECTOR_ATTENTION_REASONS);
 
 const statusSchema = z.enum(["queued", "running", "waiting_approval", "succeeded", "failed", "cancelled"]);
 
@@ -53,7 +53,7 @@ router.use(authMiddleware);
 router.get("/", validate({ query: listQuerySchema }), async (req, res, next) => {
   try {
     const query = listQuerySchema.parse(req.query);
-    const data = await followUpService.list(query);
+    const data = await attentionService.list(query);
     res.status(200).json({
       success: true,
       data,
@@ -67,7 +67,7 @@ router.get("/", validate({ query: listQuerySchema }), async (req, res, next) => 
 router.get("/:taskId", validate({ params: taskParamsSchema }), async (req, res, next) => {
   try {
     const { taskId } = req.params as z.infer<typeof taskParamsSchema>;
-    const data = await followUpService.getDetail(taskId);
+    const data = await attentionService.getDetail(taskId);
     if (!data) {
       res.status(404).json({
         success: false,

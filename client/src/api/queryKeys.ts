@@ -108,13 +108,13 @@ export const queryKeys = {
     list: (params: string) => ["tasks", "list", params] as const,
     detail: (kind: string, id: string) => ["tasks", "detail", kind, id] as const,
     recoveryCandidates: ["tasks", "recovery-candidates"] as const,
-    autoDirectorFollowUpDetail: (directorTaskId: string) => ["tasks", "auto-director-follow-up", directorTaskId] as const,
+    autoDirectorAttentionDetail: (directorTaskId: string) => ["tasks", "auto-director-attention", directorTaskId] as const,
     directorTaskSnapshot: (directorTaskId: string) => ["tasks", "director-task-snapshot", directorTaskId] as const,
     directorRuntime: (directorTaskId: string) => ["tasks", "director-runtime", directorTaskId] as const,
     directorIssuePolicy: (novelId: string) => ["novels", "director-issue-policy", novelId] as const,
   },
-  autoDirectorFollowUps: {
-    detail: (directorTaskId: string) => ["auto-director-follow-ups", "detail", directorTaskId] as const,
+  autoDirectorAttentions: {
+    detail: (directorTaskId: string) => ["auto-director-attentions", "detail", directorTaskId] as const,
   },
   agentRuns: {
     list: (params: string) => ["agent-runs", "list", params] as const,

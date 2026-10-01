@@ -1,6 +1,6 @@
 import type {
   AutoDirectorMutationActionCode,
-} from "./autoDirectorFollowUp.js";
+} from "./autoDirectorAttention.js";
 import type {
   DirectorTakeoverEntryStep,
   DirectorTakeoverRequest,
@@ -108,7 +108,7 @@ export interface AutoDirectorActionValidationInput {
   task: AutoDirectorActionValidationTaskSnapshot;
 }
 
-export const AUTO_DIRECTOR_FOLLOW_UP_SECTIONS = [
+export const AUTO_DIRECTOR_ATTENTION_SECTIONS = [
   "needs_validation",
   "exception",
   "pending",
@@ -116,9 +116,9 @@ export const AUTO_DIRECTOR_FOLLOW_UP_SECTIONS = [
   "replaced",
 ] as const;
 
-export type AutoDirectorFollowUpSection = (typeof AUTO_DIRECTOR_FOLLOW_UP_SECTIONS)[number];
+export type AutoDirectorAttentionSection = (typeof AUTO_DIRECTOR_ATTENTION_SECTIONS)[number];
 
-export interface AutoDirectorFollowUpSectionInput {
+export interface AutoDirectorAttentionSectionInput {
   status: TaskStatus | string;
   checkpointType?: NovelWorkflowCheckpoint | string | null;
   pendingManualRecovery?: boolean | null;
