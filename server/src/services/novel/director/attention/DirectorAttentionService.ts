@@ -1,7 +1,7 @@
-import { prisma } from "../../../db/prisma";
+import { prisma } from "../../../../db/prisma";
 import type { DirectorAttentionState, DirectorAttentionLevel } from "@ai-novel/shared/types/directorAttention";
 import type { DirectorBookAutomationProjection } from "@ai-novel/shared/types/directorRuntime";
-import { DirectorBookAutomationProjectionService } from "./projections/DirectorBookAutomationProjectionService";
+import { DirectorBookAutomationProjectionService } from "../projections/DirectorBookAutomationProjectionService";
 
 // Normalize the projection into a single client-facing attention state.
 // Level is derived ONLY from task-derived fields (status / requiresUserAction /

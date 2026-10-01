@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { ApiResponse } from "@ai-novel/shared/types/api";
 import { authMiddleware } from "../middleware/auth";
-import { directorAttentionService } from "../services/novel/director/DirectorAttentionService";
+import { directorAttentionService } from "../services/novel/director/attention/DirectorAttentionService";
 
 const router = Router();
 router.use(authMiddleware);
