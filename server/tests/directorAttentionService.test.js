@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { mapProjectionToAttention } = require("../dist/services/novel/director/DirectorAttentionService.js");
+const { mapProjectionToAttention } = require("../dist/services/novel/director/attention/DirectorAttentionService.js");
 
 function baseProjection(overrides = {}) {
   return {
