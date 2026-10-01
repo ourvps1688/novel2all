@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 require("../dist/app.js");
-const { AutoDirectorFollowUpService } = require("../dist/services/task/autoDirectorFollowUps/AutoDirectorFollowUpService.js");
+const { AutoDirectorAttentionService } = require("../dist/services/task/autoDirectorAttentions/AutoDirectorAttentionService.js");
 const { NovelWorkflowTaskAdapter } = require("../dist/services/task/adapters/NovelWorkflowTaskAdapter.js");
 const taskArchive = require("../dist/services/task/taskArchive.js");
 const { prisma } = require("../dist/db/prisma.js");
@@ -68,7 +68,7 @@ function buildWorkflowRow(overrides = {}) {
   };
 }
 
-test("auto director follow-up service overview counts actionable rows by reason", async () => {
+test("auto director attention service overview counts actionable rows by reason", async () => {
   const originals = {
     getArchivedTaskIds: taskArchive.getArchivedTaskIds,
     findMany: prisma.novelWorkflowTask.findMany,
@@ -84,7 +84,7 @@ test("auto director follow-up service overview counts actionable rows by reason"
   ]);
   prisma.autoDirectorAutoApprovalRecord.findMany = async () => [];
 
-  const service = new AutoDirectorFollowUpService();
+  const service = new AutoDirectorAttentionService();
   const originalHeal = service.workflowService.healAutoDirectorTaskState;
   service.workflowService.healAutoDirectorTaskState = async () => false;
 
@@ -112,7 +112,7 @@ test("auto director follow-up service overview counts actionable rows by reason"
   }
 });
 
-test("auto director follow-up service lists recent auto-approved records in auto-progress without mutation actions", async () => {
+test("auto director attention service lists recent auto-approved records in auto-progress without mutation actions", async () => {
   const originals = {
     getArchivedTaskIds: taskArchive.getArchivedTaskIds,
     findMany: prisma.novelWorkflowTask.findMany,
@@ -153,7 +153,7 @@ test("auto director follow-up service lists recent auto-approved records in auto
     ];
   };
 
-  const service = new AutoDirectorFollowUpService();
+  const service = new AutoDirectorAttentionService();
   const originalHeal = service.workflowService.healAutoDirectorTaskState;
   service.workflowService.healAutoDirectorTaskState = async () => false;
 
@@ -172,7 +172,7 @@ test("auto director follow-up service lists recent auto-approved records in auto
     assert.equal(record.reason, "auto_approval_completed");
     assert.equal(record.section, "auto_progress");
     assert.equal(record.reasonLabel, "最近自动通过");
-    assert.equal(record.followUpSummary, "AI 已自动通过角色准备，并继续推进。");
+    assert.equal(record.attentionSummary, "AI 已自动通过角色准备，并继续推进。");
     assert.deepEqual(record.availableActions.map((action) => action.code), ["open_detail"]);
     assert.deepEqual(record.batchActionCodes, []);
     assert.equal(record.supportsBatch, false);
@@ -186,7 +186,7 @@ test("auto director follow-up service lists recent auto-approved records in auto
   }
 });
 
-test("auto director follow-up service lists actionable items with filters, counters, and pagination", async () => {
+test("auto director attention service lists actionable items with filters, counters, and pagination", async () => {
   const originals = {
     getArchivedTaskIds: taskArchive.getArchivedTaskIds,
     findMany: prisma.novelWorkflowTask.findMany,
@@ -227,7 +227,7 @@ test("auto director follow-up service lists actionable items with filters, count
   };
   prisma.autoDirectorAutoApprovalRecord.findMany = async () => [];
 
-  const service = new AutoDirectorFollowUpService();
+  const service = new AutoDirectorAttentionService();
   const originalHeal = service.workflowService.healAutoDirectorTaskState;
   service.workflowService.healAutoDirectorTaskState = async () => false;
 
@@ -243,7 +243,7 @@ test("auto director follow-up service lists actionable items with filters, count
     assert.equal(response.items[0].novelTitle, "《雾港巡夜人》");
     assert.equal(response.items[0].currentModel, "anthropic/claude-sonnet-4-6");
     assert.equal(response.items[0].reason, "replan_required");
-    assert.equal(response.items[0].followUpSummary, "第 12 章审计要求调整后续节奏。");
+    assert.equal(response.items[0].attentionSummary, "第 12 章审计要求调整后续节奏。");
     assert.deepEqual(response.items[0].availableActions.map((item) => item.code), ["go_replan", "open_detail"]);
     assert.equal(response.countersByReason.replan_required, 1);
     assert.deepEqual(response.summaryCounters, {
@@ -261,7 +261,7 @@ test("auto director follow-up service lists actionable items with filters, count
   }
 });
 
-test("auto director follow-up service returns section-first counts and filters section results", async () => {
+test("auto director attention service returns section-first counts and filters section results", async () => {
   const originals = {
     getArchivedTaskIds: taskArchive.getArchivedTaskIds,
     findMany: prisma.novelWorkflowTask.findMany,
@@ -354,7 +354,7 @@ test("auto director follow-up service returns section-first counts and filters s
   ]);
   prisma.autoDirectorAutoApprovalRecord.findMany = async () => [];
 
-  const service = new AutoDirectorFollowUpService();
+  const service = new AutoDirectorAttentionService();
   const originalHeal = service.workflowService.healAutoDirectorTaskState;
   service.workflowService.healAutoDirectorTaskState = async () => false;
 
@@ -403,7 +403,7 @@ test("auto director follow-up service returns section-first counts and filters s
   }
 });
 
-test("auto director follow-up service detail reuses workflow detail and adds follow-up links", async () => {
+test("auto director attention service detail reuses workflow detail and adds attention links", async () => {
   const originals = {
     isTaskArchived: taskArchive.isTaskArchived,
     findUnique: prisma.novelWorkflowTask.findUnique,
@@ -487,7 +487,7 @@ test("auto director follow-up service detail reuses workflow detail and adds fol
     };
   };
 
-  const service = new AutoDirectorFollowUpService();
+  const service = new AutoDirectorAttentionService();
   const originalHeal = service.workflowService.healAutoDirectorTaskState;
   service.workflowService.healAutoDirectorTaskState = async () => false;
 
@@ -497,7 +497,7 @@ test("auto director follow-up service detail reuses workflow detail and adds fol
     assert.equal(detail.taskId, "task_detail");
     assert.equal(detail.reasonLabel, "待确认书级方向");
     assert.equal(detail.priority, "P1");
-    assert.equal(detail.followUpSummary, "请先确认书级方向。");
+    assert.equal(detail.attentionSummary, "请先确认书级方向。");
     assert.equal(detail.currentModel, "anthropic/claude-sonnet-4-6");
     assert.equal(detail.originDetailUrl, "/tasks?kind=novel_workflow&id=task_detail");
     assert.equal(detail.candidateSelectionUrl, "/novels/auto-director?taskId=task_detail");
@@ -520,7 +520,7 @@ test("auto director follow-up service detail reuses workflow detail and adds fol
   }
 });
 
-test("auto director follow-up service detail only marks replaced when replacement task exists", async () => {
+test("auto director attention service detail only marks replaced when replacement task exists", async () => {
   const originals = {
     isTaskArchived: taskArchive.isTaskArchived,
     findUnique: prisma.novelWorkflowTask.findUnique,
@@ -597,7 +597,7 @@ test("auto director follow-up service detail only marks replaced when replacemen
     };
   };
 
-  const service = new AutoDirectorFollowUpService();
+  const service = new AutoDirectorAttentionService();
   const originalHeal = service.workflowService.healAutoDirectorTaskState;
   const healCalls = [];
   service.workflowService.healAutoDirectorTaskState = async (taskId) => {

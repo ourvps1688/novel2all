@@ -3,8 +3,8 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 
 const { createApp } = require("../dist/app.js");
-const { AutoDirectorFollowUpService } = require("../dist/services/task/autoDirectorFollowUps/AutoDirectorFollowUpService.js");
-const { AutoDirectorFollowUpActionExecutor } = require("../dist/services/task/autoDirectorFollowUps/AutoDirectorFollowUpActionExecutor.js");
+const { AutoDirectorAttentionService } = require("../dist/services/task/autoDirectorAttentions/AutoDirectorAttentionService.js");
+const { AutoDirectorAttentionActionExecutor } = require("../dist/services/task/autoDirectorAttentions/AutoDirectorAttentionActionExecutor.js");
 
 function listen(server) {
   return new Promise((resolve) => {
@@ -15,17 +15,17 @@ function listen(server) {
   });
 }
 
-test("auto director follow-up routes expose overview, list, detail, and action endpoints", async () => {
+test("auto director attention routes expose overview, list, detail, and action endpoints", async () => {
   const originals = {
-    getOverview: AutoDirectorFollowUpService.prototype.getOverview,
-    list: AutoDirectorFollowUpService.prototype.list,
-    getDetail: AutoDirectorFollowUpService.prototype.getDetail,
-    execute: AutoDirectorFollowUpActionExecutor.prototype.execute,
-    executeBatch: AutoDirectorFollowUpActionExecutor.prototype.executeBatch,
+    getOverview: AutoDirectorAttentionService.prototype.getOverview,
+    list: AutoDirectorAttentionService.prototype.list,
+    getDetail: AutoDirectorAttentionService.prototype.getDetail,
+    execute: AutoDirectorAttentionActionExecutor.prototype.execute,
+    executeBatch: AutoDirectorAttentionActionExecutor.prototype.executeBatch,
   };
   const calls = [];
 
-  AutoDirectorFollowUpService.prototype.getOverview = async function getOverviewMock() {
+  AutoDirectorAttentionService.prototype.getOverview = async function getOverviewMock() {
     return {
       totalCount: 3,
       countersByReason: {
@@ -50,7 +50,7 @@ test("auto director follow-up routes expose overview, list, detail, and action e
       },
     };
   };
-  AutoDirectorFollowUpService.prototype.list = async function listMock(input) {
+  AutoDirectorAttentionService.prototype.list = async function listMock(input) {
     calls.push(["list", input]);
     return {
       items: [{
@@ -68,7 +68,7 @@ test("auto director follow-up routes expose overview, list, detail, and action e
         section: "pending",
         reasonLabel: "自动执行待继续",
         priority: "P2",
-        followUpSummary: "前 10 章已准备完成。",
+        attentionSummary: "前 10 章已准备完成。",
         blockingReason: null,
         validationSummary: null,
         executionScope: "前 10 章",
@@ -116,7 +116,7 @@ test("auto director follow-up routes expose overview, list, detail, and action e
       },
     };
   };
-  AutoDirectorFollowUpService.prototype.getDetail = async function getDetailMock(taskId, options) {
+  AutoDirectorAttentionService.prototype.getDetail = async function getDetailMock(taskId, options) {
     calls.push(["detail", taskId, options]);
     return {
       directorTaskId: taskId,
@@ -140,7 +140,7 @@ test("auto director follow-up routes expose overview, list, detail, and action e
       },
     };
   };
-  AutoDirectorFollowUpActionExecutor.prototype.execute = async function executeMock(input) {
+  AutoDirectorAttentionActionExecutor.prototype.execute = async function executeMock(input) {
     calls.push(["execute", input]);
     return {
       directorTaskId: input.taskId,
@@ -155,7 +155,7 @@ test("auto director follow-up routes expose overview, list, detail, and action e
       },
     };
   };
-  AutoDirectorFollowUpActionExecutor.prototype.executeBatch = async function executeBatchMock(input) {
+  AutoDirectorAttentionActionExecutor.prototype.executeBatch = async function executeBatchMock(input) {
     calls.push(["batch", input]);
     return {
       code: "partial_success",
@@ -184,7 +184,7 @@ test("auto director follow-up routes expose overview, list, detail, and action e
 
   try {
     const listResponse = await fetch(
-      `http://127.0.0.1:${port}/api/auto-director/follow-ups?section=pending&reason=chapter_batch_execution_pending&supportsBatch=true&page=1&pageSize=20`,
+      `http://127.0.0.1:${port}/api/auto-director/attentions?section=pending&reason=chapter_batch_execution_pending&supportsBatch=true&page=1&pageSize=20`,
     );
     assert.equal(listResponse.status, 200);
     const listPayload = await listResponse.json();
@@ -192,19 +192,19 @@ test("auto director follow-up routes expose overview, list, detail, and action e
     assert.equal(listPayload.data.items[0].taskId, "task_1");
 
     const validationListResponse = await fetch(
-      `http://127.0.0.1:${port}/api/auto-director/follow-ups?section=needs_validation&reason=validation_required&page=1&pageSize=20`,
+      `http://127.0.0.1:${port}/api/auto-director/attentions?section=needs_validation&reason=validation_required&page=1&pageSize=20`,
     );
     assert.equal(validationListResponse.status, 200);
     const validationListPayload = await validationListResponse.json();
     assert.equal(validationListPayload.success, true);
 
-    const detailResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/follow-ups/task_1`);
+    const detailResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/attentions/task_1`);
     assert.equal(detailResponse.status, 200);
     const detailPayload = await detailResponse.json();
     assert.equal(detailPayload.success, true);
     assert.equal(detailPayload.data.taskId, "task_1");
 
-    const actionResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/follow-ups/task_1/actions`, {
+    const actionResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/attentions/task_1/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -217,7 +217,7 @@ test("auto director follow-up routes expose overview, list, detail, and action e
     assert.equal(actionPayload.success, true);
     assert.equal(actionPayload.data.code, "executed");
 
-    const safeFixResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/follow-ups/task_1/actions`, {
+    const safeFixResponse = await fetch(`http://127.0.0.1:${port}/api/auto-director/attentions/task_1/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -263,11 +263,11 @@ test("auto director follow-up routes expose overview, list, detail, and action e
       }],
     ]);
   } finally {
-    AutoDirectorFollowUpService.prototype.getOverview = originals.getOverview;
-    AutoDirectorFollowUpService.prototype.list = originals.list;
-    AutoDirectorFollowUpService.prototype.getDetail = originals.getDetail;
-    AutoDirectorFollowUpActionExecutor.prototype.execute = originals.execute;
-    AutoDirectorFollowUpActionExecutor.prototype.executeBatch = originals.executeBatch;
+    AutoDirectorAttentionService.prototype.getOverview = originals.getOverview;
+    AutoDirectorAttentionService.prototype.list = originals.list;
+    AutoDirectorAttentionService.prototype.getDetail = originals.getDetail;
+    AutoDirectorAttentionActionExecutor.prototype.execute = originals.execute;
+    AutoDirectorAttentionActionExecutor.prototype.executeBatch = originals.executeBatch;
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });

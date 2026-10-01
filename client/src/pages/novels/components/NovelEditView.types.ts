@@ -53,7 +53,7 @@ import type {
 import type { TimelineCheckReport, TimelineContextForChapter } from "@ai-novel/shared/types/timeline";
 import type { StoryWorldSliceOverrides, StoryWorldSliceView } from "@ai-novel/shared/types/storyWorldSlice";
 import type { UnifiedTaskDetail } from "@ai-novel/shared/types/task";
-import type { AutoDirectorAction, AutoDirectorFollowUpDetail } from "@ai-novel/shared/types/autoDirectorFollowUp";
+import type { AutoDirectorAction, AutoDirectorAttentionDetail } from "@ai-novel/shared/types/autoDirectorAttention";
 import type {
   DirectorManualEditImpact,
   DirectorBookAutomationAction,
@@ -612,9 +612,9 @@ export interface NovelTaskDrawerState {
   onRejectResourceProposal?: (proposalId: string) => void;
   confirmingResourceProposalId?: string;
   rejectingResourceProposalId?: string;
-  followUp?: AutoDirectorFollowUpDetail | null;
-  onFollowUpAction?: (action: AutoDirectorAction) => void;
-  executingFollowUpAction?: boolean;
+  attention?: AutoDirectorAttentionDetail | null;
+  onAttentionAction?: (action: AutoDirectorAction) => void;
+  executingAttentionAction?: boolean;
   runtimeHardBlocked?: boolean;
   runtimeBlockedReason?: string | null;
   manualEditImpact?: DirectorManualEditImpact | null;
@@ -629,7 +629,7 @@ export interface NovelTaskDrawerState {
   retryWithTaskModelPending?: boolean;
   capabilities?: {
     availableActions: boolean;
-    availableFollowUps: boolean;
+    availableAttentions: boolean;
     canAdjustRuntimePolicy: boolean;
     canInspectManualEditImpact: boolean;
     canRetryWithOverrideModel: boolean;

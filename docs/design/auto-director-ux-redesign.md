@@ -131,10 +131,10 @@ type DirectorAttentionState = {
 ### Phase 5-D：收尾 ✅ 已完成（PR #27）
 - **T11**：回归测试 + 小白可用性走查（覆盖 `needs_recovery` / `waiting_approval` / `running` / `auto_recovering` / `idle` / 会话收起场景）。
   - 抽取纯函数选择器 `selectVisibleDirectorAttentions` / `selectAttentionByNovelId` / `selectContinueNovels`（`client/src/lib/directorAttentionSelectors.ts`），把横幅可见性与「继续创作」筛选从组件内联逻辑可单测化；回归测试 `client/src/lib/directorAttentionSelectors.test.mjs`（12 个用例，全绿）。
-  - 小白走查：需要恢复 / 等待审批的书会从导航栏铃铛角标 + 顶部常驻横幅主动提示；点「收起」仅隐藏当前会话（刷新重现），创作中枢「下一步」给出 `open_recovery` 直达恢复；无 OS 通知、无独立「导演跟进」页。
+  - 小白走查：需要恢复 / 等待审批的书会从导航栏铃铛角标 + 顶部常驻横幅主动提示；点「收起」仅隐藏当前会话（刷新重现），创作中枢「下一步」给出 `open_recovery` 直达恢复；无 OS 通知、无独立「应用内注意力提醒」页。
 - **T12**：更新 README 与恢复手册对齐新交互。
-  - README 第 2 节删除「浏览器暂停通知」陈旧条目，改为应用内注意力提醒描述；第 1 节「保存到导演跟进」改为「进入应用内注意力提醒」。
-  - 恢复手册新增「恢复入口在哪里」小节，并将矩阵与正文中的「导演跟进」统一替换为应用内入口（导航栏角标 / 全局横幅 / 创作中枢 `open_recovery` / 任务中心）。
+  - README 第 2 节删除「浏览器暂停通知」陈旧条目，改为应用内注意力提醒描述；第 1 节「保存到应用内注意力提醒」改为「进入应用内注意力提醒」。
+  - 恢复手册新增「恢复入口在哪里」小节，并将矩阵与正文中的「应用内注意力提醒」统一替换为应用内入口（导航栏角标 / 全局横幅 / 创作中枢 `open_recovery` / 任务中心）。
 - **验证**：`client typecheck` EXIT 0 ✅、`client test` 198/198 ✅。
 
 ---

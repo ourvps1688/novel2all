@@ -18,7 +18,7 @@ import type { NovelContextService } from "../NovelContextService";
 import type { StoryMacroPlanService } from "../storyMacro/StoryMacroPlanService";
 import type { NovelVolumeService } from "../volume/NovelVolumeService";
 import type { NovelWorkflowService } from "../workflow/NovelWorkflowService";
-import { recordAutoDirectorAutoApprovalFromTask } from "../../task/autoDirectorFollowUps/autoDirectorAutoApprovalAudit";
+import { recordAutoDirectorAutoApprovalFromTask } from "../../task/autoDirectorAttentions/autoDirectorAutoApprovalAudit";
 import { normalizeDirectorMemoryScope } from "./runtime/autoDirectorMemorySafety";
 import { buildWorkflowSeedPayload, normalizeDirectorRunMode } from "./runtime/novelDirectorHelpers";
 import {

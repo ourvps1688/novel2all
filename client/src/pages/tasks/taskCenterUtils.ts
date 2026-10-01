@@ -1,6 +1,6 @@
 ﻿import type {
   AutoDirectorAction,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import type { TaskKind, TaskStatus, UnifiedTaskSummary } from "@ai-novel/shared/types/task";
 import type {
   NovelWorkflowMilestoneType,
@@ -272,7 +272,7 @@ export function createIdempotencyKey(taskId: string, actionCode: string): string
   return `${taskId}:${actionCode}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
 
-export function formatFollowUpPriority(priority: "P0" | "P1" | "P2"): string {
+export function formatAttentionPriority(priority: "P0" | "P1" | "P2"): string {
   if (priority === "P0") {
     return "P0 立即处理";
   }
@@ -282,6 +282,6 @@ export function formatFollowUpPriority(priority: "P0" | "P1" | "P2"): string {
   return "P2 可稍后处理";
 }
 
-export function followUpActionVariant(action: AutoDirectorAction): "default" | "outline" {
+export function attentionActionVariant(action: AutoDirectorAction): "default" | "outline" {
   return action.kind === "navigation" || action.riskLevel !== "low" ? "outline" : "default";
 }

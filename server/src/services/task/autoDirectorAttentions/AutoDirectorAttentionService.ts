@@ -1,10 +1,10 @@
 import type {
-  AutoDirectorFollowUpDetail,
-  AutoDirectorFollowUpItem,
-  AutoDirectorFollowUpListInput,
-  AutoDirectorFollowUpListResponse,
-  AutoDirectorFollowUpOverview,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+  AutoDirectorAttentionDetail,
+  AutoDirectorAttentionItem,
+  AutoDirectorAttentionListInput,
+  AutoDirectorAttentionListResponse,
+  AutoDirectorAttentionOverview,
+} from "@ai-novel/shared/types/autoDirectorAttention";
 import { prisma } from "../../../db/prisma";
 import { NovelWorkflowService } from "../../novel/workflow/NovelWorkflowService";
 import { NovelWorkflowTaskAdapter } from "../adapters/NovelWorkflowTaskAdapter";
@@ -20,31 +20,31 @@ import {
   buildMilestones,
   buildSectionCounters,
   buildSummaryCounters,
-  compareFollowUpItems,
+  compareAttentionItems,
   decorateDetailActions,
   getReplacementTaskId,
   matchesItemFilters,
   matchesRowScopeFilters,
   normalizeWorkflowRow,
   projectAutoApprovalRecordItem,
-  projectFollowUpItem,
-  type FollowUpWorkflowRow,
-  type RawFollowUpWorkflowRow,
-} from "./autoDirectorFollowUpProjection";
+  projectAttentionItem,
+  type AttentionWorkflowRow,
+  type RawAttentionWorkflowRow,
+} from "./autoDirectorAttentionProjection";
 import { loadRecentAutoDirectorAutoApprovalRecords } from "./autoDirectorAutoApprovalAudit";
 
-export class AutoDirectorFollowUpService {
+export class AutoDirectorAttentionService {
   readonly workflowService = new NovelWorkflowService();
 
   private readonly workflowTaskAdapter = new NovelWorkflowTaskAdapter();
 
-  async getOverview(): Promise<AutoDirectorFollowUpOverview> {
+  async getOverview(): Promise<AutoDirectorAttentionOverview> {
     const rows = await this.loadRows({ heal: false });
     const knownTaskIds = new Set(rows.map((row) => row.id));
     const taskById = new Map(rows.map((row) => [row.id, row]));
     const taskItems = rows
-      .map((row) => projectFollowUpItem(row, knownTaskIds))
-      .filter((item): item is AutoDirectorFollowUpItem => Boolean(item));
+      .map((row) => projectAttentionItem(row, knownTaskIds))
+      .filter((item): item is AutoDirectorAttentionItem => Boolean(item));
     const autoApprovalItems = await this.loadAutoApprovalItems(rows, taskById);
     const items = taskItems.concat(autoApprovalItems);
 
@@ -55,18 +55,18 @@ export class AutoDirectorFollowUpService {
     };
   }
 
-  async list(input: AutoDirectorFollowUpListInput = {}): Promise<AutoDirectorFollowUpListResponse> {
+  async list(input: AutoDirectorAttentionListInput = {}): Promise<AutoDirectorAttentionListResponse> {
     const rows = await this.loadRows();
     const knownTaskIds = new Set(rows.map((row) => row.id));
     const taskById = new Map(rows.map((row) => [row.id, row]));
     const scopedRows = rows.filter((row) => matchesRowScopeFilters(row, input));
     const scopedTaskItems = scopedRows
-      .map((row) => projectFollowUpItem(row, knownTaskIds))
-      .filter((item): item is AutoDirectorFollowUpItem => Boolean(item));
+      .map((row) => projectAttentionItem(row, knownTaskIds))
+      .filter((item): item is AutoDirectorAttentionItem => Boolean(item));
     const scopedItems = scopedTaskItems.concat(await this.loadAutoApprovalItems(scopedRows, taskById));
     const filteredItems = scopedItems
       .filter((item) => matchesItemFilters(item, input))
-      .sort(compareFollowUpItems);
+      .sort(compareAttentionItems);
 
     const page = Math.max(1, input.page ?? 1);
     const pageSize = Math.max(1, input.pageSize ?? 20);
@@ -90,7 +90,7 @@ export class AutoDirectorFollowUpService {
     };
   }
 
-  async getDetail(taskId: string, options: { heal?: boolean } = {}): Promise<AutoDirectorFollowUpDetail | null> {
+  async getDetail(taskId: string, options: { heal?: boolean } = {}): Promise<AutoDirectorAttentionDetail | null> {
     if (await isTaskArchived("novel_workflow", taskId)) {
       return null;
     }
@@ -108,7 +108,7 @@ export class AutoDirectorFollowUpService {
           },
         },
       },
-    }) as RawFollowUpWorkflowRow | null;
+    }) as RawAttentionWorkflowRow | null;
     const row = rawRow ? normalizeWorkflowRow(rawRow) : null;
     if (!row) {
       return null;
@@ -125,7 +125,7 @@ export class AutoDirectorFollowUpService {
         knownTaskIds.add(replacement.id);
       }
     }
-    const item = projectFollowUpItem(row, knownTaskIds);
+    const item = projectAttentionItem(row, knownTaskIds);
     if (!item) {
       return null;
     }
@@ -150,7 +150,7 @@ export class AutoDirectorFollowUpService {
       taskId,
       reasonLabel: item.reasonLabel,
       priority: item.priority,
-      followUpSummary: item.followUpSummary,
+      attentionSummary: item.attentionSummary,
       checkpointSummary: row.checkpointSummary,
       blockingReason: item.blockingReason,
       nextStepSuggestion: task.nextActionLabel ?? task.resumeAction ?? item.availableActions[0]?.label ?? null,
@@ -172,9 +172,9 @@ export class AutoDirectorFollowUpService {
   }
 
   private async loadAutoApprovalItems(
-    rows: FollowUpWorkflowRow[],
-    taskById: ReadonlyMap<string, FollowUpWorkflowRow>,
-  ): Promise<AutoDirectorFollowUpItem[]> {
+    rows: AttentionWorkflowRow[],
+    taskById: ReadonlyMap<string, AttentionWorkflowRow>,
+  ): Promise<AutoDirectorAttentionItem[]> {
     const novelIds = rows
       .map((row) => row.novelId)
       .filter((novelId): novelId is string => Boolean(novelId?.trim()));
@@ -185,7 +185,7 @@ export class AutoDirectorFollowUpService {
     }, taskById));
   }
 
-  private async loadRows(options: { heal?: boolean } = {}): Promise<FollowUpWorkflowRow[]> {
+  private async loadRows(options: { heal?: boolean } = {}): Promise<AttentionWorkflowRow[]> {
     const archivedIds = await getArchivedTaskIds("novel_workflow");
     const rows = await this.fetchRows(archivedIds);
     if (options.heal === false) {
@@ -200,7 +200,7 @@ export class AutoDirectorFollowUpService {
     return this.fetchRows(archivedIds);
   }
 
-  private async fetchRows(archivedIds: string[]): Promise<FollowUpWorkflowRow[]> {
+  private async fetchRows(archivedIds: string[]): Promise<AttentionWorkflowRow[]> {
     const rawRows = await prisma.novelWorkflowTask.findMany({
       where: {
         lane: "auto_director",
@@ -238,10 +238,10 @@ export class AutoDirectorFollowUpService {
         },
       },
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-    }) as RawFollowUpWorkflowRow[];
+    }) as RawAttentionWorkflowRow[];
 
     return rawRows
       .map((row) => normalizeWorkflowRow(row))
-      .filter((row): row is FollowUpWorkflowRow => Boolean(row));
+      .filter((row): row is AttentionWorkflowRow => Boolean(row));
   }
 }

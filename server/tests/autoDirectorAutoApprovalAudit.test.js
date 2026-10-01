@@ -5,7 +5,7 @@ require("../dist/app.js");
 const {
   loadRecentAutoDirectorAutoApprovalRecords,
   recordAutoDirectorAutoApproval,
-} = require("../dist/services/task/autoDirectorFollowUps/autoDirectorAutoApprovalAudit.js");
+} = require("../dist/services/task/autoDirectorAttentions/autoDirectorAutoApprovalAudit.js");
 const { prisma } = require("../dist/db/prisma.js");
 
 test("auto director auto-approval audit records the event, appends a milestone, and prunes older rows", async () => {

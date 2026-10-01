@@ -1,8 +1,8 @@
 ﻿import type {
   AutoDirectorActionValidationInput,
   AutoDirectorAffectedScope,
-  AutoDirectorFollowUpSection,
-  AutoDirectorFollowUpSectionInput,
+  AutoDirectorAttentionSection,
+  AutoDirectorAttentionSectionInput,
   AutoDirectorTakeoverValidationInput,
   AutoDirectorValidationResult,
   AutoDirectorValidationRequiredAction,
@@ -16,7 +16,7 @@ import type {
 } from "@ai-novel/shared/types/novelDirector";
 import type { NovelWorkflowCheckpoint } from "@ai-novel/shared/types/novelWorkflow";
 
-const AUTO_DIRECTOR_FOLLOW_UP_SECTION_RANK: Record<AutoDirectorFollowUpSection, number> = {
+const AUTO_DIRECTOR_ATTENTION_SECTION_RANK: Record<AutoDirectorAttentionSection, number> = {
   needs_validation: 0,
   exception: 1,
   pending: 2,
@@ -439,7 +439,7 @@ export function validateAutoDirectorAction(input: AutoDirectorActionValidationIn
   });
 }
 
-export function resolveAutoDirectorFollowUpSection(input: AutoDirectorFollowUpSectionInput): AutoDirectorFollowUpSection {
+export function resolveAutoDirectorAttentionSection(input: AutoDirectorAttentionSectionInput): AutoDirectorAttentionSection {
   if (input.validationResult && !input.validationResult.allowed) {
     return "needs_validation";
   }
@@ -461,11 +461,11 @@ export function resolveAutoDirectorFollowUpSection(input: AutoDirectorFollowUpSe
   return "pending";
 }
 
-export function compareAutoDirectorFollowUpSections(
-  left: AutoDirectorFollowUpSection,
-  right: AutoDirectorFollowUpSection,
+export function compareAutoDirectorAttentionSections(
+  left: AutoDirectorAttentionSection,
+  right: AutoDirectorAttentionSection,
 ): number {
-  return AUTO_DIRECTOR_FOLLOW_UP_SECTION_RANK[left] - AUTO_DIRECTOR_FOLLOW_UP_SECTION_RANK[right];
+  return AUTO_DIRECTOR_ATTENTION_SECTION_RANK[left] - AUTO_DIRECTOR_ATTENTION_SECTION_RANK[right];
 }
 
 export class AutoDirectorValidationService {
@@ -477,7 +477,7 @@ export class AutoDirectorValidationService {
     return validateAutoDirectorAction(input);
   }
 
-  resolveFollowUpSection(input: AutoDirectorFollowUpSectionInput): AutoDirectorFollowUpSection {
-    return resolveAutoDirectorFollowUpSection(input);
+  resolveAttentionSection(input: AutoDirectorAttentionSectionInput): AutoDirectorAttentionSection {
+    return resolveAutoDirectorAttentionSection(input);
   }
 }

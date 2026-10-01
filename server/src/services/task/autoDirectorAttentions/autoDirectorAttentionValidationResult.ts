@@ -5,8 +5,8 @@ import type {
   AutoDirectorValidationResult,
 } from "@ai-novel/shared/types/autoDirectorValidation";
 import type {
-  AutoDirectorFollowUpValidationSummary,
-} from "@ai-novel/shared/types/autoDirectorFollowUp";
+  AutoDirectorAttentionValidationSummary,
+} from "@ai-novel/shared/types/autoDirectorAttention";
 
 const REQUIRED_ACTION_CODES: readonly AutoDirectorValidationRequiredActionCode[] = [
   "clear_checkpoint",
@@ -137,7 +137,7 @@ export function extractBlockedAutoDirectorValidationResult(
 
 export function summarizeAutoDirectorValidationResult(
   result: AutoDirectorValidationResult,
-): AutoDirectorFollowUpValidationSummary {
+): AutoDirectorAttentionValidationSummary {
   return {
     blockingReasons: result.blockingReasons,
     warnings: result.warnings,

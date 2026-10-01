@@ -2475,7 +2475,7 @@ model AutoDirectorAutoApprovalRecord {
   @@index([taskId, createdAt])
 }
 
-model AutoDirectorFollowUpActionLog {
+model AutoDirectorAttentionActionLog {
   id             String   @id @default(cuid())
   taskId         String
   actionCode     String

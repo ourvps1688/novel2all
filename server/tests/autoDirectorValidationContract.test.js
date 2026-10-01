@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {
   validateAutoDirectorAction,
   validateAutoDirectorTakeoverRequest,
-  resolveAutoDirectorFollowUpSection,
+  resolveAutoDirectorAttentionSection,
 } = require("../dist/services/novel/director/runtime/autoDirectorValidationService.js");
 
 test("validateAutoDirectorTakeoverRequest lets continue recovery backfill structured outline before chapter execution", () => {
@@ -457,7 +457,7 @@ test("validateAutoDirectorTakeoverRequest accepts full-book scope from any entry
   });
 });
 
-test("validateAutoDirectorAction marks safe follow-up continue with required checkpoint cleanup", () => {
+test("validateAutoDirectorAction marks safe attention continue with required checkpoint cleanup", () => {
   const result = validateAutoDirectorAction({
     source: "web",
     actionCode: "continue_auto_execution",
@@ -485,8 +485,8 @@ test("validateAutoDirectorAction marks safe follow-up continue with required che
   assert.equal(result.nextAction, "continue_auto_execution");
 });
 
-test("resolveAutoDirectorFollowUpSection gives validation issues top priority over actionable waiting state", () => {
-  const section = resolveAutoDirectorFollowUpSection({
+test("resolveAutoDirectorAttentionSection gives validation issues top priority over actionable waiting state", () => {
+  const section = resolveAutoDirectorAttentionSection({
     status: "waiting_approval",
     checkpointType: "chapter_batch_ready",
     validationResult: {
@@ -502,8 +502,8 @@ test("resolveAutoDirectorFollowUpSection gives validation issues top priority ov
   assert.equal(section, "needs_validation");
 });
 
-test("resolveAutoDirectorFollowUpSection prioritizes validation, exceptions, pending, auto progress, and replaced", () => {
-  assert.equal(resolveAutoDirectorFollowUpSection({
+test("resolveAutoDirectorAttentionSection prioritizes validation, exceptions, pending, auto progress, and replaced", () => {
+  assert.equal(resolveAutoDirectorAttentionSection({
     status: "failed",
     replacementTaskId: "task_new",
     validationResult: {
@@ -516,28 +516,28 @@ test("resolveAutoDirectorFollowUpSection prioritizes validation, exceptions, pen
     },
   }), "needs_validation");
 
-  assert.equal(resolveAutoDirectorFollowUpSection({
+  assert.equal(resolveAutoDirectorAttentionSection({
     status: "failed",
     replacementTaskId: "task_new",
   }), "exception");
 
-  assert.equal(resolveAutoDirectorFollowUpSection({
+  assert.equal(resolveAutoDirectorAttentionSection({
     status: "cancelled",
     replacementTaskId: "task_new",
   }), "replaced");
 
-  assert.equal(resolveAutoDirectorFollowUpSection({
+  assert.equal(resolveAutoDirectorAttentionSection({
     status: "waiting_approval",
     checkpointType: "chapter_batch_ready",
     replacementTaskId: "task_new",
   }), "pending");
 
-  assert.equal(resolveAutoDirectorFollowUpSection({
+  assert.equal(resolveAutoDirectorAttentionSection({
     status: "running",
     replacementTaskId: "task_new",
   }), "auto_progress");
 
-  assert.equal(resolveAutoDirectorFollowUpSection({
+  assert.equal(resolveAutoDirectorAttentionSection({
     status: "succeeded",
     replacementTaskId: "task_new",
   }), "replaced");

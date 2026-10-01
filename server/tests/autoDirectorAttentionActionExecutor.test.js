@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 require("../dist/app.js");
-const { AutoDirectorFollowUpActionExecutor } = require("../dist/services/task/autoDirectorFollowUps/AutoDirectorFollowUpActionExecutor.js");
+const { AutoDirectorAttentionActionExecutor } = require("../dist/services/task/autoDirectorAttentions/AutoDirectorAttentionActionExecutor.js");
 const { NovelWorkflowTaskAdapter } = require("../dist/services/task/adapters/NovelWorkflowTaskAdapter.js");
 const { prisma } = require("../dist/db/prisma.js");
 
@@ -95,19 +95,19 @@ function buildTaskDetail(taskId, overrides = {}) {
   };
 }
 
-test("auto director follow-up action executor continues auto execution and deduplicates repeated idempotency keys", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor continues auto execution and deduplicates repeated idempotency keys", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const calls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
     workflowUpdate: prisma.novelWorkflowTask.update,
   };
   const actionLogs = new Map();
   const workflowUpdates = [];
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -158,21 +158,21 @@ test("auto director follow-up action executor continues auto execution and dedup
   assert.equal(second.task.id, "task_chapter_range");
   assert.equal(actionLogs.size, 1);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor sends skip_quality_repair for quality-repair checkpoints", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor sends skip_quality_repair for quality-repair checkpoints", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const calls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
   };
   const actionLogs = new Map();
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -212,23 +212,23 @@ test("auto director follow-up action executor sends skip_quality_repair for qual
     },
   }]);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor retries with the route model and resumes execution", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor retries with the route model and resumes execution", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const calls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
     workflowUpdate: prisma.novelWorkflowTask.update,
   };
   const actionLogs = new Map();
   const workflowUpdates = [];
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -287,8 +287,8 @@ test("auto director follow-up action executor retries with the route model and r
   assert.equal(result.task.model, "gpt-5.4");
   assert.equal(actionLogs.get("retry-route-k1").resultCode, "executed");
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
   prisma.novelWorkflowTask.update = originals.workflowUpdate;
 });
 
@@ -338,15 +338,15 @@ test("novel workflow retry forces auto director resume after retry state healing
   prisma.taskCenterArchive.findUnique = originalArchiveFindUnique;
 });
 
-test("auto director follow-up action executor returns forbidden when the action is not allowed for the current reason", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor returns forbidden when the action is not allowed for the current reason", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
   };
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async () => null;
-  prisma.autoDirectorFollowUpActionLog.create = async () => null;
+  prisma.autoDirectorAttentionActionLog.findUnique = async () => null;
+  prisma.autoDirectorAttentionActionLog.create = async () => null;
 
   executor.workflowService.healAutoDirectorTaskState = async () => false;
   executor.workflowService.getTaskByIdWithoutHealing = async () => buildWorkflowRow({
@@ -377,19 +377,19 @@ test("auto director follow-up action executor returns forbidden when the action 
   assert.equal(result.taskId, "task_candidate");
   assert.match(result.message, /当前任务不支持该操作|不支持/);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor returns state_changed when the follow-up is no longer actionable", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor returns state_changed when the attention is no longer actionable", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
   };
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async () => null;
-  prisma.autoDirectorFollowUpActionLog.create = async () => null;
+  prisma.autoDirectorAttentionActionLog.findUnique = async () => null;
+  prisma.autoDirectorAttentionActionLog.create = async () => null;
 
   executor.workflowService.healAutoDirectorTaskState = async () => false;
   executor.workflowService.getTaskByIdWithoutHealing = async () => buildWorkflowRow({
@@ -417,23 +417,23 @@ test("auto director follow-up action executor returns state_changed when the fol
   assert.equal(result.code, "state_changed");
   assert.equal(result.task.status, "succeeded");
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor batches per-task results without all-or-nothing failure", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor batches per-task results without all-or-nothing failure", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const retryCalls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
     workflowUpdate: prisma.novelWorkflowTask.update,
   };
   const actionLogs = new Map();
   const workflowUpdates = [];
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -499,21 +499,21 @@ test("auto director follow-up action executor batches per-task results without a
     ["task_fail", "failed"],
   ]);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
   prisma.novelWorkflowTask.update = originals.workflowUpdate;
 });
 
-test("auto director follow-up action executor blocks mutation when unified validation fails", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor blocks mutation when unified validation fails", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const calls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
   };
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async () => null;
-  prisma.autoDirectorFollowUpActionLog.create = async () => null;
+  prisma.autoDirectorAttentionActionLog.findUnique = async () => null;
+  prisma.autoDirectorAttentionActionLog.create = async () => null;
 
   executor.workflowService.healAutoDirectorTaskState = async () => false;
   executor.workflowService.getTaskByIdWithoutHealing = async () => buildWorkflowRow({
@@ -550,21 +550,21 @@ test("auto director follow-up action executor blocks mutation when unified valid
   assert.match(result.message, /缺少节奏拆章/);
   assert.deepEqual(calls, []);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor passes batch high-memory count into later resumes", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor passes batch high-memory count into later resumes", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const continueCalls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
   };
   const actionLogs = new Map();
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -604,22 +604,22 @@ test("auto director follow-up action executor passes batch high-memory count int
     },
   }]);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor restricts batch actions to matching sections", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor restricts batch actions to matching sections", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const continueCalls = [];
   const retryCalls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
   };
   const actionLogs = new Map();
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -693,21 +693,21 @@ test("auto director follow-up action executor restricts batch actions to matchin
     ["task_running", "forbidden"],
   ]);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor blocks validation-required tasks from batch continue", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor blocks validation-required tasks from batch continue", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const continueCalls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
   };
   const actionLogs = new Map();
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -769,23 +769,23 @@ test("auto director follow-up action executor blocks validation-required tasks f
   assert.match(result.itemResults[0].message, /分区不支持|批量动作/);
   assert.deepEqual(continueCalls, []);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
 });
 
-test("auto director follow-up action executor clears validation and resumes structured outline backfill", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention action executor clears validation and resumes structured outline backfill", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const continueCalls = [];
   const workflowUpdates = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
     workflowUpdate: prisma.novelWorkflowTask.update,
   };
   const actionLogs = new Map();
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -855,24 +855,24 @@ test("auto director follow-up action executor clears validation and resumes stru
   assert.equal(JSON.parse(workflowUpdates[0].data.seedPayloadJson).autoDirectorValidationResult, undefined);
   assert.equal(actionLogs.get("structured-backfill-k1").resultCode, "executed");
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
   prisma.novelWorkflowTask.update = originals.workflowUpdate;
 });
 
-test("auto director follow-up safe fix repairs only validator-marked safe actions", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention safe fix repairs only validator-marked safe actions", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const calls = [];
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
     workflowUpdate: prisma.novelWorkflowTask.update,
   };
   const actionLogs = new Map();
   const workflowUpdates = [];
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
-  prisma.autoDirectorFollowUpActionLog.create = async ({ data }) => {
+  prisma.autoDirectorAttentionActionLog.findUnique = async ({ where }) => actionLogs.get(where.idempotencyKey) ?? null;
+  prisma.autoDirectorAttentionActionLog.create = async ({ data }) => {
     actionLogs.set(data.idempotencyKey, {
       ...data,
       executedAt: data.executedAt ?? new Date(),
@@ -952,22 +952,22 @@ test("auto director follow-up safe fix repairs only validator-marked safe action
   assert.match(actionLogs.get("safe-fix-k1").metadataJson, /revalidate_assets/);
   assert.doesNotMatch(actionLogs.get("safe-fix-k1").metadataJson, /create_rewrite_snapshot/);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
   prisma.novelWorkflowTask.update = originals.workflowUpdate;
 });
 
-test("auto director follow-up safe fix blocks unsafe validation repairs", async () => {
-  const executor = new AutoDirectorFollowUpActionExecutor();
+test("auto director attention safe fix blocks unsafe validation repairs", async () => {
+  const executor = new AutoDirectorAttentionActionExecutor();
   const originals = {
-    actionLogFindUnique: prisma.autoDirectorFollowUpActionLog.findUnique,
-    actionLogCreate: prisma.autoDirectorFollowUpActionLog.create,
+    actionLogFindUnique: prisma.autoDirectorAttentionActionLog.findUnique,
+    actionLogCreate: prisma.autoDirectorAttentionActionLog.create,
     workflowUpdate: prisma.novelWorkflowTask.update,
   };
   const workflowUpdates = [];
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = async () => null;
-  prisma.autoDirectorFollowUpActionLog.create = async () => null;
+  prisma.autoDirectorAttentionActionLog.findUnique = async () => null;
+  prisma.autoDirectorAttentionActionLog.create = async () => null;
   prisma.novelWorkflowTask.update = async ({ where, data }) => {
     workflowUpdates.push({ where, data });
     return { id: where.id, ...data };
@@ -1012,7 +1012,7 @@ test("auto director follow-up safe fix blocks unsafe validation repairs", async 
   assert.match(result.message, /人工处理|不能安全修复|高风险/);
   assert.equal(workflowUpdates.length, 0);
 
-  prisma.autoDirectorFollowUpActionLog.findUnique = originals.actionLogFindUnique;
-  prisma.autoDirectorFollowUpActionLog.create = originals.actionLogCreate;
+  prisma.autoDirectorAttentionActionLog.findUnique = originals.actionLogFindUnique;
+  prisma.autoDirectorAttentionActionLog.create = originals.actionLogCreate;
   prisma.novelWorkflowTask.update = originals.workflowUpdate;
 });

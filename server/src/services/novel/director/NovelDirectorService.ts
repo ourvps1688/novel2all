@@ -74,7 +74,7 @@ import {
   normalizeDirectorAutoApprovalConfig,
   shouldAutoApproveDirectorApprovalPoint,
 } from "@ai-novel/shared/types/autoDirectorApproval";
-import { recordAutoDirectorAutoApprovalFromTask } from "../../task/autoDirectorFollowUps/autoDirectorAutoApprovalAudit";
+import { recordAutoDirectorAutoApprovalFromTask } from "../../task/autoDirectorAttentions/autoDirectorAutoApprovalAudit";
 import { flattenPreparedOutlineChapters } from "./recovery/novelDirectorStructuredOutlineRecovery";
 import { DirectorRuntimeService } from "./runtime/DirectorRuntimeService";
 import { DirectorEventProjectionService } from "./runtime/DirectorEventProjectionService";

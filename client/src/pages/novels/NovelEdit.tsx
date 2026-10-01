@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BOOK_ANALYSIS_SECTIONS } from "@ai-novel/shared/types/bookAnalysis";
 import type { DirectorContinuationMode, DirectorLockScope, DirectorSessionState, DirectorStepCalibrationAction } from "@ai-novel/shared/types/novelDirector";
 import { extractDirectorTaskSeedPayloadFromMeta } from "@ai-novel/shared/types/novelDirector";
-import type { AutoDirectorAction, AutoDirectorMutationActionCode } from "@ai-novel/shared/types/autoDirectorFollowUp";
+import type { AutoDirectorAction, AutoDirectorMutationActionCode } from "@ai-novel/shared/types/autoDirectorAttention";
 import type { DirectorBookAutomationAction, DirectorDashboardMode, DirectorTaskSnapshot } from "@ai-novel/shared/types/directorRuntime";
 import type { NovelExportDownloadFormat, NovelExportFormat, NovelExportScope } from "@ai-novel/shared/types/novelExport";
 import type {
@@ -26,7 +26,7 @@ import { flattenGenreTreeOptions, getGenreTree } from "@/api/genre";
 import { acceptManualChangesAndContinueDirector, calibrateDirectorStep, getDirectorBookAutomationProjection, getDirectorTaskSnapshot } from "@/api/novelDirector";
 import { continueNovelWorkflow, getActiveAutoDirectorTask } from "@/api/novelWorkflow";
 import { archiveTask, cancelTask, getTaskDetail, retryTask } from "@/api/tasks";
-import { executeAutoDirectorFollowUpAction, getAutoDirectorFollowUpDetail } from "@/api/autoDirectorFollowUps";
+import { executeAutoDirectorAttentionAction, getAutoDirectorAttentionDetail } from "@/api/autoDirectorAttentions";
 import {
   auditNovelChapter,
   backfillNovelCharacterResources,
@@ -818,9 +818,9 @@ export default function NovelEdit() {
     || activeDirectorRuntimeProjection?.blockedReason?.trim()
     || activeDirectorRuntimeProjection?.detail?.trim()
     || null;
-  const activeAutoDirectorFollowUpQuery = useQuery({
-    queryKey: queryKeys.autoDirectorFollowUps.detail(selectedDirectorTaskId || "none"),
-    queryFn: () => getAutoDirectorFollowUpDetail(selectedDirectorTaskId),
+  const activeAutoDirectorAttentionQuery = useQuery({
+    queryKey: queryKeys.autoDirectorAttentions.detail(selectedDirectorTaskId || "none"),
+    queryFn: () => getAutoDirectorAttentionDetail(selectedDirectorTaskId),
     enabled: Boolean(selectedDirectorTaskId),
     retry: false,
     refetchInterval: () => (
@@ -833,7 +833,7 @@ export default function NovelEdit() {
         : false
     ),
   });
-  const activeAutoDirectorFollowUp = activeAutoDirectorFollowUpQuery.data?.data ?? null;
+  const activeAutoDirectorAttention = activeAutoDirectorAttentionQuery.data?.data ?? null;
   const workflowCurrentTab = useMemo(
     () => {
       const displayStageTab = tabFromDirectorDisplayStage(activeDirectorSnapshot?.displayState.stageKey ?? null);
@@ -965,7 +965,7 @@ export default function NovelEdit() {
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks.detail("novel_workflow", taskId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks.directorTaskSnapshot(taskId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tasks.directorRuntime(taskId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.autoDirectorFollowUps.detail(taskId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.autoDirectorAttentions.detail(taskId) }),
       );
     }
     await Promise.allSettled(invalidations);
@@ -1166,7 +1166,7 @@ export default function NovelEdit() {
       toast.error(message);
     },
   });
-  const executeFollowUpActionMutation = useMutation({
+  const executeAttentionActionMutation = useMutation({
     mutationFn: async (input: {
       directorTaskId?: string;
       actionCode: AutoDirectorMutationActionCode;
@@ -1175,7 +1175,7 @@ export default function NovelEdit() {
       if (!targetTaskId) {
         throw new Error("当前没有可执行的动作。");
       }
-      return executeAutoDirectorFollowUpAction(targetTaskId, {
+      return executeAutoDirectorAttentionAction(targetTaskId, {
         actionCode: input.actionCode,
         idempotencyKey: `${targetTaskId}:${input.actionCode}:${Date.now()}`,
       });
@@ -1284,7 +1284,7 @@ export default function NovelEdit() {
     setIsTaskDrawerOpen(false);
     navigate(getDirectorCockpitActionHref(bookAutomationProjection, action));
   };
-  const handleDrawerFollowUpAction = (action: AutoDirectorAction) => {
+  const handleDrawerAttentionAction = (action: AutoDirectorAction) => {
     if (action.kind === "navigation") {
       const targetUrl = action.targetUrl?.trim() || visibleDirectorTask?.sourceRoute || activeAutoDirectorTask?.sourceRoute || "";
       const internalTarget = resolveInternalNavigationTarget(targetUrl);
@@ -1298,9 +1298,9 @@ export default function NovelEdit() {
       }
       return;
     }
-    executeFollowUpActionMutation.mutate(
+    executeAttentionActionMutation.mutate(
       {
-        directorTaskId: activeAutoDirectorFollowUp?.directorTaskId ?? actionTargetDirectorTaskId,
+        directorTaskId: activeAutoDirectorAttention?.directorTaskId ?? actionTargetDirectorTaskId,
         actionCode: (action.executorActionCode ?? action.code) as AutoDirectorMutationActionCode,
       },
     );
@@ -2825,9 +2825,9 @@ export default function NovelEdit() {
         },
         actions: taskDrawerActions,
         onProjectionAction: handleTaskDrawerProjectionAction,
-        followUp: activeAutoDirectorFollowUp,
-        onFollowUpAction: handleDrawerFollowUpAction,
-        executingFollowUpAction: executeFollowUpActionMutation.isPending,
+        attention: activeAutoDirectorAttention,
+        onAttentionAction: handleDrawerAttentionAction,
+        executingAttentionAction: executeAttentionActionMutation.isPending,
         runtimeHardBlocked: activeDirectorRuntimeHardBlocked,
         runtimeBlockedReason: activeDirectorRuntimeBlockedReason,
         overrideModel: retryOverride,
@@ -2839,7 +2839,7 @@ export default function NovelEdit() {
         retryWithTaskModelPending: retryAutoDirectorWithTaskModelMutation.isPending,
         capabilities: {
           availableActions: taskDrawerActions.length > 0,
-          availableFollowUps: Boolean(activeAutoDirectorFollowUp),
+          availableAttentions: Boolean(activeAutoDirectorAttention),
           canAdjustRuntimePolicy: Boolean(activeDirectorRuntimeSnapshot && displayAutoDirectorTask),
           canInspectManualEditImpact: Boolean(displayAutoDirectorTask),
           canRetryWithOverrideModel: Boolean(displayAutoDirectorTask && (displayAutoDirectorTask.status === "failed" || displayAutoDirectorTask.status === "cancelled")),
