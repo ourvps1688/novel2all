@@ -4,6 +4,15 @@ packages:
   - site
   - shared
 injectWorkspacePackages: true
+# 构建脚本白名单（双键并存，按 pnpm 版本二选一生效）：
+# - onlyBuiltDependencies：pnpm 10.7 ~ 10.x 生效（10.6.x 两个位置都不读，属坏版本，engines 已排除）
+# - allowBuilds：pnpm >= 10.26 / v11+ 生效（v11 起 onlyBuiltDependencies 被移除、以本键为准）
+# 两键保持同集合同步维护；来源：原 package.json#pnpm.onlyBuiltDependencies 迁移（pnpm 10 不再读该字段）。
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - better-sqlite3
+  - esbuild
+  - prisma
 allowBuilds:
   '@prisma/engines': true
   better-sqlite3: true

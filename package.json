@@ -2,10 +2,10 @@
   "name": "novel2all",
   "private": true,
   "license": "AGPL-3.0-only",
-  "packageManager": "pnpm@10.6.0",
+  "packageManager": "pnpm@10.34.6",
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=24.0.0",
-    "pnpm": ">=10.6.0"
+    "pnpm": ">=10.7.0"
   },
   "scripts": {
     "check:deps": "node scripts/check-deps.cjs",
@@ -31,14 +31,6 @@
     "test:client": "pnpm --filter @ai-novel/client test",
     "test:all": "pnpm --filter @ai-novel/server test:all && pnpm --filter @ai-novel/client test",
     "lint": "pnpm --filter @ai-novel/shared lint && pnpm --filter @ai-novel/server lint && pnpm --filter @ai-novel/client lint"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/engines",
-      "better-sqlite3",
-      "esbuild",
-      "prisma"
-    ]
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
