@@ -19,6 +19,7 @@ const routedPaths = [
   "/creative-hub",
   "/chat-legacy",
   "/book-analysis",
+  "/assets",
   "/market-radar",
   "/tasks",
   "/knowledge",
