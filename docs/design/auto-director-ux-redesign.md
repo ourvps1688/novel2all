@@ -108,17 +108,20 @@ type DirectorAttentionState = {
 
 ## 5. 分阶段实施计划
 
-### Phase 5-A：服务端正本清源（解耦）✅ 已完成（本地提交 `cf8a655`，待 push/PR）
+### Phase 5-A：服务端正本清源（解耦）✅ 已完成（PR #21，合并于 `08e7ca2`）
 - **T1**：新增 `DirectorAttentionState` 规整化服务（`server/src/services/novel/director/DirectorAttentionService.ts` + 类型 `shared/types/directorAttention.ts`）。`mapProjectionToAttention` 基于现有 `DirectorBookAutomationProjectionService.getProjection` 输出归一，`level` 仅由 task 派生字段（`status` / `requiresUserAction` / `workerHealth.derivedState`）推导，**不读 `DirectorRuntimeInstance.status`**。`primaryAction`/`fallbackActions` 复用既有 `DirectorBookAutomationAction` 结构化描述符（未新增字符串分支表，符合 AI-First 红线）。
 - **T2**：新增 `GET /api/director-attentions`（聚合）与 `GET /api/director-attentions/:novelId`（单本）端点（`server/src/routes/directorAttention.ts`，挂载于 `app.ts` 的 `/api/director-attentions`）。端点路径采用 `/api/director-attentions` 而非设计稿的 `/novels/:id/director-attention`，更贴合现有 `/api/tasks` 风格。
 - **T3**：新增两个 DB-free 测试——`directorAttentionService.test.js`（纯映射断言：pendingManualRecovery→needs_recovery、waiting_approval、blocked、failed、running、auto_recovering、idle）+ `directorAttentionRoutes.test.js`（路由断言，mock service prototype）——`node --test` 9/9 通过。
 - **实现注意（关键）**：`NovelWorkflowTask.status` 枚举实际只有 `queued|running|waiting_approval|succeeded|failed|cancelled`；`waiting_recovery` / `blocked` 是 **projection 层** `DirectorBookAutomationStatus` 的值，由 `pendingManualRecovery` 布尔与 dashboard 推导，并非 task 列值。因此聚合查询用 `OR:[{status in [...]},{pendingManualRecovery:true}]`，避免漏掉「运行中卡住」的小说（projection 会把它提升为 `needs_recovery`）。
 
-### Phase 5-B：客户端统一组件（合并）
+### Phase 5-B：客户端统一组件 ✅ T4-T6 已完成（PR #22，合并于 `850895f`）
 - **T4**：新建 `DirectorAttentionCenter`（卡片/横幅/徽标）与 `useDirectorAttentions()` hook。
-- **T5**：`Navbar` 接入常驻徽标 + 待处理抽屉。
-- **T6**：`NovelEdit` 横幅改用统一组件，删除散乱 `checkpointType` 分支，补 `blocked` 兜底按钮。
-- **T7**：workspace 栏卡片、AICockpit、TaskCenter 改用统一组件（删除重复）。
+  - 组件仅按服务端 `level` 切换视觉（`LEVEL_META`），渲染 `state.primaryAction` + `state.fallbackActions`；`idle` 惰性；**绝不**按 `checkpointType` 分支。
+  - 新增 `client/src/api/directorAttention.ts`、`client/src/hooks/useDirectorAttention.ts`、`client/src/lib/directorAttentionActions.ts`（唯一归一化动作入口，复用 `isDirectorCockpitContinuationAction` → `continueDirectorRuntime(...)`，其余回落 `action.target.href`）。
+- **T5**：`Navbar` 接入常驻徽标 `DirectorAttentionBadge`（持久化、非 sessionStorage）+ Radix Dialog 待处理抽屉，`useDirectorAttentions()` 统计非 idle 数——修复「不知去哪处理」。
+- **T6**：`NovelEdit` 横幅改用 `DirectorAttentionBanner`（薄封装），替换原 `AITakeoverContainer`，删除散乱 `checkpointType` 分支，补 `blocked` 兜底按钮（服务端始终返回可点 primaryAction）。
+- **验证**：`shared build` ✅、`client typecheck` EXIT 0 ✅、`client test` 182/182 ✅。
+- **T7**（未做，单独 PR）：workspace 栏卡片、AICockpit、TaskCenter 改用统一组件（删除重复）。
 
 ### Phase 5-C：主动提示与闭环
 - **T8**：全局 in-app Toast / Banner（替代默认关的浏览器通知）；「收起」不消灭入口。
