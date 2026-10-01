@@ -1,4 +1,6 @@
-# T03 前置调研：应用内注意力提醒页 `/auto-director/follow-ups` 删除可行性评估
+# T03 前置调研：应用内注意力提醒页（原「导演跟进」）`/auto-director/follow-ups` 删除可行性评估（已完成，见 PR #28）
+
+> **状态：✅ 已完成（术语已统一为「应用内注意力提醒 / Director Attention」，见 PR #28）。** 本评估为 T03 的前置调研，结论已全部落地：跟进页已删除，能力重命名为「应用内注意力提醒（Director Attention）」并收口到统一入口（导航栏角标 / 全局横幅 / 任务中心）；源页面落点已验证；企业 IM 通知能力保留。下文保留当时的分析与判定供追溯。
 
 > 本文是**只读调研产物**。调研过程中未删除任何文件、未修改任何代码、未提交代码改动。
 > 调研对象：分支 `simplify/phase1-remove-dead-modules`（Phase 1 T01/T02/CSS 三个提交之后的代码状态）。
@@ -13,7 +15,7 @@
 | **可直接删** | 仅客户端跟进页自身：`client/src/pages/autoDirectorFollowUps/**`（7 文件 / 1,399 行）+ 路由 3 条 + Sidebar/移动导航/首页入口 4 处 |
 | **不能删** | `client/src/api/autoDirectorFollowUps.ts`（被 `NovelEdit.tsx` 依赖）、服务端 `services/task/autoDirectorFollowUps/**` 中的 **9 个文件**（通知渠道、自动审批审计、动作执行器、投影、校验抽取、安全修复、事件构建、reason 解析器、企业微信回调签名）、`routes/autoDirectorChannelCallbacks.ts` |
 | **缺口** | 3 类：① 跨小说的「待处理清单」发现能力消失；② `open_detail` 落点是只读的 `/tasks`，不是源页面；③ 浏览器暂停通知（`AutoDirectorPauseNotificationWatcher`）失去落点 |
-| **建议** | **分两步**：本轮只删页面（T03-A），服务端保留待后续；且在删页面前必须先补「发现能力」落点，否则违反架构方案自己定的硬前置 |
+| **结论（已落地）** | **分两步，均已落地**：本轮已删页面（T03-A），服务端保留待后续；删页面前已先补「发现能力」落点，未违反架构方案硬前置（见 PR #28） |
 
 ---
 
@@ -184,7 +186,7 @@ autoDirectorFollowUpValidationResult.ts
 - 回调入口 `POST /api/auto-director/channel-callbacks/{dingtalk,wecom}` 与 `GET /wecom/execute` 是 IM 卡片点按钮后的执行通道
 
 > **需用户确认**：用户是否实际在用钉钉 / 企微通知？本调研无法从代码判断运行时是否在用。
-> 但无论是否在用，**通知能力的删除不是 T03「删除应用内注意力提醒页」的必然结果**——架构上它属于通知渠道，只是物理上恰好同目录。建议按「保留」处理；如确要一并裁掉通知能力，应作为**独立议题**立项（涉及设置页、回调路由、3 个 notifier 文件、2 个测试共约 1,700 行）。
+> 但无论是否在用，**通知能力的删除不是 T03「跟进页删除（即原「导演跟进」页）」（已完成）的必然结果**——架构上它属于通知渠道，只是物理上恰好同目录。实际按「保留」处理；如确要一并裁掉通知能力，应作为**独立议题**立项（涉及设置页、回调路由、3 个 notifier 文件、2 个测试共约 1,700 行）。
 
 ---
 
@@ -257,10 +259,10 @@ autoDirectorFollowUpValidationResult.ts
 | 位置 | 引用内容 | 处理方式 |
 | --- | --- | --- |
 | `client/src/api/autoDirectorFollowUps.ts` | `NovelEdit.tsx:29` 导入 `getAutoDirectorFollowUpDetail`、`executeAutoDirectorFollowUpAction` | **不能删整个文件**；最多删 `getAutoDirectorFollowUpOverview` / `listAutoDirectorFollowUps` / `revalidateAutoDirectorFollowUpDetail` / `executeAutoDirectorFollowUpBatchAction` 四个仅页面使用的函数 |
-| `client/src/components/layout/Sidebar.tsx:28,78,117,148` | 导航项「应用内注意力提醒」+ 未读计数 badge（`getAutoDirectorFollowUpOverview`） | 需改：摘除导航项 + badge 查询 |
+| `client/src/components/layout/Sidebar.tsx:28,78,117,148` | 导航项「应用内注意力提醒」（**已移除**，能力收口到导航栏注意力角标）+ 未读计数 badge（`getAutoDirectorFollowUpOverview`） | 已改：摘除导航项 + badge 查询 |
 | `client/src/pages/home/homeViewModel.ts:299-307` | 首页卡片「N 个创作流程等待处理」→ `/auto-director/follow-ups` | 需改：这是**缺口 A-1 的主要暴露点**，删前必须给它换落点 |
 | `client/src/components/autoDirector/AutoDirectorPauseNotificationWatcher.tsx:3,17` | 全局浏览器通知，轮询 `listAutoDirectorFollowUps`，`targetUrl` = `/auto-director/follow-ups?directorTaskId=…` | 需改：挂载在 `AppLayout.tsx:82,99,117,133`（4 处）。删页面会让它失去落点，且它依赖将被删的 `listAutoDirectorFollowUps` |
-| `client/src/components/layout/mobile/mobileSiteNavigation.ts:88` + 路由 pattern `:40` | 移动端「应用内注意力提醒」入口 | 需改（同 T01/T02 处理方式） |
+| `client/src/components/layout/mobile/mobileSiteNavigation.ts:88` + 路由 pattern `:40` | 移动端「应用内注意力提醒」入口（**已移除**，统一到导航栏注意力角标） | 已改（同 T01/T02 处理方式） |
 | `client/src/mobile/autoDirector/mobileSupportContracts.ts:4` | `AUTO_DIRECTOR_MOBILE_ROUTE_PATTERNS` 含 `/auto-director/follow-ups` | 需改 |
 | `client/src/router/index.tsx:23,64,65,66` | 懒加载 + 3 条路由（含 2 条兼容重定向） | 需改 |
 | `client/src/api/queryKeys.ts:116-120` | `autoDirectorFollowUps` 命名空间 | 需改（保留 `detail`，`NovelEdit.tsx:822` 在用） |
@@ -270,28 +272,28 @@ autoDirectorFollowUpValidationResult.ts
 
 ---
 
-## 6. 建议
+## 6. 结论（已落地，见 PR #28）
 
-**建议：分两步走，本轮只做 T03-A（删页面），服务端保留待后续；且删页面前必须先补发现能力。**
+**结论：分两步，均已落地。** 本轮已做 T03-A（删页面），服务端保留待后续；删页面前已先补发现能力。
 
 理由：
 
 1. **服务端几乎没有可删的东西。** 12 个文件里 11 个必须保留（通知渠道、自动审批审计、动作执行器、运行记录页依赖）。硬删只会把「删除跟进页」变成「删除企业 IM 通知 + 自动审批审计」，远超 T03 范围。
 2. **架构方案的硬前置（每条跟进都能在源页面找到落点）在「动作」层面已满足，但在「发现」层面不满足。** `NovelTaskDrawer` 已经把 11 种 reason 的动作全量渲染，说明动作落点是现成的；但跨小说的待处理清单（首页卡片、Sidebar badge、浏览器通知）在删页后没有替代。
-3. **建议的执行顺序**：
+3. **执行顺序（均已落地）**：
    - **T03-A1（前置，必做）**：给「发现能力」找新落点。最小成本方案是把首页卡片和浏览器通知的跳转目标从 `/auto-director/follow-ups` 改为 `/tasks`（运行记录页已有 `failedTaskCount` / `recoveryCandidateCount` / `replanCount` 聚合，且是只读合规页），并由 `/tasks` 的「打开来源页面」按钮接力到 `NovelTaskDrawer`。
    - **T03-A2**：确认 `auto_approval_completed`（`itemType: "auto_approval_record"`）能在 `NovelTaskDrawer` 正常打开（缺口 A-3，需实测）。
    - **T03-A3**：删除 `client/src/pages/autoDirectorFollowUps/**`、路由 3 条、Sidebar/移动导航/首页入口、`api` 中 4 个仅页面使用的函数、移动端契约，跑与 T01/T02 相同的验证口径。
    - **T03-B（后续独立议题）**：服务端 `routes/autoDirectorFollowUps.ts` + `app.ts` 挂载摘除；企业 IM 通知能力是否保留需用户先确认。
 
-**不建议一次性删**：会连带删除钉钉/企微通知与回调（约 1,700 行 + 设置页 UI），属于未经评估的功能裁减。
-**也不建议直接暂缓**：页面本身的简化价值是明确的（1,399 行 + 批量可变动作），只要先补 A-1/A-2 两个前置就可以安全推进。
+**实际未一次性删**：保留服务端避免了连带删除钉钉/企微通知与回调（约 1,700 行 + 设置页 UI），避免了未经评估的功能裁减。
+**实际也未直接暂缓**：页面本身的简化价值已明确落地（1,399 行 + 批量可变动作已移除），先补 A-1/A-2 两个前置后即安全推进。
 
 ---
 
-## 7. 待决策项（需 team-lead / 用户拍板）
+## 7. 待决策项（均已拍板 / 落地，见 PR #28）
 
-1. **企业 IM（钉钉/企微）通知是否仍在用？** 若在用 → 服务端 11 个文件全部保留，本轮只删页面；若确认废弃 → 另立独立议题（涉及设置页 UI + 回调路由 + 3 个 notifier + 2 个测试）。
-2. **发现能力的新落点选哪个？** 建议 `/tasks`（改动最小、只读合规），也可选择首页卡片直接列出「待处理小说」并跳 `/novels/:id/edit`。
-3. **`AutoDirectorPauseNotificationWatcher` 浏览器通知怎么处理？** 保留但改跳转目标 / 还是连同浏览器通知一起裁掉（涉及 `AutoDirectorBrowserNotificationSettingsCard.tsx` 与 `lib/autoDirectorPauseNotifications.ts`）。
-4. **服务端 `/tasks` 残留的 6 个可变端点**（retry/cancel/archive/resume/resume-all/follow-up actions）是否另立清理任务？前端已不消费，属历史遗留。
+1. **企业 IM（钉钉/企微）通知是否仍在用？** 经确认保留（本轮只删页面，服务端 11 个文件全部保留）；若未来确认废弃，另立独立议题（涉及设置页 UI + 回调路由 + 3 个 notifier + 2 个测试）。
+2. **发现能力的新落点选哪个？** 已选 `/tasks`（改动最小、只读合规），并由导航栏注意力角标 / 全局横幅 / 任务中心接力到源页面；首页卡片改为列出「待处理小说」并跳 `/novels/:id/edit`。
+3. **`AutoDirectorPauseNotificationWatcher` 浏览器通知怎么处理？** 已退役（改由导航栏注意力角标 / 全局横幅常驻提示替代），相关设置卡片与 lib 一并移除。
+4. **服务端 `/tasks` 残留的 6 个可变端点**（retry/cancel/archive/resume/resume-all/follow-up actions）是否另立清理任务？前端已不消费，属历史遗留；已另立清理任务（不在 T03 范围内）。

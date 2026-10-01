@@ -8,6 +8,8 @@
 
 客户端规范以 `docs/design/product-ui-design-system.md` 为准。`site/DESIGN.md` 只约束公开介绍站，不用于客户端页面。
 
+> **状态：✅ 已完成（术语已统一为「应用内注意力提醒 / Director Attention」，见 PR #28）。** 本文中提及的「应用内注意力提醒」页（`/auto-director/follow-ups`）已移除，其能力以「应用内注意力提醒（Director Attention）」收口到统一入口（导航栏角标 / 全局横幅 / 任务中心）；第二批的视觉统一目标已通过该统一入口落地。下文保留当时的批次规划与结果供追溯。
+
 ## 目标
 
 - 让新手在每个核心页面首屏都能看见当前对象、当前阶段、主任务、推荐动作和关键状态。
@@ -57,7 +59,7 @@
 - `/base-characters`
 - `/book-analysis`
 - `/tasks`
-- `/auto-director/follow-ups`
+- `/auto-director/follow-ups`（独立页已移除，能力收口为「应用内注意力提醒（Director Attention）」统一入口，见 PR #28）
 - `/creative-hub`
 
 ### 部分对齐
@@ -117,25 +119,25 @@
 - `/creative-hub`
 - `/book-analysis`
 - `/tasks`
-- `/auto-director/follow-ups`
+- `/auto-director/follow-ups`（独立页已移除，能力收口为「应用内注意力提醒（Director Attention）」统一入口，见 PR #28）
 
 实施重点：
 
 - 创作中枢从普通聊天视觉收敛为“创作线程 + 当前小说 + 执行活动”工作台。
 - 拆书页把来源、分析阶段、结果和下一动作固定在首屏。
-- 任务与应用内注意力提醒统一阻塞、质量提醒、普通任务的视觉等级和处理后果说明。
+- 任务中心与统一注意力入口（导航栏角标 / 全局横幅 / 任务中心，即「应用内注意力提醒（Director Attention）」收口后的形态）统一阻塞、质量提醒、普通任务的视觉等级和处理后果说明。
 - 清理 Creative Hub 的硬编码 slate/amber/emerald 色和嵌套 Card。
 
 阶段拆分：
 
-- 2A 任务与恢复合同：建立 Workspace / Task Queue 共享展示边界，统一任务中心和应用内注意力提醒的阻塞、质量债、待操作与普通进度语义。
+- 2A 任务与恢复合同：建立 Workspace / Task Queue 共享展示边界，统一任务中心与「应用内注意力提醒（Director Attention）」统一入口（导航栏角标 / 全局横幅 / 任务中心）的阻塞、质量债、待操作与普通进度语义。
 - 2B 拆书结果工作台：把来源、分析阶段、结果入口、部分完成和恢复动作固定在工作台首屏。
 - 2C Creative Hub 创作工作台：收敛为创作线程、推进记录和当前小说上下文，修复线程加载与错误状态。
 
 兼容边界：
 
 - 只消费现有结构化状态，不新增 API、数据库字段、路由、Prompt 或工作流分支。
-- `directorTaskId` 继续作为应用内注意力提醒事实标识，`workspaceTaskId` 不得作为替代。
+- `directorTaskId` 继续作为应用内注意力提醒（Director Attention）事实标识，`workspaceTaskId` 不得作为替代。
 - 拆书源文读取失败不得隐藏已经生成的分析结果；Creative Hub 切换线程不得继续展示上一线程内容。
 
 ## 第三批：世界、写法与模型基础设施
@@ -234,7 +236,7 @@
 
 - 建立无业务状态的 Workspace 页面组合和 Task Queue 展示边界。
 - 任务中心使用现有任务概览展示全局执行、等待操作和恢复候选，并为列表、详情补齐加载、失败、空态和重试。
-- 应用内注意力提醒继续以 `directorTaskId` 作为事实身份，旧 `taskId` 只用于兼容读取，未使用 `workspaceTaskId` 替代。
+- 应用内注意力提醒（Director Attention）继续以 `directorTaskId` 作为事实身份，旧 `taskId` 只用于兼容读取，未使用 `workspaceTaskId` 替代。
 - 明确区分必须处理、待操作、可继续质量提醒和普通进度；所有任务动作展示执行后果。
 
 ## 第二批 2B 实施结果
