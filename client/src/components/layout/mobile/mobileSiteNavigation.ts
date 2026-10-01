@@ -29,6 +29,7 @@ export const MOBILE_ROUTE_PATTERNS: MobileRoutePattern[] = [
   { key: "creative-hub", pattern: /^\/creative-hub\/?$/, title: "创作中枢", group: "creation" },
   { key: "chat-legacy", pattern: /^\/chat-legacy\/?$/, title: "旧版聊天", group: "creation" },
   { key: "book-analysis", pattern: /^\/book-analysis\/?$/, title: "拆书", group: "creation" },
+  { key: "assets", pattern: /^\/assets(\/.*)?$/, title: "创作资产", group: "more" },
   { key: "market-radar", pattern: /^\/market-radar\/?$/, title: "热门题材雷达", group: "creation" },
   { key: "tasks", pattern: /^\/tasks\/?$/, title: "运行记录", group: "tasks" },
   { key: "knowledge", pattern: /^\/knowledge\/?$/, title: "知识库", group: "more" },

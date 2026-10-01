@@ -112,7 +112,9 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       );
     }
 
-    if (to === "/knowledge" && failedIndexCount > 0) {
+    // 知识库索引失败徽标：合并进 /assets 枢纽后，原 /knowledge 入口已不存在，
+    // 改挂到「创作资产」入口（契约 §2，确保索引失败的新手仍可见该信号）。
+    if (to === "/assets" && failedIndexCount > 0) {
       return (
         <Badge
           variant="destructive"
