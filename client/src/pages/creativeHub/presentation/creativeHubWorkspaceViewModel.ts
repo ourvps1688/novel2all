@@ -7,6 +7,8 @@ import type {
   CreativeHubTurnSummary,
 } from "@ai-novel/shared/types/creativeHub";
 import type { WorkspaceTone } from "@/components/workspace";
+import type { DirectorAttentionState } from "@ai-novel/shared/types/directorAttention";
+import type { DirectorBookAutomationAction } from "@ai-novel/shared/types/directorRuntime";
 
 export type CreativeHubWorkspaceAction =
   | "retry_threads"
@@ -18,7 +20,8 @@ export type CreativeHubWorkspaceAction =
   | "view_activity"
   | "send_prompt"
   | "select_novel"
-  | "open_production";
+  | "open_production"
+  | "open_recovery";
 
 export interface CreativeHubWorkspaceRecommendation {
   tone: WorkspaceTone;
@@ -27,6 +30,7 @@ export interface CreativeHubWorkspaceRecommendation {
   action: CreativeHubWorkspaceAction;
   actionLabel: string;
   prompt?: string;
+  recoveryAction?: DirectorBookAutomationAction;
 }
 
 export interface CreativeHubWorkspacePresentation {
@@ -74,6 +78,7 @@ export function resolveCreativeHubWorkspacePresentation(input: {
   threadLoadError?: unknown;
   novelsError?: unknown;
   createThreadError?: unknown;
+  directorAttention?: DirectorAttentionState | null;
 }): CreativeHubWorkspacePresentation {
   const objectTitle = input.currentNovelTitle?.trim()
     || input.productionStatus?.title?.trim()
@@ -205,6 +210,27 @@ export function resolveCreativeHubWorkspacePresentation(input: {
     || failedTurn?.impactSummary?.trim()
     || (input.thread?.status === "error" ? "当前创作线程处于异常状态。" : null);
   if (failureSummary) {
+    const attention = input.directorAttention;
+    if (
+      attention
+      && (attention.level === "needs_recovery" || attention.level === "waiting_approval")
+      && attention.primaryAction
+    ) {
+      return {
+        objectTitle,
+        stageLabel,
+        threadStatusLabel,
+        recommendation: {
+          tone: attention.level === "needs_recovery" ? "danger" : "warning",
+          title: attention.headline || "处理自动导演状态",
+          description: attention.detail
+            || `${failureSummary} 恢复操作会继续使用现有小说资产和任务记录。`,
+          action: "open_recovery",
+          actionLabel: attention.primaryAction.label || "继续处理",
+          recoveryAction: attention.primaryAction,
+        },
+      };
+    }
     const recoveryHint = input.diagnostics?.recoveryHint?.trim()
       || input.productionStatus?.recoveryHint?.trim()
       || failedTurn?.nextSuggestion?.trim()

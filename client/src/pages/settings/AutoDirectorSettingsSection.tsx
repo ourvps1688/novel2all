@@ -10,7 +10,6 @@ import {
 } from "@/api/settings";
 import { queryKeys } from "@/api/queryKeys";
 import { AutoDirectorApprovalPreferenceCard } from "./AutoDirectorApprovalPreferenceCard";
-import { AutoDirectorBrowserNotificationSettingsCard } from "./AutoDirectorBrowserNotificationSettingsCard";
 import { AutoDirectorPendingReviewAutoPromotionCard } from "./AutoDirectorPendingReviewAutoPromotionCard";
 import { AutoDirectorIssuePolicyCard } from "./AutoDirectorIssuePolicyCard";
 
@@ -76,8 +75,6 @@ export default function AutoDirectorSettingsSection(props: {
 
   return (
     <>
-      <AutoDirectorBrowserNotificationSettingsCard onActionResult={onActionResult} />
-
       <AutoDirectorIssuePolicyCard
         policy={issuePolicy}
         isLoading={issuePolicyQuery.isLoading}

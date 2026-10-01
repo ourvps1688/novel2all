@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DirectorContinuationMode } from "@ai-novel/shared/types/novelDirector";
+import type { DirectorAttentionState } from "@ai-novel/shared/types/directorAttention";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDirectorBookAutomationProjection } from "@/api/novelDirector";
@@ -15,6 +16,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import { resolveWorkflowContinuationFeedback } from "@/lib/novelWorkflowContinuation";
 import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
+import { useDirectorAttentions } from "@/hooks/useDirectorAttention";
 import { useTaskRecovery } from "@/components/layout/TaskRecoveryContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NovelListEmptyState } from "./components/list/NovelListEmptyState";
@@ -28,7 +30,6 @@ import { NovelCoverDialog } from "./components/cover/NovelCoverDialog";
 import { createDefaultNovelBasicFormState, type NovelBasicFormState } from "./novelBasicInfo.shared";
 import {
   buildNovelListSummary,
-  getNovelWorkflowTask,
   getNovelWorkspaceHref,
   NOVEL_LIST_PAGE_SIZE,
   type StatusFilter,
@@ -49,6 +50,16 @@ function createDownload(blob: Blob, fileName: string): void {
 export default function NovelList() {
   const navigate = useNavigate();
   const directorAttentionExecutor = useDirectorAttentionActionExecutor();
+  const directorAttentionsQuery = useDirectorAttentions();
+  const attentionByNovelId = useMemo(() => {
+    const map = new Map<string, DirectorAttentionState>();
+    for (const attention of directorAttentionsQuery.data ?? []) {
+      if (attention.level !== "idle") {
+        map.set(attention.novelId, attention);
+      }
+    }
+    return map;
+  }, [directorAttentionsQuery.data]);
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const storedView = typeof window !== "undefined" ? window.localStorage.getItem("novel-list-view") : null;
@@ -223,11 +234,8 @@ export default function NovelList() {
 
   const coverNovel = coverNovelId ? allNovels.find((item) => item.id === coverNovelId) ?? null : null;
   const continueNovels = useMemo(
-    () => novels.filter((novel) => {
-      const task = getNovelWorkflowTask(novel);
-      return task?.status === "running" || task?.status === "waiting_approval";
-    }).slice(0, 3),
-    [novels],
+    () => novels.filter((novel) => attentionByNovelId.has(novel.id)).slice(0, 3),
+    [novels, attentionByNovelId],
   );
   const coverBasicForm = useMemo<NovelBasicFormState | null>(() => {
     if (!coverNovel) return null;
