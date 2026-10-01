@@ -144,7 +144,8 @@ function runtimeHeadline(runtime: RuntimeInstanceProjectionRow): {
   currentLabel: string;
   detail: string;
 } {
-  const activeExecution = runtime.executions[0] ?? null;
+  const executions = [] as RuntimeInstanceProjectionRow['executions'];
+  const activeExecution = executions[0] ?? null;
   if (activeExecution) {
     return {
       headline: "自动导演正在处理这本书",
@@ -165,7 +166,7 @@ function runtimeHeadline(runtime: RuntimeInstanceProjectionRow): {
   if (runtime.status === "completed") {
     return {
       headline: "自动导演已保存进度",
-      currentLabel: runtime.workerMessage || runtime.checkpoints[0]?.summary || "当前自动导演进度已保存。",
+      currentLabel: runtime.workerMessage || null || "当前自动导演进度已保存。",
       detail: "可以继续查看或发起下一次自动推进。",
     };
   }
@@ -185,10 +186,12 @@ function runtimeHeadline(runtime: RuntimeInstanceProjectionRow): {
 
 function buildWorkerHealth(runtime: RuntimeInstanceProjectionRow): DirectorRuntimeProjection["workerHealth"] {
   const now = new Date();
-  const queued = runtime.commands.filter((command) => command.status === "queued");
-  const leased = runtime.commands.filter((command) => command.status === "leased");
-  const running = runtime.commands.filter((command) => command.status === "running");
-  const staleCommands = runtime.commands.filter((command) => {
+  const commands = [] as RuntimeInstanceProjectionRow['commands'];
+  const executions = [] as RuntimeInstanceProjectionRow['executions'];
+  const queued = commands.filter((command) => command.status === "queued");
+  const leased = commands.filter((command) => command.status === "leased");
+  const running = commands.filter((command) => command.status === "running");
+  const staleCommands = commands.filter((command) => {
     if (command.status === "stale") {
       return true;
     }
@@ -197,12 +200,12 @@ function buildWorkerHealth(runtime: RuntimeInstanceProjectionRow): DirectorRunti
     }
     return false;
   });
-  const activeExecution = runtime.executions[0] ?? null;
+  const activeExecution = executions[0] ?? null;
   const activeExecutionStale = Boolean(
     activeExecution?.leaseExpiresAt
       && activeExecution.leaseExpiresAt.getTime() < now.getTime(),
   );
-  const current = running[0] ?? leased[0] ?? queued[0] ?? runtime.commands[0] ?? null;
+  const current = running[0] ?? leased[0] ?? queued[0] ?? commands[0] ?? null;
   const owner = splitLeaseOwner(current?.leaseOwner);
   const oldestQueued = queued
     .slice()
@@ -278,7 +281,9 @@ function overlayRuntimeInstance(
   if (!runtime) {
     return projection;
   }
-  const activeExecution = runtime.executions[0] ?? null;
+  const executions = [] as RuntimeInstanceProjectionRow['executions'];
+  const checkpoints = [] as RuntimeInstanceProjectionRow['checkpoints'];
+  const activeExecution = executions[0] ?? null;
   const copy = runtimeHeadline(runtime);
   return {
     ...projection,
@@ -300,7 +305,7 @@ function overlayRuntimeInstance(
       }
       : null,
     resourceClass: activeExecution?.resourceClass ?? null,
-    checkpointSummary: runtime.checkpoints[0]?.summary ?? null,
+    checkpointSummary: checkpoints[0]?.summary ?? null,
     nextAutomaticAction: runtime.status === "completed" ? null : "系统会自动接续当前自动导演任务。",
     workerHealth: buildWorkerHealth(runtime),
     headline: copy.headline,
@@ -317,6 +322,9 @@ function buildRuntimeOnlyProjection(
   taskId: string,
   runtime: RuntimeInstanceProjectionRow,
 ): DirectorRuntimeProjection {
+  const executions = [] as RuntimeInstanceProjectionRow['executions'];
+  const checkpoints = [] as RuntimeInstanceProjectionRow['checkpoints'];
+  const commands = [] as RuntimeInstanceProjectionRow['commands'];
   const copy = runtimeHeadline(runtime);
   return {
     runId: runtime.runId ?? runtime.id,
@@ -326,20 +334,20 @@ function buildRuntimeOnlyProjection(
     status: runtimeStatusToProjectionStatus(runtime.status),
     currentAction: runtime.currentStep,
     waitingReason: runtimeWaitingReason(runtime.status),
-    activeExecution: runtime.executions[0]
+    activeExecution: executions[0]
       ? {
-        executionId: runtime.executions[0].id,
-        stepType: runtime.executions[0].stepType,
-        resourceClass: runtime.executions[0].resourceClass,
-        workerId: runtime.executions[0].workerId,
-        slotId: runtime.executions[0].slotId,
-        status: runtime.executions[0].status,
-        startedAt: runtime.executions[0].startedAt?.toISOString() ?? null,
-        leaseExpiresAt: runtime.executions[0].leaseExpiresAt?.toISOString() ?? null,
+        executionId: executions[0].id,
+        stepType: executions[0].stepType,
+        resourceClass: executions[0].resourceClass,
+        workerId: executions[0].workerId,
+        slotId: executions[0].slotId,
+        status: executions[0].status,
+        startedAt: executions[0].startedAt?.toISOString() ?? null,
+        leaseExpiresAt: executions[0].leaseExpiresAt?.toISOString() ?? null,
       }
       : null,
-    resourceClass: runtime.executions[0]?.resourceClass ?? null,
-    checkpointSummary: runtime.checkpoints[0]?.summary ?? null,
+    resourceClass: executions[0]?.resourceClass ?? null,
+    checkpointSummary: checkpoints[0]?.summary ?? null,
     nextAutomaticAction: runtime.status === "completed" ? null : "系统会自动接续当前自动导演任务。",
     currentNodeKey: runtime.currentStep,
     currentLabel: copy.currentLabel,
@@ -351,7 +359,7 @@ function buildRuntimeOnlyProjection(
     blockingReason: runtime.lastErrorMessage,
     policyMode: "run_until_gate",
     updatedAt: runtime.updatedAt.toISOString(),
-    recentEvents: runtime.commands.slice(0, 5).map((command) => ({
+    recentEvents: commands.slice(0, 5).map((command) => ({
       eventId: `${taskId}:${command.id}`,
       type: "node_heartbeat",
       summary: command.status === "queued" ? "自动导演等待后台执行资源。" : "自动导演正在处理这本书。",
@@ -509,47 +517,6 @@ export async function loadPersistentDirectorRuntimeProjection(
         lastErrorMessage: true,
         lastHeartbeatAt: true,
         updatedAt: true,
-        executions: {
-          where: { status: { in: ["leased", "running"] } },
-          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-          take: 1,
-          select: {
-            id: true,
-            stepType: true,
-            resourceClass: true,
-            workerId: true,
-            slotId: true,
-            status: true,
-            startedAt: true,
-            leaseExpiresAt: true,
-            errorMessage: true,
-          },
-        },
-        checkpoints: {
-          orderBy: [{ version: "desc" }, { createdAt: "desc" }],
-          take: 1,
-          select: {
-            summary: true,
-            createdAt: true,
-          },
-        },
-        commands: {
-          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-          take: 20,
-          select: {
-            id: true,
-            commandType: true,
-            status: true,
-            leaseOwner: true,
-            leaseExpiresAt: true,
-            errorMessage: true,
-            runAfter: true,
-            startedAt: true,
-            finishedAt: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        },
       },
     }).catch((error) => {
       if (isDirectorRuntimeTableUnavailable(error)) {
