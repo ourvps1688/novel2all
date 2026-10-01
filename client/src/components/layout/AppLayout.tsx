@@ -7,7 +7,6 @@ import NovelWorkspaceRail from "./NovelWorkspaceRail";
 import Sidebar from "./Sidebar";
 import LiveExecutionDialog from "@/components/liveExecution/LiveExecutionDialog";
 import MobileSiteShell from "./mobile/MobileSiteShell";
-import AutoDirectorPauseNotificationWatcher from "@/components/autoDirector/AutoDirectorPauseNotificationWatcher";
 import { TaskRecoveryProvider } from "./TaskRecoveryContext";
 import TaskRecoveryDialog from "./TaskRecoveryDialog";
 import { useIsMobileViewport } from "./mobile/useIsMobileViewport";
@@ -79,8 +78,7 @@ export default function AppLayout() {
       <CreationSetupProvider>
         <TaskRecoveryProvider>
           <div className="h-[100dvh] overflow-hidden bg-background text-foreground">
-            <AutoDirectorPauseNotificationWatcher />
-            <LLMSelectionBootstrap />
+                        <LLMSelectionBootstrap />
             <Suspense fallback={<AppRouteFallback />}>
               <Outlet />
             </Suspense>
@@ -96,8 +94,7 @@ export default function AppLayout() {
       <CreationSetupProvider>
       <TaskRecoveryProvider>
         <div className="min-h-screen bg-background">
-          <AutoDirectorPauseNotificationWatcher />
-          <LiveExecutionDialog compact className="fixed right-3 top-3 z-50 h-9 w-9 bg-background px-0 shadow-sm" />
+                    <LiveExecutionDialog compact className="fixed right-3 top-3 z-50 h-9 w-9 bg-background px-0 shadow-sm" />
           <LLMSelectionBootstrap />
           <Suspense fallback={<AppRouteFallback />}>
             <Outlet />
@@ -114,8 +111,7 @@ export default function AppLayout() {
       <CreationSetupProvider>
       <TaskRecoveryProvider>
         <MobileSiteShell>
-          <AutoDirectorPauseNotificationWatcher />
-          <LLMSelectionBootstrap />
+                    <LLMSelectionBootstrap />
           <Suspense fallback={<AppRouteFallback />}>
             <Outlet />
           </Suspense>
@@ -130,8 +126,7 @@ export default function AppLayout() {
     <CreationSetupProvider>
     <TaskRecoveryProvider>
       <div className="h-[100dvh] overflow-hidden bg-background">
-        <AutoDirectorPauseNotificationWatcher />
-        <LLMSelectionBootstrap />
+                <LLMSelectionBootstrap />
         <Navbar
           workspaceNavMode={isNovelWorkspace ? workspaceNavMode : undefined}
           onWorkspaceNavModeChange={isNovelWorkspace ? setWorkspaceNavMode : undefined}

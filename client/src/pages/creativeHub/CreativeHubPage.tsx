@@ -37,6 +37,8 @@ import {
   findCreativeHubInitialThread,
 } from "./routing/creativeHubRouteBindings";
 import { resolveCreativeHubWorkspacePresentation } from "./presentation/creativeHubWorkspaceViewModel";
+import { useDirectorAttention } from "@/hooks/useDirectorAttention";
+import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
 
 const RUNTIME_DETAILS_COLLAPSED_STORAGE_KEY = "creative-hub.runtime-details-collapsed";
 const DEFAULT_THREAD_TITLE = "\u65b0\u5bf9\u8bdd";
@@ -45,6 +47,7 @@ const pendingAutoCreateThreadKeys = new Set<string>();
 export default function CreativeHubPage() {
   const llm = useLLMStore();
   const queryClient = useQueryClient();
+  const directorAttentionExecutor = useDirectorAttentionActionExecutor();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedThreadId = searchParams.get("threadId")?.trim() ?? "";
   const activeThreadId = requestedThreadId;
@@ -234,6 +237,8 @@ export default function CreativeHubPage() {
     worldId: rawThreadBindings.worldId ?? productionStatus?.worldId ?? null,
   }), [productionStatus?.worldId, rawThreadBindings]);
 
+  const directorAttentionQuery = useDirectorAttention(currentBindings.novelId);
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -310,6 +315,7 @@ export default function CreativeHubPage() {
       threadLoadError: runtimeState.threadLoadError,
       novelsError: novelsQuery.error,
       createThreadError: activeThreadId ? null : createThreadMutation.error,
+      directorAttention: directorAttentionQuery.data,
     }),
     [
       currentNovelTitle,
@@ -326,6 +332,7 @@ export default function CreativeHubPage() {
       stateQuery.data?.data?.diagnostics,
       stateQuery.error,
       threadsQuery.error,
+      directorAttentionQuery.data,
     ],
   );
 
@@ -497,6 +504,10 @@ export default function CreativeHubPage() {
     }
     if (recommendation.action === "send_prompt" && recommendation.prompt) {
       void handleQuickAction(recommendation.prompt);
+      return;
+    }
+    if (recommendation.action === "open_recovery" && recommendation.recoveryAction) {
+      void directorAttentionExecutor(recommendation.recoveryAction);
       return;
     }
     if (recommendation.action === "select_novel" || recommendation.action === "open_production") {
