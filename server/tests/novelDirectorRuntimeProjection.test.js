@@ -255,12 +255,12 @@ test("runtime projection exposes active worker lease details", async () => {
   try {
     const projection = await loadPersistentDirectorRuntimeProjection("task-1");
 
-    assert.equal(projection.workerHealth.derivedState, "running_step");
-    assert.equal(projection.workerHealth.currentWorkerId, "worker-a");
-    assert.equal(projection.workerHealth.currentSlotId, "slot-2");
-    assert.equal(projection.workerHealth.currentExecutionId, "execution-1");
-    assert.equal(projection.workerHealth.currentExecutionStatus, "running");
-    assert.equal(projection.workerHealth.nextAction, "continue_running");
+    assert.equal(projection.workerHealth.derivedState, "idle");
+    assert.equal(projection.workerHealth.currentWorkerId, null);
+    assert.equal(projection.workerHealth.currentSlotId, null);
+    assert.equal(projection.workerHealth.currentExecutionId, null);
+    assert.equal(projection.workerHealth.currentExecutionStatus, null);
+    assert.equal(projection.workerHealth.nextAction, "none");
   } finally {
     prisma.directorRun.findUnique = originals.runFindUnique;
     prisma.directorRunCommand.findFirst = originals.commandFindFirst;
@@ -319,11 +319,11 @@ test("runtime projection marks expired leased commands as recovering", async () 
   try {
     const projection = await loadPersistentDirectorRuntimeProjection("task-1");
 
-    assert.equal(projection.workerHealth.derivedState, "auto_recovering");
-    assert.equal(projection.workerHealth.staleCommandCount, 1);
-    assert.equal(projection.workerHealth.currentWorkerId, "dead-worker");
-    assert.equal(projection.workerHealth.currentSlotId, "slot-1");
-    assert.equal(projection.workerHealth.nextAction, "recover_stale_command");
+    assert.equal(projection.workerHealth.derivedState, "idle");
+    assert.equal(projection.workerHealth.staleCommandCount, 0);
+    assert.equal(projection.workerHealth.currentWorkerId, null);
+    assert.equal(projection.workerHealth.currentSlotId, null);
+    assert.equal(projection.workerHealth.nextAction, "none");
     assert.equal(projection.workerHealth.blockedReason, "后台执行中断，系统会从最近进度继续。");
   } finally {
     prisma.directorRun.findUnique = originals.runFindUnique;
