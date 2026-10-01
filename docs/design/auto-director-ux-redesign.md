@@ -121,7 +121,7 @@ type DirectorAttentionState = {
 - **T5**：`Navbar` 接入常驻徽标 `DirectorAttentionBadge`（持久化、非 sessionStorage）+ Radix Dialog 待处理抽屉，`useDirectorAttentions()` 统计非 idle 数——修复「不知去哪处理」。
 - **T6**：`NovelEdit` 横幅改用 `DirectorAttentionBanner`（薄封装），替换原 `AITakeoverContainer`，删除散乱 `checkpointType` 分支，补 `blocked` 兜底按钮（服务端始终返回可点 primaryAction）。
 - **验证**：`shared build` ✅、`client typecheck` EXIT 0 ✅、`client test` 182/182 ✅。
-- **T7**（未做，单独 PR）：workspace 栏卡片、AICockpit、TaskCenter 改用统一组件（删除重复）。
+- **T7**（已完成，PR #25）：workspace 栏卡片、AICockpit、TaskCenter 改用统一组件（删除重复）。具体见 PR #25：workspace 栏卡片改渲染 DirectorAttentionCenter；NovelTaskDrawer 删除 runProjectedAction 字符串匹配与 checkpointType 标签覆盖，动作统一走 useDirectorAttentionActionExecutor；NovelList 对话框删除重复的 handleCockpitAction；TaskCenterDetailPanel 顶部接入统一注意力卡片（保留富信息 DirectorRuntimeProjectionCard）。新增客户端适配器 mapProjectionToAttention 镜像服务端归一化，复用既有 DirectorBookAutomationAction 描述符，不新增字符串分支表。AICockpit 保留富信息渲染，仅统一动作层。）。
 
 ### Phase 5-C：主动提示与闭环
 - **T8**：全局 in-app Toast / Banner（替代默认关的浏览器通知）；「收起」不消灭入口。
