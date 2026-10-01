@@ -83,10 +83,10 @@ import { resolveChapterTitleWarning } from "@/lib/directorTaskNotice";
 import { resolveInternalNavigationTarget } from "@/lib/internalNavigation";
 import { resolveDirectorContinueMode, resolveWorkflowContinuationFeedback } from "@/lib/novelWorkflowContinuation";
 import {
-  getDirectorCockpitActionHref,
-  getDirectorCockpitContinuationMode,
-  isDirectorCockpitContinuationAction,
-} from "@/lib/directorCockpitActions";
+  getDirectorActionHref,
+  getDirectorContinuationMode,
+  isDirectorContinuationAction,
+} from "@/lib/directorContinuationActions";
 import { canCancelDirectorTask, getCandidateSelectionLink } from "@/lib/novelWorkflowTaskUi";
 import { syncAutoDirectorTaskCache } from "@/lib/taskQueryCache";
 import {
@@ -1258,10 +1258,10 @@ export default function NovelEdit() {
       ?? action.target.taskId
       ?? bookAutomationProjection.latestTask?.id
       ?? activeAutoDirectorTask?.id;
-    if (taskId && isDirectorCockpitContinuationAction(action)) {
+    if (taskId && isDirectorContinuationAction(action)) {
       continueProjectedDirectorActionMutation.mutate({
         taskId,
-        mode: getDirectorCockpitContinuationMode(action),
+        mode: getDirectorContinuationMode(action),
       });
       return;
     }
@@ -1282,7 +1282,7 @@ export default function NovelEdit() {
       return;
     }
     setIsTaskDrawerOpen(false);
-    navigate(getDirectorCockpitActionHref(bookAutomationProjection, action));
+    navigate(getDirectorActionHref(bookAutomationProjection, action));
   };
   const handleDrawerAttentionAction = (action: AutoDirectorAction) => {
     if (action.kind === "navigation") {

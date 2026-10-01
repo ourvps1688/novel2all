@@ -28,6 +28,7 @@ import {
 } from "@/lib/directorTaskNotice";
 import { extractWorkflowActivityTags } from "@/lib/novelWorkflowActivityTags";
 import { useDirectorChapterTitleRepair } from "@/hooks/useDirectorChapterTitleRepair";
+import { CHAPTER_EXECUTION_ITEM_KEYS, QUALITY_REPAIR_ITEM_KEYS } from "@/lib/directorItemKeys";
 import NovelDirectorPreparationJourney, {
   type DirectorPreparationStepStatus,
 } from "./NovelDirectorPreparationJourney";
@@ -166,21 +167,8 @@ function isCandidateSetupFlow(task: UnifiedTaskDetail | null): boolean {
 
 function resolveDirectorExecutionStepIndex(task: UnifiedTaskDetail | null): number {
   const itemKey = task?.currentItemKey ?? "";
-  const chapterExecutionKeys = new Set([
-    "chapter_execution",
-    "chapter_execution_node",
-    "chapter.draft.write",
-    "chapter.write",
-  ]);
-  const qualityRepairKeys = new Set([
-    "reviewing",
-    "repairing",
-    "quality_repair",
-    "chapter_quality_review_node",
-    "chapter.quality.review",
-    "chapter_state_commit_node",
-    "chapter.state.commit",
-  ]);
+  const chapterExecutionKeys = new Set(CHAPTER_EXECUTION_ITEM_KEYS);
+  const qualityRepairKeys = new Set(QUALITY_REPAIR_ITEM_KEYS);
   if (qualityRepairKeys.has(itemKey)) {
     return 5;
   }

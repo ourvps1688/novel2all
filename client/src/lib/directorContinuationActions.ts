@@ -4,11 +4,11 @@ import type {
 } from "@ai-novel/shared/types/directorRuntime";
 import type { DirectorContinuationMode } from "@ai-novel/shared/types/novelDirector";
 
-export function isDirectorCockpitContinuationAction(action: DirectorBookAutomationAction): boolean {
+export function isDirectorContinuationAction(action: DirectorBookAutomationAction): boolean {
   return action.type === "continue" || action.type === "auto_execute_range";
 }
 
-export function getDirectorCockpitContinuationMode(
+export function getDirectorContinuationMode(
   action: DirectorBookAutomationAction,
 ): DirectorContinuationMode | undefined {
   if (action.type === "auto_execute_range") {
@@ -20,7 +20,7 @@ export function getDirectorCockpitContinuationMode(
   return undefined;
 }
 
-export function getDirectorCockpitActionHref(
+export function getDirectorActionHref(
   projection: DirectorBookAutomationProjection,
   action: DirectorBookAutomationAction,
 ): string {
