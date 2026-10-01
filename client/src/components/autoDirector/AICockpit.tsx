@@ -329,12 +329,11 @@ export default function AICockpit(props: AICockpitProps) {
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-start gap-2">
             <span className="mt-0.5 shrink-0 text-muted-foreground">{stateIcon("idle")}</span>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-foreground">AI 推进状态</div>
-              <div className="mt-1 text-xs leading-5 text-muted-foreground">{fallbackProjectionReason(props)}</div>
-            </div>
+              <div className="min-w-0">
+                <div className="text-xs leading-5 text-muted-foreground">{fallbackProjectionReason(props)}</div>
+              </div>
           </div>
-          <Badge variant="secondary" className="shrink-0">{fallbackStatusLabel ?? "未开启"}</Badge>
+          <Badge variant="secondary" className="shrink-0">{fallbackStatusLabel ?? "还没开始自动写作"}</Badge>
         </div>
         {onOpenFallbackDetails ? (
           <Button type="button" size="sm" variant="outline" className="mt-3 w-full" onClick={onOpenFallbackDetails}>
@@ -413,12 +412,11 @@ export default function AICockpit(props: AICockpitProps) {
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-start gap-2">
             <span className="mt-0.5 shrink-0 text-foreground">{stateIcon(focusProjection.displayState)}</span>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-foreground">AI 推进状态</div>
-              <div className="mt-1 line-clamp-1 text-xs leading-5 text-muted-foreground">
-                {focusProjection.userHeadline || focusProjection.headline || reason}
+              <div className="min-w-0">
+                <div className="line-clamp-1 text-xs leading-5 text-muted-foreground">
+                  {focusProjection.userHeadline || focusProjection.headline || reason}
+                </div>
               </div>
-            </div>
           </div>
           <Badge variant={stateBadgeVariant(focusProjection.displayState)} className="shrink-0">
             {displayStateLabel(focusProjection.displayState)}

@@ -132,34 +132,37 @@ export function NovelShelfCard(props: {
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 text-muted-foreground"
+              className="h-8 gap-1 px-2 text-muted-foreground"
               title={coverStatusLabel(coverStatus)}
               aria-label={coverStatusLabel(coverStatus)}
               onClick={() => props.onManageCover(novel.id)}
             >
               <ImagePlus className="h-4 w-4" aria-hidden="true" />
+              <span className="text-xs">封面</span>
             </Button>
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 text-muted-foreground"
+              className="h-8 gap-1 px-2 text-muted-foreground"
               title="导出作品"
               aria-label="导出作品"
               onClick={() => props.onDownload({ novelId: novel.id, novelTitle: novel.title })}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
+              <span className="text-xs">下载</span>
             </Button>
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+              className="h-8 gap-1 px-2 text-muted-foreground hover:text-destructive"
               title="删除作品"
               aria-label="删除作品"
               onClick={() => props.onDelete(novel.id, novel.title)}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
+              <span className="text-xs">删除</span>
             </Button>
           </div>
         </div>
@@ -202,11 +205,13 @@ export function NovelContinueCard(props: {
             <Button asChild size="sm" variant="secondary" className="h-8 flex-1 px-2 text-xs">
               <Link to={action.href}><BookOpen className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />{action.label}</Link>
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground" title="管理封面" aria-label="管理封面" onClick={() => props.onManageCover(novel.id)}>
+            <Button type="button" size="sm" variant="ghost" className="h-8 gap-1 px-2 text-muted-foreground" title="管理封面" aria-label="管理封面" onClick={() => props.onManageCover(novel.id)}>
               <ImagePlus className="h-4 w-4" aria-hidden="true" />
+              <span className="text-xs">封面</span>
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive" title="删除作品" aria-label="删除作品" onClick={() => props.onDelete(novel.id, novel.title)}>
+            <Button type="button" size="sm" variant="ghost" className="h-8 gap-1 px-2 text-muted-foreground hover:text-destructive" title="删除作品" aria-label="删除作品" onClick={() => props.onDelete(novel.id, novel.title)}>
               <Trash2 className="h-4 w-4" aria-hidden="true" />
+              <span className="text-xs">删除</span>
             </Button>
           </div>
         </div>

@@ -176,16 +176,17 @@ export function NovelProjectCard(props: {
           </div>
           <div className="flex flex-wrap items-center gap-1 opacity-70 transition group-hover:opacity-100 focus-within:opacity-100">
             {props.novel.narrativeForm !== "short_story" ? (
-              <Button asChild size="sm" variant="ghost" className="h-8 w-8 px-0" title="阅读预览" aria-label="阅读预览">
-                <Link to={`/novels/${props.novel.id}/preview`} onClick={stopCardClick}>
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              </Button>
+            <Button asChild size="sm" variant="ghost" className="h-8 gap-1 px-2" title="阅读预览" aria-label="阅读预览">
+              <Link to={`/novels/${props.novel.id}/preview`} onClick={stopCardClick}>
+                <Eye className="h-4 w-4" aria-hidden="true" />
+                <span className="text-xs">预览</span>
+              </Link>
+            </Button>
             ) : null}
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 px-0"
+              className="h-8 gap-1 px-2"
               onClick={(event) => {
                 stopCardClick(event);
                 props.onDownload({
@@ -198,11 +199,12 @@ export function NovelProjectCard(props: {
               aria-label={isDownloadPending ? "正在导出" : "导出作品"}
             >
               <Download className="h-4 w-4" aria-hidden="true" />
+              <span className="text-xs">{isDownloadPending ? "导出中" : "下载"}</span>
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 px-0 text-muted-foreground hover:text-destructive"
+              className="h-8 gap-1 px-2 text-muted-foreground hover:text-destructive"
               onClick={(event) => {
                 stopCardClick(event);
                 props.onDelete(props.novel.id, props.novel.title);
@@ -212,6 +214,7 @@ export function NovelProjectCard(props: {
               aria-label={isDeletePending ? "正在删除" : "删除作品"}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
+              <span className="text-xs">{isDeletePending ? "删除中" : "删除"}</span>
             </Button>
           </div>
         </div>

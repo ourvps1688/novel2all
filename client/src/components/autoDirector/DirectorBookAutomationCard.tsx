@@ -36,6 +36,7 @@ export default function DirectorBookAutomationCard({
 
   return (
     <div className="space-y-2">
+      <div className="text-sm font-semibold text-foreground">AI 推进状态</div>
       <AICockpit
         projection={effectiveProjection}
         mode={compact ? "compact" : "focusedNovel"}
