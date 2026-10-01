@@ -38,6 +38,7 @@ import styleEngineRouter from "./routes/styleEngine";
 import styleEngineExtractionRouter from "./routes/styleEngineExtraction";
 import storyModeRouter from "./routes/storyMode";
 import tasksRouter from "./routes/tasks";
+import directorAttentionRouter from "./routes/directorAttention";
 import titleLibraryRouter from "./routes/titleLibrary";
 import worldRouter from "./modules/setup/world/http";
 import writingFormulaRouter from "./routes/writingFormula";
@@ -149,6 +150,7 @@ export function createApp() {
   app.use("/api/images", imagesRouter);
   app.use("/api/visual-assets", visualAssetRouter);
   app.use("/api/tasks", tasksRouter);
+  app.use("/api/director-attentions", directorAttentionRouter);
   app.use("/api/auto-director/follow-ups", autoDirectorFollowUpsRouter);
   app.use("/api/settings/auto-director", settingsAutoDirectorRouter);
   app.use("/api/settings", settingsRouter);
