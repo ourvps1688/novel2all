@@ -147,4 +147,8 @@ export const queryKeys = {
   novelsKnowledge: {
     bindings: (id: string) => ["novels", "knowledge-documents", id] as const,
   },
+  directorAttentions: {
+    all: ["director-attentions"] as const,
+    detail: (id: string) => ["director-attentions", "detail", id] as const,
+  },
 };

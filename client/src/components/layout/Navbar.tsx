@@ -3,6 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import LLMSelector from "@/components/common/LLMSelector";
 import { useCreationSetup } from "@/components/onboarding/CreationSetupContext";
 import AppVersionBadge from "@/components/layout/AppVersionBadge";
+import DirectorAttentionBadge from "@/components/layout/DirectorAttentionBadge";
 import DesktopBrandMark from "@/components/layout/DesktopBrandMark";
 import LiveExecutionDialog from "@/components/liveExecution/LiveExecutionDialog";
 import ProjectGithubLink from "@/components/layout/ProjectGithubLink";
@@ -51,6 +52,7 @@ export default function Navbar(props: NavbarProps) {
             {workspaceNavMode === "workspace" ? "项目导航" : "创作导航"}
           </Button>
         ) : null}
+        <DirectorAttentionBadge />
         <LiveExecutionDialog />
         <ThemeToggle />
         <Button
