@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { ChevronDown, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { useIsMobileViewport } from "@/components/layout/mobile/useIsMobileViewport";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -361,13 +361,16 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
                   </Card>
                 ) : null}
 
-                <div className="space-y-2 border-t border-border/70 pt-4">
-                  <p className="text-sm font-medium">调试检查</p>
+                <details className="group space-y-2 border-t border-border/70 pt-4">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                    <ChevronDown className="h-4 w-4 shrink-0 transition group-open:rotate-180" />
+                    调试检查
+                  </summary>
                   <p className="text-xs text-muted-foreground">
                     这本书推进卡住时，可以在这里查看每一步是否已经有产出。
                   </p>
                   <DirectorFactDebugDialog novelId={id} taskId={taskDrawer?.task?.id ?? null} />
-                </div>
+                </details>
               </DialogContent>
             </Dialog>
 
