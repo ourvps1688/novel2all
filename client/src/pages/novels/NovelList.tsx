@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DirectorContinuationMode } from "@ai-novel/shared/types/novelDirector";
-import type {
-  DirectorBookAutomationAction,
-  DirectorBookAutomationProjection,
-} from "@ai-novel/shared/types/directorRuntime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDirectorBookAutomationProjection } from "@/api/novelDirector";
@@ -18,11 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
 import { resolveWorkflowContinuationFeedback } from "@/lib/novelWorkflowContinuation";
-import {
-  getDirectorCockpitActionHref,
-  getDirectorCockpitContinuationMode,
-  isDirectorCockpitContinuationAction,
-} from "@/lib/directorCockpitActions";
+import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
 import { useTaskRecovery } from "@/components/layout/TaskRecoveryContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NovelListEmptyState } from "./components/list/NovelListEmptyState";
@@ -56,6 +48,7 @@ function createDownload(blob: Blob, fileName: string): void {
 
 export default function NovelList() {
   const navigate = useNavigate();
+  const directorAttentionExecutor = useDirectorAttentionActionExecutor();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const storedView = typeof window !== "undefined" ? window.localStorage.getItem("novel-list-view") : null;
@@ -266,22 +259,6 @@ export default function NovelList() {
     };
   }, [coverNovel]);
 
-  const handleCockpitAction = (
-    projection: DirectorBookAutomationProjection,
-    action: DirectorBookAutomationAction,
-  ) => {
-    const taskId = action.commandPayload?.taskId ?? action.target.taskId ?? projection.latestTask?.id;
-    if (taskId && isDirectorCockpitContinuationAction(action)) {
-      continueWorkflowMutation.mutate({
-        taskId,
-        mode: getDirectorCockpitContinuationMode(action),
-      });
-      return;
-    }
-    setCockpitNovelId(null);
-    navigate(getDirectorCockpitActionHref(projection, action));
-  };
-
   return (
     <div className="space-y-5">
       <NovelListHeader
@@ -433,7 +410,10 @@ export default function NovelList() {
               projection={cockpitProjection}
               mode="focusedNovel"
               isActionPending={continueWorkflowMutation.isPending}
-              onAction={handleCockpitAction}
+              onAction={(_projection, action) => {
+                setCockpitNovelId(null);
+                void directorAttentionExecutor(action);
+              }}
               onOpenNovel={(projection) => {
                 setCockpitNovelId(null);
                 navigate(projection.focusNovel.href);

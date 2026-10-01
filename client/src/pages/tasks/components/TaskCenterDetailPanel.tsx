@@ -3,6 +3,8 @@ import type { NovelWorkflowMilestone } from "@ai-novel/shared/types/novelWorkflo
 import type { UnifiedTaskDetail, UnifiedTaskStep } from "@ai-novel/shared/types/task";
 import { Link } from "react-router-dom";
 import DirectorRuntimeProjectionCard from "@/components/autoDirector/DirectorRuntimeProjectionCard";
+import { DirectorAttentionCenter } from "@/components/autoDirector/DirectorAttentionCenter";
+import { useDirectorAttention } from "@/hooks/useDirectorAttention";
 import {
   TaskQueueActionRow,
   TaskQueueImpactNotice,
@@ -33,6 +35,10 @@ interface TaskCenterDetailPanelProps {
 
 export default function TaskCenterDetailPanel(props: TaskCenterDetailPanelProps) {
   const task = props.task;
+  // Unified attention entry point: surfaces the same canonical state + primary
+  // action used by the novel page banner and navbar badge, so auto-director
+  // recovery is discoverable from the Task Center too (T7).
+  const directorAttention = useDirectorAttention(props.runtimeProjection?.novelId ?? null);
 
   return (
     <TaskQueueSection
@@ -87,6 +93,10 @@ export default function TaskCenterDetailPanel(props: TaskCenterDetailPanelProps)
 
             {task.kind === "novel_workflow" && task.checkpointSummary ? (
               <WorkspaceStateNotice compact title="最近检查点" description={task.checkpointSummary} />
+            ) : null}
+
+            {props.isAutoDirectorTask && directorAttention.data && directorAttention.data.level !== "idle" ? (
+              <DirectorAttentionCenter state={directorAttention.data} variant="card" />
             ) : null}
 
             {props.isAutoDirectorTask ? <DirectorRuntimeProjectionCard projection={props.runtimeProjection} /> : null}

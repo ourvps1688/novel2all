@@ -7,6 +7,7 @@ import type { TaskStatus } from "@ai-novel/shared/types/task";
 import type { CharacterResourceProposalSummary } from "@ai-novel/shared/types/characterResource";
 import type { AutoDirectorAction } from "@ai-novel/shared/types/autoDirectorFollowUp";
 import AICockpit from "@/components/autoDirector/AICockpit";
+import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
 import LLMSelector from "@/components/common/LLMSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -297,45 +298,16 @@ export default function NovelTaskDrawer({
         ? projectedProgressPercent
         : 0,
   )));
+  const executor = useDirectorAttentionActionExecutor();
   const tokenUsage = task?.tokenUsage ?? null;
   const primaryAction = projection?.primaryAction ?? null;
-  const primaryActionLabel = (
-    (primaryAction?.type === "continue" || primaryAction?.type === "auto_execute_range")
-    && projection?.displayState === "needs_confirmation"
-    && projection.latestTask?.checkpointType !== "replan_required"
-  )
-    ? "确认并继续"
-    : primaryAction?.label;
-  const runProjectedAction = (action: DirectorBookAutomationAction) => {
-    const matchedAction = actions.find((item) => {
-      if (item.label === action.label) {
-        return true;
-      }
-      if (action.type === "continue") {
-        return item.label.includes("继续");
-      }
-      if (action.type === "auto_execute_range") {
-        return item.label.includes("自动执行");
-      }
-      if (action.type === "confirm_candidate") {
-        return item.label.includes("书级方向");
-      }
-      if (action.type === "open_quality_repair") {
-        return item.label.includes("质量修复");
-      }
-      if (action.type === "open_chapter") {
-        return item.label.includes("章节执行");
-      }
-      return false;
-    });
-    matchedAction?.onClick();
-  };
+  const primaryActionLabel = primaryAction?.label ?? "继续处理";
   const handleProjectionAction = (action: DirectorBookAutomationAction) => {
     if (onProjectionAction) {
       onProjectionAction(action);
       return;
     }
-    runProjectedAction(action);
+    void executor(action);
   };
   const canShowRuntimePolicy = capabilities?.canAdjustRuntimePolicy !== false && Boolean(task?.id && runtimeSnapshot);
   const canShowManualImpact = capabilities?.canInspectManualEditImpact !== false && Boolean(task);
