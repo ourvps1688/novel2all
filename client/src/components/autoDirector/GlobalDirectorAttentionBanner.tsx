@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useDirectorAttentions } from "@/hooks/useDirectorAttention";
 import { DirectorAttentionCenter } from "./DirectorAttentionCenter";
+import { selectVisibleDirectorAttentions } from "@/lib/directorAttentionSelectors";
 
 /**
  * Phase 5-C (T8): replaces the old default-OFF OS browser-notification watcher
@@ -16,11 +17,7 @@ export default function GlobalDirectorAttentionBanner() {
   const attentionsQuery = useDirectorAttentions();
   const [dismissedNovelIds, setDismissedNovelIds] = useState<Set<string>>(new Set());
 
-  const visible = (attentionsQuery.data ?? []).filter(
-    (attention) =>
-      (attention.level === "needs_recovery" || attention.level === "waiting_approval")
-      && !dismissedNovelIds.has(attention.novelId),
-  );
+  const visible = selectVisibleDirectorAttentions(attentionsQuery.data ?? [], dismissedNovelIds);
 
   if (visible.length === 0) {
     return null;

@@ -16,6 +16,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import { resolveWorkflowContinuationFeedback } from "@/lib/novelWorkflowContinuation";
 import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
+import { selectAttentionByNovelId, selectContinueNovels } from "@/lib/directorAttentionSelectors";
 import { useDirectorAttentions } from "@/hooks/useDirectorAttention";
 import { useTaskRecovery } from "@/components/layout/TaskRecoveryContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,15 +52,10 @@ export default function NovelList() {
   const navigate = useNavigate();
   const directorAttentionExecutor = useDirectorAttentionActionExecutor();
   const directorAttentionsQuery = useDirectorAttentions();
-  const attentionByNovelId = useMemo(() => {
-    const map = new Map<string, DirectorAttentionState>();
-    for (const attention of directorAttentionsQuery.data ?? []) {
-      if (attention.level !== "idle") {
-        map.set(attention.novelId, attention);
-      }
-    }
-    return map;
-  }, [directorAttentionsQuery.data]);
+  const attentionByNovelId = useMemo(
+    () => selectAttentionByNovelId(directorAttentionsQuery.data ?? []),
+    [directorAttentionsQuery.data],
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const storedView = typeof window !== "undefined" ? window.localStorage.getItem("novel-list-view") : null;
@@ -234,7 +230,7 @@ export default function NovelList() {
 
   const coverNovel = coverNovelId ? allNovels.find((item) => item.id === coverNovelId) ?? null : null;
   const continueNovels = useMemo(
-    () => novels.filter((novel) => attentionByNovelId.has(novel.id)).slice(0, 3),
+    () => selectContinueNovels(novels, attentionByNovelId),
     [novels, attentionByNovelId],
   );
   const coverBasicForm = useMemo<NovelBasicFormState | null>(() => {

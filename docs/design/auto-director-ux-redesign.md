@@ -123,14 +123,19 @@ type DirectorAttentionState = {
 - **验证**：`shared build` ✅、`client typecheck` EXIT 0 ✅、`client test` 182/182 ✅。
 - **T7**（已完成，PR #25）：workspace 栏卡片、AICockpit、TaskCenter 改用统一组件（删除重复）。具体见 PR #25：workspace 栏卡片改渲染 DirectorAttentionCenter；NovelTaskDrawer 删除 runProjectedAction 字符串匹配与 checkpointType 标签覆盖，动作统一走 useDirectorAttentionActionExecutor；NovelList 对话框删除重复的 handleCockpitAction；TaskCenterDetailPanel 顶部接入统一注意力卡片（保留富信息 DirectorRuntimeProjectionCard）。新增客户端适配器 mapProjectionToAttention 镜像服务端归一化，复用既有 DirectorBookAutomationAction 描述符，不新增字符串分支表。AICockpit 保留富信息渲染，仅统一动作层。）。
 
-### Phase 5-C：主动提示与闭环
-- **T8**：全局 in-app Toast / Banner（替代默认关的浏览器通知）；「收起」不消灭入口。
-- **T9**：Creative Hub「下一步」在停态返回真实恢复 action。
-- **T10**：列表页「继续创作」纳入 `blocked/paused`。
+### Phase 5-C：主动提示与闭环 ✅ 已完成（PR #26，提交 `05e6731`）
+- **T8**：用全局 in-app `GlobalDirectorAttentionBanner`（挂载于 `main.tsx`）替代默认关的浏览器通知；仅展示 `needs_recovery` / `waiting_approval`，「收起」仅存于会话级 React state（不入 sessionStorage），导航栏注意力角标保留为常驻计数。退役 `AutoDirectorPauseNotificationWatcher`、暂停通知 lib、浏览器通知设置卡片。
+- **T9**：Creative Hub「下一步」在 `needs_recovery` / `waiting_approval` 态经 `useDirectorAttention(novelId)` 返回真实 `open_recovery` action（直连 `useDirectorAttentionActionExecutor`），不再只给聊天诊断 prompt。
+- **T10**：列表页「继续创作」改由 `useDirectorAttentions()` 驱动，纳入 `blocked` / `waiting_recovery`（任何非 idle 态）。
 
-### Phase 5-D：收尾
-- **T11**：回归测试 + 小白可用性走查（覆盖 `blocked` / `needs_recovery` 场景）。
+### Phase 5-D：收尾 ✅ 已完成（PR #27）
+- **T11**：回归测试 + 小白可用性走查（覆盖 `needs_recovery` / `waiting_approval` / `running` / `auto_recovering` / `idle` / 会话收起场景）。
+  - 抽取纯函数选择器 `selectVisibleDirectorAttentions` / `selectAttentionByNovelId` / `selectContinueNovels`（`client/src/lib/directorAttentionSelectors.ts`），把横幅可见性与「继续创作」筛选从组件内联逻辑可单测化；回归测试 `client/src/lib/directorAttentionSelectors.test.mjs`（12 个用例，全绿）。
+  - 小白走查：需要恢复 / 等待审批的书会从导航栏铃铛角标 + 顶部常驻横幅主动提示；点「收起」仅隐藏当前会话（刷新重现），创作中枢「下一步」给出 `open_recovery` 直达恢复；无 OS 通知、无独立「导演跟进」页。
 - **T12**：更新 README 与恢复手册对齐新交互。
+  - README 第 2 节删除「浏览器暂停通知」陈旧条目，改为应用内注意力提醒描述；第 1 节「保存到导演跟进」改为「进入应用内注意力提醒」。
+  - 恢复手册新增「恢复入口在哪里」小节，并将矩阵与正文中的「导演跟进」统一替换为应用内入口（导航栏角标 / 全局横幅 / 创作中枢 `open_recovery` / 任务中心）。
+- **验证**：`client typecheck` EXIT 0 ✅、`client test` 198/198 ✅。
 
 ---
 
