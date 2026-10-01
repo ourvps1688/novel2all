@@ -466,7 +466,6 @@ body {
   .mobile-route-model-routes,
   .mobile-route-settings,
   .mobile-route-worlds,
-  .mobile-route-world-generator,
   .mobile-route-world-workspace,
   .mobile-route-style-engine,
   .mobile-route-anti-ai-rules,
@@ -497,7 +496,6 @@ body {
   .mobile-route-model-routes,
   .mobile-route-settings,
   .mobile-route-worlds,
-  .mobile-route-world-generator,
   .mobile-route-world-workspace,
   .mobile-route-style-engine,
   .mobile-route-anti-ai-rules,
@@ -730,7 +728,6 @@ body {
   .mobile-route-model-routes .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-settings .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-worlds .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
-  .mobile-route-world-generator .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-world-workspace .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-style-engine .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
   .mobile-route-anti-ai-rules .rounded-xl.border.bg-card .rounded-xl.border.bg-card,
@@ -760,8 +757,6 @@ body {
   .mobile-route-settings .grid.md\:grid-cols-2,
   .mobile-route-settings .grid.md\:grid-cols-3,
   .mobile-route-settings .grid.md\:grid-cols-4,
-  .mobile-route-world-generator .grid.md\:grid-cols-2,
-  .mobile-route-world-generator .grid.lg\:grid-cols-2,
   .mobile-route-world-workspace .grid.md\:grid-cols-2,
   .mobile-route-world-workspace .grid.lg\:grid-cols-2,
   .mobile-route-story-modes .grid.md\:grid-cols-2,
@@ -784,7 +779,6 @@ body {
   .mobile-route-story-modes .rounded-xl > .p-6,
   .mobile-route-titles .rounded-xl > .p-6,
   .mobile-route-worlds .rounded-xl > .p-6,
-  .mobile-route-world-generator .rounded-xl > .p-6,
   .mobile-route-world-workspace .rounded-xl > .p-6,
   .mobile-route-base-characters .rounded-xl > .p-6 {
     padding: 1rem;
@@ -793,7 +787,6 @@ body {
   .mobile-route-model-routes .flex.items-center.justify-end,
   .mobile-route-settings .flex.items-center.justify-end,
   .mobile-route-world-workspace .flex.items-center.justify-end,
-  .mobile-route-world-generator .flex.justify-end,
   .mobile-route-knowledge .flex.justify-end,
   .mobile-route-book-analysis .flex.justify-end {
     justify-content: stretch;
@@ -802,7 +795,6 @@ body {
   .mobile-route-model-routes .flex.items-center.justify-end > *,
   .mobile-route-settings .flex.items-center.justify-end > *,
   .mobile-route-world-workspace .flex.items-center.justify-end > *,
-  .mobile-route-world-generator .flex.justify-end > *,
   .mobile-route-knowledge .flex.justify-end > *,
   .mobile-route-book-analysis .flex.justify-end > * {
     flex: 1 1 100%;
