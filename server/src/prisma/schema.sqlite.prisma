@@ -2596,7 +2596,6 @@ model AutoDirectorAutoApprovalRecord {
   @@index([taskId, createdAt])
 }
 
-
 model AutoDirectorFollowUpActionLog {
   id             String   @id @default(cuid())
   taskId         String
@@ -2612,26 +2611,6 @@ model AutoDirectorFollowUpActionLog {
 
   @@index([taskId, executedAt])
   @@index([taskId, actionCode, executedAt])
-}
-
-model AutoDirectorFollowUpNotificationLog {
-  id             String   @id @default(cuid())
-  eventId        String
-  eventType      String
-  taskId         String
-  channelType    String
-  target         String?
-  requestPayload String?
-  responseBody   String?
-  responseStatus Int?
-  attemptCount   Int      @default(1)
-  deliveredAt    DateTime?
-  status         String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([taskId, createdAt])
-  @@index([eventId, channelType, createdAt])
 }
 
 model StoryStateSnapshot {
@@ -3587,31 +3566,10 @@ model DramaProject {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  sourceBundle   DramaSourceBundle?
   characters     DramaCharacter[]
-  episodes       DramaEpisode[]
-  facts          DramaFact[]
-  characterLibraryItems DramaCharacterLibrary[]
-  storyboards    DramaStoryboard[]
-  videoPrompts   DramaVideoPrompt[]
-  batchJobs      DramaBatchJob[]
 
   @@index([source])
   @@index([status])
-}
-
-model DramaSourceBundle {
-  id         String   @id @default(cuid())
-  projectId  String   @unique
-  synopsis   String?
-  beats      String?
-  worldNotes String?
-  hardFacts  String?
-  rawText    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  project    DramaProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model DramaCharacter {
@@ -3637,90 +3595,10 @@ model DramaCharacter {
   @@index([projectId])
 }
 
-model DramaEpisode {
-  id           String   @id @default(cuid())
-  projectId    String
-  order        Int
-  title        String
-  content      String?  @default("")
-  hookOpening  String?
-  cliffhanger  String?
-  hookType     String?
-  isPaywall    Boolean  @default(false)
-  emotionNet   Int?
-  beatSheet    String?
-  sourceMap    String?
-  durationSec  Int?
-  status       String   @default("planned")
-  qualityFlags String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  project      DramaProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  storyboards  DramaStoryboard[]
-  videoPrompts DramaVideoPrompt[]
-  batchJobs    DramaBatchJob[]
-
-  @@unique([projectId, order])
-  @@index([projectId, status])
-}
-
-model DramaFact {
-  id           String   @id @default(cuid())
-  projectId    String
-  episodeOrder Int
-  text         String
-  category     String   @default("completed")
-  source       String   @default("auto")
-  createdAt    DateTime @default(now())
-
-  project      DramaProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId, episodeOrder])
-  @@index([projectId, category])
-}
-
-model DramaCharacterLibrary {
-  id           String   @id @default(cuid())
-  projectId    String?
-  name         String
-  archetype    String?
-  persona      String?
-  speechStyle  String?
-  visualAnchor String?
-  voiceProfile String?
-  relations    String?
-  tags         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  project      DramaProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  @@index([projectId])
-  @@index([name])
-}
-
-model DramaStoryboard {
-  id        String   @id @default(cuid())
-  projectId String
-  episodeId String
-  version   Int      @default(1)
-  status    String   @default("draft")
-  summary   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project   DramaProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  episode   DramaEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  shots     DramaShot[]
-
-  @@index([projectId])
-  @@index([episodeId])
-}
-
 model DramaShot {
   id            String   @id @default(cuid())
-  storyboardId  String
+  projectId    String
+  episodeOrder Int
   order         Int
   shotSize      String?
   cameraMove    String?
@@ -3735,57 +3613,7 @@ model DramaShot {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  storyboard    DramaStoryboard @relation(fields: [storyboardId], references: [id], onDelete: Cascade)
-
-  @@unique([storyboardId, order])
-  @@index([storyboardId])
-}
-
-model DramaVideoPrompt {
-  id             String   @id @default(cuid())
-  projectId      String
-  episodeId      String?
-  shotId         String?
-  provider       String   @default("mock")
-  prompt         String
-  negativePrompt String?
-  aspectRatio    String   @default("9:16")
-  durationSec    Int?
-  status         String   @default("prompted")
-  version        Int      @default(1)
-  supersededById String?
-  providerTaskId String?
-  resultUrl      String?
-  failureReason  String?
-  providerResult String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  project        DramaProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  episode        DramaEpisode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
-
   @@index([projectId])
-  @@index([episodeId])
-  @@index([projectId, shotId, version])
-  @@index([provider, status])
-}
-
-model DramaBatchJob {
-  id        String   @id @default(cuid())
-  projectId String
-  episodeId String?
-  type      String
-  status    String   @default("pending")
-  progress  String   @default("{}")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project   DramaProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  episode   DramaEpisode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
-
-  @@index([projectId, createdAt])
-  @@index([episodeId, status])
-  @@index([type, status])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3805,27 +3633,12 @@ model ComicProject {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  sourceBundle    ComicSourceBundle?
   characters      ComicCharacter[]
   characterAssets ComicCharacterAsset[]
   scenes          ComicScene[]
-  episodes        ComicEpisode[]
-  facts           ComicFact[]
-  uploadAssets    ComicUploadAsset[]
-  exportJobs      ComicExportJob[]
-  batchJobs       ComicBatchJob[]
 
   @@index([sourceType])
   @@index([status])
-}
-
-model ComicSourceBundle {
-  id         String   @id @default(cuid())
-  projectId  String   @unique
-  bundleJson String
-  importedAt DateTime @default(now())
-
-  project ComicProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model ComicCharacter {
@@ -3881,32 +3694,10 @@ model ComicScene {
   @@index([projectId])
 }
 
-model ComicEpisode {
-  id          String   @id @default(cuid())
-  projectId   String
-  order       Int
-  title       String?
-  hookType    String?
-  cliffhanger String?
-  isPaywalled Boolean  @default(false)
-  outline     String?
-  sourceText  String?
-  status      String   @default("draft")
-  scriptConfig String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  project   ComicProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  panels    ComicPanel[]
-  batchJobs ComicBatchJob[]
-
-  @@unique([projectId, order])
-  @@index([projectId, status])
-}
-
 model ComicPanel {
   id            String   @id @default(cuid())
-  episodeId     String
+  projectId    String
+  episodeOrder Int
   order         Int
   panelType     String?
   action        String
@@ -3923,72 +3714,7 @@ model ComicPanel {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  episode ComicEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-
-  @@unique([episodeId, order])
-  @@index([episodeId])
-}
-
-model ComicFact {
-  id           String   @id @default(cuid())
-  projectId    String
-  text         String
-  category     String   @default("completed")
-  episodeOrder Int?
-  createdAt    DateTime @default(now())
-
-  project ComicProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
   @@index([projectId])
-}
-
-model ComicUploadAsset {
-  id        String   @id @default(cuid())
-  projectId String
-  kind      String
-  filePath  String
-  refId     String?
-  metadata  String?
-  createdAt DateTime @default(now())
-
-  project ComicProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId, kind])
-}
-
-model ComicExportJob {
-  id        String   @id @default(cuid())
-  projectId String
-  episodeId String?
-  format    String
-  spec      String?
-  status    String   @default("pending")
-  artifacts String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project ComicProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId, createdAt])
-  @@index([format, status])
-}
-
-model ComicBatchJob {
-  id        String   @id @default(cuid())
-  projectId String
-  episodeId String?
-  type      String
-  status    String   @default("pending")
-  progress  String   @default("{}")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project ComicProject  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  episode ComicEpisode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
-
-  @@index([projectId, createdAt])
-  @@index([episodeId, status])
-  @@index([type, status])
 }
 
 model MarketScanRun {

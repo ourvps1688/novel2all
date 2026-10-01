@@ -216,7 +216,17 @@ async function readComicSources(): Promise<VisualAssetSourceItem[]> {
     prisma.comicCharacter.findMany({ include: { project: { select: { id: true, title: true } } } }),
     prisma.comicCharacterAsset.findMany({ include: { project: { select: { id: true, title: true } }, character: { select: { name: true } } } }),
     prisma.comicScene.findMany({ include: { project: { select: { id: true, title: true } } } }),
-    prisma.comicPanel.findMany({ include: { episode: { include: { project: { select: { id: true, title: true } } } } } }),
+    prisma.comicPanel.findMany({
+      select: {
+        id: true,
+        order: true,
+        createdAt: true,
+        imageData: true,
+        letteredData: true,
+        projectId: true,
+        episodeOrder: true,
+      },
+    }),
   ]);
   const output: VisualAssetSourceItem[] = [];
   for (const character of characters) {
@@ -248,12 +258,19 @@ async function readComicSources(): Promise<VisualAssetSourceItem[]> {
       scopeLabel: scene.project.title, kind: "comic_scene", fallbackCreatedAt: scene.createdAt,
     }, scene.sheetData));
   }
+  const panelProjectIds = Array.from(new Set(panels.map((p) => p.projectId)));
+  const panelProjects = await prisma.comicProject.findMany({
+    where: { id: { in: panelProjectIds } },
+    select: { id: true, title: true },
+  });
+  const panelTitleMap = new Map(panelProjects.map((p) => [p.id, p.title]));
   for (const panel of panels) {
-    const scope = panel.episode.project;
+    const scopeId = panel.projectId;
+    const scopeLabel = panelTitleMap.get(panel.projectId) ?? null;
     const base: SourceItemBase = {
       sourceDomain: "comic", sourceType: "panel", sourceId: panel.id,
-      sourceLabel: `第 ${panel.episode.order} 话 · 第 ${panel.order} 格`, scopeKind: "comic_project", scopeId: scope.id,
-      scopeLabel: scope.title, kind: "comic_panel", fallbackCreatedAt: panel.createdAt,
+      sourceLabel: `第 ${panel.episodeOrder} 话 · 第 ${panel.order} 格`, scopeKind: "comic_project", scopeId,
+      scopeLabel, kind: "comic_panel", fallbackCreatedAt: panel.createdAt,
     };
     output.push(...readVersionedState(base, panel.imageData));
     output.push(...readVersionedState({ ...base, sourceType: "panel_lettered", sourceLabel: `${base.sourceLabel} · 成品` }, panel.letteredData));
@@ -264,7 +281,16 @@ async function readComicSources(): Promise<VisualAssetSourceItem[]> {
 async function readDramaSources(): Promise<VisualAssetSourceItem[]> {
   const [characters, shots] = await Promise.all([
     prisma.dramaCharacter.findMany({ include: { project: { select: { id: true, title: true } } } }),
-    prisma.dramaShot.findMany({ include: { storyboard: { include: { project: { select: { id: true, title: true } }, episode: { select: { order: true } } } } } }),
+    prisma.dramaShot.findMany({
+      select: {
+        id: true,
+        order: true,
+        createdAt: true,
+        keyframeData: true,
+        projectId: true,
+        episodeOrder: true,
+      },
+    }),
   ]);
   const output: VisualAssetSourceItem[] = [];
   for (const character of characters) {
@@ -276,12 +302,19 @@ async function readDramaSources(): Promise<VisualAssetSourceItem[]> {
     output.push(...readVersionedState(base, character.portraitData));
     output.push(...readImageArray({ ...base, sourceType: "character_view", sourceLabel: `${character.name} · 角色视图` }, character.threeViewData));
   }
+  const shotProjectIds = Array.from(new Set(shots.map((s) => s.projectId)));
+  const shotProjects = await prisma.dramaProject.findMany({
+    where: { id: { in: shotProjectIds } },
+    select: { id: true, title: true },
+  });
+  const shotTitleMap = new Map(shotProjects.map((p) => [p.id, p.title]));
   for (const shot of shots) {
-    const project = shot.storyboard.project;
+    const scopeId = shot.projectId;
+    const scopeLabel = shotTitleMap.get(shot.projectId) ?? null;
     output.push(...readVersionedState({
       sourceDomain: "drama", sourceType: "shot_keyframe", sourceId: shot.id,
-      sourceLabel: `第 ${shot.storyboard.episode.order} 集 · 镜头 ${shot.order}`, scopeKind: "drama_project", scopeId: project.id,
-      scopeLabel: project.title, kind: "drama_shot_keyframe", fallbackCreatedAt: shot.createdAt,
+      sourceLabel: `第 ${shot.episodeOrder} 集 · 镜头 ${shot.order}`, scopeKind: "drama_project", scopeId,
+      scopeLabel, kind: "drama_shot_keyframe", fallbackCreatedAt: shot.createdAt,
     }, shot.keyframeData));
   }
   return output;
