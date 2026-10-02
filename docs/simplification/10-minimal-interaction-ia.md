@@ -11,7 +11,7 @@
 > | **D · 枢纽加固（白屏）** | 修 `/assets` 嵌套 invariant 白屏（根因：合成 location + `<Routes location>` 机制触发 invariant） | 已完成 | PR #37 `c0df852` |
 > | **D · 枢纽加固（子项）** | 把 `knowledge`/`book-analysis` 也改为 inline（参数命名空间化） | 未做 / 可选 | — |
 > | **B · 运行模式收敛** | 隐藏 runMode/policyMode 选择器，给默认；单一"智能自动" | 已完成 | 见本次 PR（接管对话框冗余选择器已删；实测入口从无 3×4 矩阵，启动 payload 从不携带 policyMode，runMode 由服务端按缺省 `auto_to_ready` + 就绪度推导） |
-> | **C · 单工作台** | 合并散落界面 → `/novels/:id` + Context Drawer（首切片：预览→右侧 Drawer 已落地） | 进行中（首切片已落地） | PR #42 |
+> | **C · 单工作台** | 合并散落界面 → `/novels/:id` 工作区；切片1 预览→右侧 Drawer 已落地，切片2 单章编辑器吸收为工作区分区（?stage=chapter&chapterId&editor=1）已落地 | 进行中（切片1、2 已落地） | PR #42 / PR #43 |
 >
 > 注：痛点 ①②⑤（三处恢复横幅轰炸、`/assets` 白屏）已随 PR #37/#39 消除；B/C 对应的痛点（模式矩阵、多页多概念）仍待解决。
 
