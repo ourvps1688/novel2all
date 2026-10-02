@@ -25,6 +25,7 @@ import {
   buildVolumeDiff,
   buildVolumeDiffSummary,
   buildVolumeImpactResult,
+  normalizeVolumeDraftInput,
 } from "./volumePlanUtils";
 import { generateVolumePlanDocument } from "./volumeGenerationOrchestrator";
 import { VolumeChapterSyncService } from "./VolumeChapterSyncService";
@@ -150,7 +151,13 @@ export class NovelVolumeService {
       return changed ? { ...volume, chapters } : volume;
     });
 
-    return { document: changed ? { ...document, volumes } : document, changed };
+    // Re-normalize through the shared draft normalizer so any chapterOrder
+    // collision introduced by the canonical-field hydration (e.g. a stale
+    // chapterId falling back to an order that another plan chapter already
+    // owns) is deterministically re-slotted instead of failing the workspace
+    // write invariant. Ids are preserved by normalizeVolumeDraftInput.
+    const volumesForDocument = changed ? normalizeVolumeDraftInput(novelId, volumes) : document.volumes;
+    return { document: { ...document, volumes: volumesForDocument }, changed };
   }
 
   async mirrorChapterIntoWorkspace(
@@ -202,9 +209,13 @@ export class NovelVolumeService {
     if (!changed) {
       return;
     }
+    // Re-normalize so the double-match (chapterId OR chapterOrder) resolution
+    // cannot collapse two plan chapters into the same slot. Passing the
+    // normalized volumes keeps the canonical alignment while guaranteeing
+    // globally-unique chapterOrder/sortOrder before persistence.
     await this.persistWorkspaceDocument(novelId, {
       ...document,
-      volumes: nextVolumes,
+      volumes: normalizeVolumeDraftInput(novelId, nextVolumes),
     }, {
       emitEvent: false,
       syncPayoffLedger: false,
