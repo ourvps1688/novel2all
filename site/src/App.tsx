@@ -58,7 +58,7 @@ const consoleModules = [
     icon: BrainCircuit,
   },
   {
-    title: "AI 驾驶舱",
+    title: "AI 推进状态",
     text: "自动导演持续准备世界、角色和卷章任务，只有需要选择方案或处理异常时才请求介入。",
     icon: Sparkles,
   },

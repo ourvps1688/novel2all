@@ -4,9 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { DirectorBookAutomationAction } from "@ai-novel/shared/types/directorRuntime";
 import { continueDirectorRuntime } from "@/api/novelDirector";
 import {
-  getDirectorCockpitContinuationMode,
-  isDirectorCockpitContinuationAction,
-} from "@/lib/directorCockpitActions";
+  getDirectorContinuationMode,
+  isDirectorContinuationAction,
+} from "@/lib/directorContinuationActions";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/components/ui/toast";
 
@@ -18,8 +18,8 @@ type InvalidateFn = () => void | Promise<void>;
  *
  * It maps a `DirectorBookAutomationActionType` to the project's *existing*
  * recovery handlers (`continueDirectorRuntime`, `approveDirectorGate`) and their
- * shared helpers (`isDirectorCockpitContinuationAction`,
- * `getDirectorCockpitContinuationMode`). Action types without a headless handler
+ * shared helpers (`isDirectorContinuationAction`,
+ * `getDirectorContinuationMode`). Action types without a headless handler
  * fall back to the deep link the server already prepared in
  * `action.target.href`. No new ad-hoc fetch path or string→branch table is
  * introduced here.
@@ -31,9 +31,9 @@ export async function executeDirectorAttentionAction(
 ): Promise<void> {
   const taskId = action.commandPayload?.taskId ?? action.target.taskId ?? null;
 
-  if (taskId && isDirectorCockpitContinuationAction(action)) {
+  if (taskId && isDirectorContinuationAction(action)) {
     await continueDirectorRuntime(taskId, {
-      continuationMode: getDirectorCockpitContinuationMode(action) ?? "resume",
+      continuationMode: getDirectorContinuationMode(action) ?? "resume",
     });
     await invalidate();
     return;

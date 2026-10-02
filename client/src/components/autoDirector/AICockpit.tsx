@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 export interface AICockpitProps {
   projection?: DirectorBookAutomationProjection | null;
-  mode?: "focusedNovel" | "compact";
+  mode?: "focusedNovel";
   fallbackSummary?: string | null;
   fallbackStatusLabel?: string | null;
   isActionPending?: boolean;
@@ -311,7 +311,6 @@ function DetailPanel(props: {
 
 export default function AICockpit(props: AICockpitProps) {
   const {
-    mode = "focusedNovel",
     fallbackStatusLabel,
     isActionPending = false,
     showDetailsAction = true,
@@ -321,7 +320,6 @@ export default function AICockpit(props: AICockpitProps) {
     onOpenFallbackDetails,
   } = props;
   const focusProjection = props.projection ?? null;
-  const isCompact = mode === "compact";
 
   if (!focusProjection) {
     return (
@@ -347,7 +345,7 @@ export default function AICockpit(props: AICockpitProps) {
   const primaryAction = focusProjection.primaryAction ?? null;
   const detailAction = focusProjection.secondaryActions?.find((item) => item.type === "open_details") ?? null;
   const canOpenDetails = showDetailsAction && Boolean(onOpenDetails || (detailAction && onAction));
-  const recentItems = focusProjection.timeline.slice(0, isCompact ? 2 : 3);
+  const recentItems = focusProjection.timeline.slice(0, 3);
   const artifactRows = focusProjection.artifactSummary.byType?.slice(0, 3) ?? [];
   const usageSummary = focusProjection.usageSummary ?? null;
   const stepUsage = focusProjection.stepUsage?.slice(0, 2) ?? [];
@@ -397,37 +395,6 @@ export default function AICockpit(props: AICockpitProps) {
     }
     onOpenDetails?.(focusProjection);
   };
-
-  const handleCompactOpen = () => {
-    if (onOpenNovel) {
-      onOpenNovel(focusProjection);
-      return;
-    }
-    handleDetails();
-  };
-
-  if (isCompact) {
-    return (
-      <div className={cn("rounded-lg border p-3", stateClassName(focusProjection.displayState))}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-start gap-2">
-            <span className="mt-0.5 shrink-0 text-foreground">{stateIcon(focusProjection.displayState)}</span>
-              <div className="min-w-0">
-                <div className="line-clamp-1 text-xs leading-5 text-muted-foreground">
-                  {focusProjection.userHeadline || focusProjection.headline || reason}
-                </div>
-              </div>
-          </div>
-          <Badge variant={stateBadgeVariant(focusProjection.displayState)} className="shrink-0">
-            {displayStateLabel(focusProjection.displayState)}
-          </Badge>
-        </div>
-        <Button type="button" size="sm" variant="outline" className="mt-3 w-full" onClick={handleCompactOpen}>
-          查看
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">

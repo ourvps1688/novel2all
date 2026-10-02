@@ -3,6 +3,7 @@ import type { DirectorLockScope } from "@ai-novel/shared/types/novelDirector";
 import type { NovelWorkspaceFlowTab, NovelWorkspaceTab, NovelWorkflowStage } from "@ai-novel/shared/types/novelWorkflow";
 import { NOVEL_WORKSPACE_FLOW_TABS, NOVEL_WORKFLOW_STAGE_LABELS } from "@ai-novel/shared/types/novelWorkflow";
 import { resolveWorkflowTabFromDisplayStage } from "@ai-novel/shared/types/directorWorkflowStepCatalog";
+import { CHAPTER_EXECUTION_ITEM_KEYS, QUALITY_REPAIR_ITEM_KEYS } from "../../lib/directorItemKeys.ts";
 
 export type { NovelWorkspaceFlowTab, NovelWorkspaceTab };
 
@@ -149,6 +150,8 @@ export function tabFromDirectorProgress(input: {
   })();
 
   const currentTab = (() => {
+    if (CHAPTER_EXECUTION_ITEM_KEYS.includes(input.currentItemKey ?? "")) return "chapter";
+    if (QUALITY_REPAIR_ITEM_KEYS.includes(input.currentItemKey ?? "")) return "pipeline";
     switch (input.currentItemKey) {
     case "novel_create":
     case "project_setup":
@@ -170,19 +173,6 @@ export function tabFromDirectorProgress(input: {
     case "chapter_sync":
     case "chapter_detail_bundle":
       return "structured";
-    case "chapter_execution":
-    case "chapter_execution_node":
-    case "chapter.draft.write":
-    case "chapter.write":
-      return "chapter";
-    case "reviewing":
-    case "repairing":
-    case "quality_repair":
-    case "chapter_quality_review_node":
-    case "chapter.quality.review":
-    case "chapter_state_commit_node":
-    case "chapter.state.commit":
-      return "pipeline";
     default:
       break;
     }
