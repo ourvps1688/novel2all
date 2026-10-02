@@ -319,8 +319,16 @@ test("ensureRuntimeDatabaseReady repairs partially satisfied visual asset schema
 
   try {
     createMigrationTable(database);
+    const setupWithheldMigrations = [
+      ...visualAssetSchemaRepairMigrations,
+      // phase4_drop_orphans consumes ComicPanel.sceneRef, which the withheld
+      // comic_panel_scene_ref repair migration provides. Withhold it here so
+      // ensureRuntimeDatabaseReady applies it after sceneRef exists, rather than
+      // the setup applying an impossible partially-upgraded database.
+      "20261001150000_phase4_drop_orphans",
+    ];
     for (const migrationName of allMigrationNames) {
-      if (visualAssetSchemaRepairMigrations.includes(migrationName)) {
+      if (setupWithheldMigrations.includes(migrationName)) {
         continue;
       }
       database.exec(fs.readFileSync(path.join(migrationsDir, migrationName, "migration.sql"), "utf8"));
