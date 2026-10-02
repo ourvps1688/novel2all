@@ -325,7 +325,7 @@ export async function generateBeatChunkedChapterList(params: {
     beatSheetCount: document.beatSheets.length,
   });
   if (!targetBeatSheet) {
-    throw new Error("当前卷还没有节奏板，不能直接拆章节列表。");
+    throw new Error(`第 ${targetVolume.sortOrder} 卷「${targetVolume.title}」还没有节奏板，不能直接拆章节列表。`);
   }
 
   const chapterBudget = deriveChapterBudget({ novel, workspace, options });
@@ -346,7 +346,7 @@ export async function generateBeatChunkedChapterList(params: {
     beatSheetRequiredChapterCount,
   });
   if (!resolvedTargetChapterCount.beatSheetCountAccepted && beatSheetRequiredChapterCount > 0) {
-    throw new Error("当前卷节奏板的章节跨度异常，建议先重生成节奏板，再继续生成章节标题。");
+    throw new Error(`第 ${targetVolume.sortOrder} 卷「${targetVolume.title}」节奏板的章节跨度异常，建议先重生成节奏板，再继续生成章节标题。`);
   }
   if (resolvedTargetChapterCount.targetChapterCount >= 20) {
     const beatSheetCoverage = validateBeatSheetChapterCoverage({
@@ -354,7 +354,7 @@ export async function generateBeatChunkedChapterList(params: {
       targetChapterCount: resolvedTargetChapterCount.targetChapterCount,
     });
     if (!beatSheetCoverage.accepted) {
-      throw new Error(`${beatSheetCoverage.message ?? "当前卷节奏板章节跨度没有覆盖目标章数。"}建议先重生成节奏板，再继续生成章节标题。`);
+      throw new Error(`第 ${targetVolume.sortOrder} 卷「${targetVolume.title}」${beatSheetCoverage.message ?? "节奏板章节跨度没有覆盖目标章数。"}建议先重生成节奏板，再继续生成章节标题。`);
     }
   }
 
