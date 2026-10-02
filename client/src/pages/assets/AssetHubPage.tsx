@@ -1,5 +1,5 @@
-import { Suspense, useMemo } from "react";
-import { Link, Route, Routes, useSearchParams } from "react-router-dom";
+import { Suspense } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ASSET_TABS, getAssetTab, type AssetTab } from "./assetHub.config";
 
@@ -7,17 +7,10 @@ export default function AssetHubPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const active = getAssetTab(searchParams.get("tab"));
 
-  // 业务参数透传：把除 hub 自身 ?tab= 之外的所有 query 原样喂给被渲染组件，
-  // 绝不吞掉 / 改写 / 重排任何业务参数（契约 §5）。
-  const passthrough = useMemo(() => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("tab");
-    const serialized = next.toString();
-    return serialized ? `?${serialized}` : "";
-  }, [searchParams]);
-
-  // 合成 location：让内联渲染的页面组件表现得像在自己的原路由上（R3 化解，契约 §4.4）。
-  const syntheticLocation = `${active.originalPath}${passthrough}`;
+  // 内联渲染时直接渲染目标页面组件即可：组件自身通过 useSearchParams 读取真实
+  // URL（/assets?tab=…&其它业务参数），无需合成 location。合成 location 会让
+  // <Routes location> 的 pathname（如 /genres）不以父路由基址（/assets）开头，
+  // 触发 React Router 的 invariant 而整页白屏，故此处直接渲染。
 
   const selectTab = (key: string) => {
     const next = new URLSearchParams(searchParams);
@@ -68,12 +61,7 @@ export default function AssetHubPage() {
               <div className="py-10 text-center text-sm text-muted-foreground">加载中…</div>
             }
           >
-            <Routes location={syntheticLocation}>
-              <Route
-                path={active.originalPath}
-                element={active.component ? <active.component /> : null}
-              />
-            </Routes>
+            {active.component ? <active.component /> : null}
           </Suspense>
         )}
       </section>
