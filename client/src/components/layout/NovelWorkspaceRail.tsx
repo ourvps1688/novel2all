@@ -7,6 +7,7 @@ import {
   History,
   LayoutDashboard,
   ListTodo,
+  Sparkles,
 } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import type { DirectorLockScope } from "@ai-novel/shared/types/novelDirector";
@@ -17,6 +18,7 @@ import { getNovelWorld } from "@/api/novelWorldSlice";
 import { getDirectorBookAutomationProjection, getDirectorRuntimeProjection, getDirectorTaskSnapshot } from "@/api/novelDirector";
 import { continueNovelWorkflow, getActiveAutoDirectorTask } from "@/api/novelWorkflow";
 import { queryKeys } from "@/api/queryKeys";
+import { buildCreativeHubPath } from "@/lib/creativeHubLinks";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import {
@@ -577,6 +579,19 @@ export default function NovelWorkspaceRail(props: NovelWorkspaceRailProps) {
           >
             <History className="h-4 w-4 shrink-0" />
             {!collapsed ? <span className="text-sm font-medium">版本历史</span> : null}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate(buildCreativeHubPath({ novelId }))}
+            title="在创作中枢继续本书"
+            className={cn(
+              "flex w-full items-center rounded-xl text-muted-foreground transition-colors hover:bg-background/75 hover:text-foreground",
+              collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-3 text-left",
+            )}
+          >
+            <Sparkles className="h-4 w-4 shrink-0" />
+            {!collapsed ? <span className="text-sm font-medium">创作中枢</span> : null}
           </button>
 
           {!collapsed ? (
