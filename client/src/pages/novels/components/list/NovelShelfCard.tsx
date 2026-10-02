@@ -47,7 +47,7 @@ function getPrimaryAction(novel: NovelListItem): { label: string; href: string }
 function getPreviewHref(novel: NovelListItem): string {
   return novel.narrativeForm === "short_story"
     ? `/novels/${novel.id}/story`
-    : `/novels/${novel.id}/preview`;
+    : `/novels/${novel.id}/edit?preview=1`;
 }
 
 function coverStatusLabel(status?: ImageTaskStatus | null): string {

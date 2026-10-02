@@ -13,7 +13,6 @@ const routedPaths = [
   "/",
   "/novels",
   "/novels/create",
-  "/novels/demo/preview",
   "/novels/demo/edit",
   "/creative-hub",
   "/chat-legacy",
