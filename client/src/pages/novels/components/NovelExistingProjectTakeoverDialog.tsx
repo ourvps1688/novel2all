@@ -57,14 +57,6 @@ interface NovelExistingProjectTakeoverDialogProps {
   workflowTaskId?: string | null;
 }
 
-const RUN_MODE_OPTIONS: Array<{ value: DirectorRunMode; label: string; description: string }> = [
-  {
-    value: "auto_to_ready",
-    label: "推进到可开写",
-    description: "AI 会补齐正文生产前需要的资源，再让你选择简易生产或专业生产。",
-  },
-];
-
 const STRATEGY_OPTIONS: Array<{ value: DirectorTakeoverStrategy; label: string; description: string }> = [
   {
     value: "continue_existing",
@@ -104,7 +96,6 @@ export default function NovelExistingProjectTakeoverDialog({
   const queryClient = useQueryClient();
   const llm = useLLMStore();
   const [open, setOpen] = useState(false);
-  const [runMode, setRunMode] = useState<DirectorRunMode>("auto_to_ready");
   const [selectedEntryStep, setSelectedEntryStep] = useState<DirectorTakeoverEntryStep>(defaultEntryStep);
   const [selectedStrategy, setSelectedStrategy] = useState<DirectorTakeoverStrategy>("continue_existing");
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -160,11 +151,6 @@ export default function NovelExistingProjectTakeoverDialog({
     }),
     [basicForm.styleTone, selectedStyleProfile],
   );
-  const advancedAutoExecutionPlan: DirectorAutoExecutionPlan | undefined = runMode === "full_book_autopilot"
-    ? buildFullBookAutopilotExecutionPlan()
-    : runMode === "auto_to_execution"
-      ? buildDirectorAutoExecutionPlanFromDraft(autoExecutionDraft, { usage: "takeover" })
-      : undefined;
   const quickChapterTarget = useMemo(
     () => buildTakeoverChapterTarget(readiness, contextTaskSnapshot, selectedChapterTargetOrder),
     [contextTaskSnapshot, readiness, selectedChapterTargetOrder],
@@ -183,7 +169,12 @@ export default function NovelExistingProjectTakeoverDialog({
     ? "full_book_autopilot"
     : !advancedOpen && quickChapterTarget
       ? "auto_to_execution"
-      : runMode;
+      : "auto_to_ready";
+  const advancedAutoExecutionPlan: DirectorAutoExecutionPlan | undefined = effectiveRunMode === "full_book_autopilot"
+    ? buildFullBookAutopilotExecutionPlan()
+    : effectiveRunMode === "auto_to_execution"
+      ? buildDirectorAutoExecutionPlanFromDraft(autoExecutionDraft, { usage: "takeover" })
+      : undefined;
   const autoExecutionPlan: DirectorAutoExecutionPlan | undefined = useFullBookAutopilot
     ? buildFullBookAutopilotExecutionPlan()
     : !advancedOpen && quickChapterTarget
@@ -229,7 +220,6 @@ export default function NovelExistingProjectTakeoverDialog({
     if (!open) {
       setSelectedEntryStep(defaultEntryStep);
       setSelectedStrategy("continue_existing");
-      setRunMode("auto_to_ready");
       setAdvancedOpen(false);
       setAutoExecutionDraft(createDefaultDirectorAutoExecutionDraftState("takeover"));
       setAutoExecutionDraftTouched(false);
@@ -279,7 +269,7 @@ export default function NovelExistingProjectTakeoverDialog({
   }, [readiness, selectedScopeMode]);
 
   useEffect(() => {
-    if (!open || runMode !== "auto_to_execution" || autoExecutionDraftTouched) {
+    if (!open || effectiveRunMode !== "auto_to_execution" || autoExecutionDraftTouched) {
       return;
     }
     const preferredDraft = buildTakeoverAutoExecutionDraftFromExecutableRange(
@@ -298,7 +288,7 @@ export default function NovelExistingProjectTakeoverDialog({
     autoExecutionDraftTouched,
     open,
     readiness?.executableRange,
-    runMode,
+    effectiveRunMode,
     selectedStrategy,
   ]);
 
@@ -415,25 +405,7 @@ export default function NovelExistingProjectTakeoverDialog({
                     />
                   </div>
                 </div>
-                <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
-                  {RUN_MODE_OPTIONS.map((option) => {
-                    const active = option.value === runMode;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`rounded-xl border px-3 py-3 text-left transition ${
-                          active ? "border-primary bg-primary/10 shadow-sm" : "border-border bg-background hover:border-primary/40"
-                        }`}
-                        onClick={() => setRunMode(option.value)}
-                      >
-                        <div className="text-sm font-medium text-foreground">{option.label}</div>
-                        <div className={`mt-1 text-xs leading-5 text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>{option.description}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-                {runMode === "auto_to_execution" ? (
+                {effectiveRunMode === "auto_to_execution" ? (
                   <>
                     <DirectorAutoExecutionPlanFields
                       draft={autoExecutionDraft}
@@ -453,7 +425,7 @@ export default function NovelExistingProjectTakeoverDialog({
                     />
                   </>
                 ) : null}
-                {runMode === "full_book_autopilot" ? (
+                {effectiveRunMode === "full_book_autopilot" ? (
                   <div className={`mt-3 rounded-md border border-primary/15 bg-primary/5 p-3 text-xs leading-5 text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
                     <div className="text-sm font-medium text-foreground">全书自动接管</div>
                     <div className="mt-1">
