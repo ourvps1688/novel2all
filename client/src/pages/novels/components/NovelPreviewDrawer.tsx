@@ -252,7 +252,7 @@ export default function NovelPreviewDrawer({
                     </Button>
                   ) : (
                     <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-                      <Link to={`/novels/${novelId}/chapters/${activeChapter.id}`}><Edit3 className="mr-1.5 h-4 w-4" />编辑本章</Link>
+                      <Link to={`/novels/${novelId}/edit?stage=chapter&chapterId=${activeChapter.id}&editor=1`}><Edit3 className="mr-1.5 h-4 w-4" />编辑本章</Link>
                     </Button>
                   )
                 ) : null}

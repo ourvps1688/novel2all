@@ -11,7 +11,7 @@ test("simple shelf explains quality debt and routes editing through the shared c
   assert.match(shelfSource, /formatQualityDebtSource/);
   assert.match(shelfSource, /formatQualityDebtAttempts/);
   assert.match(shelfSource, /修改并重新审校/);
-  assert.match(shelfSource, /\/novels\/\$\{id\}\/chapters\/\$\{encodeURIComponent\(selectedChapter\.id\)\}/);
+  assert.match(shelfSource, /\/novels\/\$\{id\}\/edit\?stage=chapter&chapterId=\$\{encodeURIComponent\(selectedChapter\.id\)\}/);
   assert.doesNotMatch(shelfSource, /reviewNovelChapter/);
 });
 

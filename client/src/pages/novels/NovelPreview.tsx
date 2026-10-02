@@ -228,7 +228,7 @@ export default function NovelPreview() {
             </Button>
             {activeChapter ? (
                 <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-                <Link to={`/novels/${id}/chapters/${activeChapter.id}`}><Edit3 className="mr-1.5 h-4 w-4" />编辑本章</Link>
+                <Link to={`/novels/${id}/edit?stage=chapter&chapterId=${activeChapter.id}&editor=1`}><Edit3 className="mr-1.5 h-4 w-4" />编辑本章</Link>
               </Button>
             ) : null}
           </footer>

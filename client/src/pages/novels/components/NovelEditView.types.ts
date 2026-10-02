@@ -68,6 +68,7 @@ import type { ChapterDetailBundleRequest } from "../chapterDetailPlanning.shared
 import type { StructuredSyncOptions } from "../novelEdit.utils";
 import type { NovelBasicFormState } from "../novelBasicInfo.shared";
 import type { ExistingOutlineChapter } from "../volumePlan.utils";
+import type { ChapterEditorShellProps } from "./chapterEditor/chapterEditorTypes";
 import type { AITakeoverAction } from "@/components/workflow/AITakeoverContainer";
 import type { LLMSelectorValue } from "@/components/common/LLMSelector";
 import type { SSEFrame } from "@ai-novel/shared/types/api";
@@ -660,6 +661,8 @@ export interface NovelEditViewProps {
   outlineTab: OutlineTabViewProps;
   structuredTab: StructuredTabViewProps;
   chapterTab: ChapterTabViewProps;
+  chapterEditor?: ChapterEditorShellProps | null;
+  onOpenChapterEditor?: (chapterId: string) => void;
   pipelineTab: PipelineTabViewProps;
   characterTab: CharacterTabViewProps;
   takeover?: NovelEditTakeoverState | null;

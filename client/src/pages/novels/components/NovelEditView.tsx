@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import KnowledgeBindingPanel from "@/components/knowledge/KnowledgeBindingPanel";
 import ChapterManagementTab from "./ChapterManagementTab";
+import ChapterEditorShell from "./chapterEditor/ChapterEditorShell";
 import DirectorFactDebugDialog from "./DirectorFactDebugDialog";
 import NovelCharacterPanel from "./NovelCharacterPanel";
 import NovelTaskDrawer from "./NovelTaskDrawer";
@@ -70,6 +71,8 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
     onSwitchToSimpleMode,
     isSwitchingToSimpleMode = false,
     onActiveTabChange,
+    chapterEditor,
+    onOpenChapterEditor,
   } = props;
 
   const [isProjectToolsOpen, setIsProjectToolsOpen] = useState(false);
@@ -178,7 +181,11 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
       case "structured":
         return <StructuredOutlineTab {...structuredTab} />;
       case "chapter":
-        return <ChapterManagementTab {...chapterTab} />;
+        return chapterEditor ? (
+          <ChapterEditorShell {...chapterEditor} />
+        ) : (
+          <ChapterManagementTab {...chapterTab} />
+        );
       case "pipeline":
         return <PipelineTab {...pipelineTab} />;
       case "character":
@@ -402,8 +409,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
         onOpenChange={setIsPreviewOpen}
         initialChapterId={chapterTab.selectedChapterId}
         onEditChapter={(chapterId) => {
-          chapterTab.onSelectChapter(chapterId);
-          onActiveTabChange("chapter");
+          onOpenChapterEditor?.(chapterId);
           setIsPreviewOpen(false);
         }}
       />

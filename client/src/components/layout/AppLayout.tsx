@@ -31,9 +31,13 @@ export default function AppLayout() {
   const workspaceRoute = useMemo(() => {
     const editMatch = matchPath("/novels/:id/edit", location.pathname);
     if (editMatch?.params.id) {
+      const editParams = new URLSearchParams(location.search);
+      const chapterId = editParams.get("editor") === "1"
+        ? (editParams.get("chapterId") ?? "")
+        : "";
       return {
         novelId: editMatch.params.id,
-        chapterId: "",
+        chapterId,
       };
     }
     const chapterMatch = matchPath("/novels/:id/chapters/:chapterId", location.pathname);
@@ -44,7 +48,7 @@ export default function AppLayout() {
       };
     }
     return null;
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   const isNovelWorkspace = Boolean(workspaceRoute?.novelId);
   const useMobileNovelWorkspaceLayout = isMobileViewport && isNovelWorkspace;

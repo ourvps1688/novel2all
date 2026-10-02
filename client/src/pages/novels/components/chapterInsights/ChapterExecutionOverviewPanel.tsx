@@ -103,7 +103,7 @@ export default function ChapterExecutionOverviewPanel(props: ChapterExecutionOve
         </div>
 
         <Button asChild size="sm" variant="outline" className="w-full justify-center">
-          <Link to={`/novels/${selectedChapter.novelId}/chapters/${selectedChapter.id}`}>打开章节编辑器</Link>
+          <Link to={`/novels/${selectedChapter.novelId}/edit?stage=chapter&chapterId=${selectedChapter.id}&editor=1`}>打开章节编辑器</Link>
         </Button>
       </div>
 
