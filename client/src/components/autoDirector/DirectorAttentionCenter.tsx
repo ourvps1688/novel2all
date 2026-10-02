@@ -4,50 +4,30 @@ import type {
   DirectorAttentionState,
 } from "@ai-novel/shared/types/directorAttention";
 import type { DirectorBookAutomationAction } from "@ai-novel/shared/types/directorRuntime";
-import {
-  Activity,
-  AlertTriangle,
-  Clock3,
-  Loader2,
-  PauseCircle,
-  ShieldCheck,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
+import { displayStateForAttentionLevel, displayStateMeta } from "./bookAutomationStatusMeta";
 
 /**
- * Visual language shared by the three variants, reusing the surface/accent
- * classes already established in `AICockpit`. We never branch on
- * `checkpointType` — the server owns that logic and only sends `level` +
- * `primaryAction` / `fallbackActions`.
+ * The attention layer keys states by `DirectorAttentionLevel`; it reuses the
+ * exact same surface/accent/icon palette as the projection-driven
+ * `BookAutomationStatusBar` via `displayStateMeta` — the only place the two
+ * enums are correlated. We never branch on `checkpointType`; the server owns
+ * that logic and only sends `level` + `primaryAction` / `fallbackActions`.
  */
+function levelVisual(level: DirectorAttentionLevel): { surface: string; accent: string; icon: ReactNode } {
+  const meta = displayStateMeta[displayStateForAttentionLevel(level)];
+  return { surface: meta.surface, accent: meta.accent, icon: meta.icon };
+}
+
 const LEVEL_META: Record<DirectorAttentionLevel, { surface: string; accent: string; icon: ReactNode }> = {
-  idle: {
-    surface: "border-border/70 bg-muted/20",
-    accent: "text-muted-foreground",
-    icon: <ShieldCheck className="h-4 w-4" />,
-  },
-  running: {
-    surface: "border-sky-500/25 bg-sky-500/10",
-    accent: "text-sky-700 dark:text-sky-300",
-    icon: <Activity className="h-4 w-4" />,
-  },
-  waiting_approval: {
-    surface: "border-amber-500/25 bg-amber-500/10",
-    accent: "text-amber-700 dark:text-amber-300",
-    icon: <PauseCircle className="h-4 w-4" />,
-  },
-  auto_recovering: {
-    surface: "border-indigo-500/25 bg-indigo-500/10",
-    accent: "text-indigo-700 dark:text-indigo-300",
-    icon: <Clock3 className="h-4 w-4" />,
-  },
-  needs_recovery: {
-    surface: "border-destructive/30 bg-destructive/5",
-    accent: "text-destructive",
-    icon: <AlertTriangle className="h-4 w-4" />,
-  },
+  idle: levelVisual("idle"),
+  running: levelVisual("running"),
+  waiting_approval: levelVisual("waiting_approval"),
+  auto_recovering: levelVisual("auto_recovering"),
+  needs_recovery: levelVisual("needs_recovery"),
 };
 
 function resolveActionVariant(
