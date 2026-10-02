@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useParams } from "react-router-dom";
 import { getNovelDetail } from "@/api/novel";
+import { setLastNovelId } from "@/lib/lastNovel";
 import NovelEdit from "./NovelEdit";
 
 export default function NarrativeFormNovelEditRoute() {
@@ -10,6 +12,13 @@ export default function NarrativeFormNovelEditRoute() {
     queryFn: () => getNovelDetail(novelId),
     enabled: Boolean(novelId),
   });
+
+  // Remember the most-recently opened novel so global entry points (Sidebar
+  // "创作资产", the /assets route) can open the assets drawer inside a concrete
+  // workspace.
+  useEffect(() => {
+    if (novelId) setLastNovelId(novelId);
+  }, [novelId]);
   if (query.isLoading) {
     return <div className="py-16 text-center text-sm text-muted-foreground">正在打开作品…</div>;
   }

@@ -3,6 +3,8 @@ import type { RouteObject } from "react-router-dom";
 import { Navigate, useNavigate, useParams, useRoutes } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { featureFlags } from "@/config/featureFlags";
+import { useIsMobileViewport } from "@/components/layout/mobile/useIsMobileViewport";
+import { getLastNovelId } from "@/lib/lastNovel";
 
 const Home = lazy(() => import("@/pages/Home"));
 const NovelList = lazy(() => import("@/pages/novels/NovelList"));
@@ -73,6 +75,38 @@ function PreviewPartitionRedirect() {
   return null;
 }
 
+// The /assets hub is now reachable as a right-side drawer inside the novel
+// workspace (?assets=1). On desktop we redirect to the last-opened novel's
+// workspace so the drawer opens there; on mobile we keep the full hub page
+// (the drawer is desktop-only). If no novel was opened recently, fall back to
+// the novel list so the user can pick one.
+function AssetsHubRedirect() {
+  const isMobile = useIsMobileViewport();
+  if (isMobile) {
+    return <AssetHubPage />;
+  }
+  const lastNovelId = getLastNovelId();
+  if (lastNovelId) {
+    return <Navigate to={`/novels/${encodeURIComponent(lastNovelId)}/edit?assets=1`} replace />;
+  }
+  return <Navigate to="/novels" replace />;
+}
+
+// Legacy deep link /novels/:id/assets -> workspace drawer.
+function NovelAssetsPartitionRedirect() {
+  const params = useParams();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const novelId = params.id;
+    if (novelId) {
+      navigate(`/novels/${novelId}/edit?assets=1`, { replace: true });
+    } else {
+      navigate("/novels", { replace: true });
+    }
+  }, [navigate, params.id]);
+  return null;
+}
+
 const routes: RouteObject[] = [
   {
     path: "/",
@@ -88,6 +122,7 @@ const routes: RouteObject[] = [
       { path: "novels/:id/preview", element: <PreviewPartitionRedirect /> },
       { path: "novels/:id/edit", element: <NarrativeFormNovelEditRoute /> },
       { path: "novels/:id/chapters/:chapterId", element: <ChapterEditorPartitionRedirect /> },
+      { path: "novels/:id/assets", element: <NovelAssetsPartitionRedirect /> },
       { path: "creative-hub", element: <CreativeHubPage /> },
       { path: "chat-legacy", element: <ChatPage /> },
       { path: "chat", element: <Navigate to="/creative-hub" replace /> },
@@ -95,7 +130,7 @@ const routes: RouteObject[] = [
       { path: "market-radar", element: <MarketRadarPage /> },
       { path: "tasks", element: <TaskCenterPage /> },
       { path: "knowledge", element: <KnowledgePage /> },
-      { path: "assets", element: <AssetHubPage /> },
+      { path: "assets", element: <AssetsHubRedirect /> },
       { path: "genres", element: <GenreManagementPage /> },
       { path: "story-modes", element: <StoryModeManagementPage /> },
       { path: "titles", element: <TitleStudioPage /> },
