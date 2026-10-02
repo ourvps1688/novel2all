@@ -6,7 +6,6 @@ import "highlight.js/styles/github.css";
 import ServerStartupGate from "./components/layout/ServerStartupGate";
 import AppRouter from "./router";
 import { Toaster } from "./components/ui/toast";
-import GlobalDirectorAttentionBanner from "./components/autoDirector/GlobalDirectorAttentionBanner";
 import "./index.css";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 
@@ -28,7 +27,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <AppRouter />
           </ServerStartupGate>
           <Toaster />
-          <GlobalDirectorAttentionBanner />
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>

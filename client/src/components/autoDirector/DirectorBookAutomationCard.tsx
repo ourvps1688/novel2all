@@ -1,9 +1,10 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import type {
   DirectorBookAutomationAction,
   DirectorBookAutomationProjection,
 } from "@ai-novel/shared/types/directorRuntime";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, ListTree } from "lucide-react";
 import { DirectorAttentionCenter } from "./DirectorAttentionCenter";
 import { Button } from "@/components/ui/button";
 import { mapProjectionToAttention } from "@/lib/mapProjectionToAttention";
@@ -33,6 +34,22 @@ export default function DirectorBookAutomationCard({
     [projection],
   );
   const executor = useDirectorAttentionActionExecutor();
+  const navigate = useNavigate();
+  const novelId = projection?.novelId ?? null;
+  // When the director is stuck on a recovery/blocked state (often because the
+  // beat sheet coverage is insufficient), surface a direct entry point to the
+  // structured outline where "重新生成当前卷节奏板" lives — otherwise the user
+  // only sees the suggestion with no way to act on it.
+  const showBeatSheetEntry =
+    Boolean(novelId) &&
+    (projection?.status === "waiting_recovery" ||
+      projection?.status === "blocked" ||
+      projection?.status === "failed");
+
+  const handleOpenBeatSheet = () => {
+    if (!novelId) return;
+    navigate(`/novels/${novelId}/edit?stage=structured`);
+  };
 
   const handleAction = (action: DirectorBookAutomationAction) => {
     // `open_details` stays a host-side side effect (open the Task Center drawer),
@@ -54,6 +71,18 @@ export default function DirectorBookAutomationCard({
           {fallbackSummary?.trim() || "当前没有需要处理的导演状态。"}
         </div>
       )}
+      {showBeatSheetEntry ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="w-full"
+          onClick={handleOpenBeatSheet}
+        >
+          <ListTree className="h-4 w-4" />
+          重生成节奏板
+        </Button>
+      ) : null}
       {onSwitchToProjectNav ? (
         <Button type="button" size="sm" variant="ghost" className="w-full" onClick={onSwitchToProjectNav}>
           <LayoutDashboard className="h-4 w-4" />
