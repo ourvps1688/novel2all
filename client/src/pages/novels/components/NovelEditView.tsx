@@ -18,6 +18,7 @@ import ChapterManagementTab from "./ChapterManagementTab";
 import DirectorFactDebugDialog from "./DirectorFactDebugDialog";
 import NovelCharacterPanel from "./NovelCharacterPanel";
 import NovelTaskDrawer from "./NovelTaskDrawer";
+import NovelPreviewDrawer from "./NovelPreviewDrawer";
 import OutlineTab from "./OutlineTab";
 import PipelineTab from "./PipelineTab";
 import StoryMacroPlanTab from "./StoryMacroPlanTab";
@@ -68,10 +69,12 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
     activeStepTakeoverEntry,
     onSwitchToSimpleMode,
     isSwitchingToSimpleMode = false,
+    onActiveTabChange,
   } = props;
 
   const [isProjectToolsOpen, setIsProjectToolsOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const resetChaptersMutation = useMutation({
@@ -380,6 +383,10 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
               执行详情
               {taskAttentionLabel ? <Badge variant="secondary">{taskAttentionLabel}</Badge> : null}
             </Button>
+
+            <Button variant="outline" onClick={() => setIsPreviewOpen(true)}>
+              预览
+            </Button>
             </>
           )}
         />
@@ -388,6 +395,18 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
       {renderActivePanel()}
 
       {taskDrawer ? <NovelTaskDrawer {...taskDrawer} /> : null}
+
+      <NovelPreviewDrawer
+        novelId={id}
+        open={isPreviewOpen}
+        onOpenChange={setIsPreviewOpen}
+        initialChapterId={chapterTab.selectedChapterId}
+        onEditChapter={(chapterId) => {
+          chapterTab.onSelectChapter(chapterId);
+          onActiveTabChange("chapter");
+          setIsPreviewOpen(false);
+        }}
+      />
     </div>
   );
 }
