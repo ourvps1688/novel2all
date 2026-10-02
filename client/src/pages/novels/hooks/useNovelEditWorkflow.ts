@@ -69,6 +69,7 @@ export function useNovelEditWorkflow(novelId: string) {
   );
   const editorOpen = searchParams.get("editor") === "1";
   const previewOpen = searchParams.get("preview") === "1";
+  const assetsDrawerOpen = searchParams.get("assets") === "1";
 
   const setActiveTab = (value: string) => {
     const nextTab = normalizeNovelWorkspaceTab(value);
@@ -79,6 +80,7 @@ export function useNovelEditWorkflow(novelId: string) {
       // and the preview overlay so returning to a tab shows a clean panel.
       next.delete("editor");
       next.delete("preview");
+      next.delete("assets");
       return next;
     }, { replace: true });
   };
@@ -92,6 +94,7 @@ export function useNovelEditWorkflow(novelId: string) {
       // Opening the chapter-editor partition closes the preview overlay so the
       // two overlays never show at the same time.
       next.delete("preview");
+      next.delete("assets");
       return next;
     }, { replace: true });
   }, [setSearchParams]);
@@ -110,6 +113,7 @@ export function useNovelEditWorkflow(novelId: string) {
       // Opening the preview overlay closes the chapter-editor partition so the
       // two overlays never show at the same time.
       next.delete("editor");
+      next.delete("assets");
       next.set("preview", "1");
       return next;
     }, { replace: true });
@@ -119,6 +123,26 @@ export function useNovelEditWorkflow(novelId: string) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("preview");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const openAssetsDrawer = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      // Opening the assets drawer closes the chapter-editor partition and the
+      // preview overlay so the overlays never show at the same time.
+      next.delete("editor");
+      next.delete("preview");
+      next.set("assets", "1");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const closeAssetsDrawer = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("assets");
       return next;
     }, { replace: true });
   }, [setSearchParams]);
@@ -179,5 +203,8 @@ export function useNovelEditWorkflow(novelId: string) {
     previewOpen,
     openPreview,
     closePreview,
+    assetsDrawerOpen,
+    openAssetsDrawer,
+    closeAssetsDrawer,
   };
 }
