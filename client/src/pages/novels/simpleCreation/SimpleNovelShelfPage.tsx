@@ -267,7 +267,7 @@ export default function SimpleNovelShelfPage() {
             <div className="flex items-center gap-3">
               <div className="text-xs text-muted-foreground">{savedDraftCount} 章有正文 · {stableChapterCount} 章已稳定</div>
               <Button variant="outline" size="sm" asChild>
-                <Link to={`/novels/${id}/preview${selectedChapter ? `?chapterId=${encodeURIComponent(selectedChapter.id)}` : ""}`}>
+                <Link to={`/novels/${id}/edit?preview=1${selectedChapter ? `&chapterId=${encodeURIComponent(selectedChapter.id)}` : ""}`}>
                   <Eye className="h-4 w-4" /> 进入预览模式
                 </Link>
               </Button>

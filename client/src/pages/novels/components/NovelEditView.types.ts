@@ -663,6 +663,9 @@ export interface NovelEditViewProps {
   chapterTab: ChapterTabViewProps;
   chapterEditor?: ChapterEditorShellProps | null;
   onOpenChapterEditor?: (chapterId: string) => void;
+  previewOpen?: boolean;
+  openPreview?: () => void;
+  closePreview?: () => void;
   pipelineTab: PipelineTabViewProps;
   characterTab: CharacterTabViewProps;
   takeover?: NovelEditTakeoverState | null;

@@ -68,6 +68,7 @@ export function useNovelEditWorkflow(novelId: string) {
     [searchParams],
   );
   const editorOpen = searchParams.get("editor") === "1";
+  const previewOpen = searchParams.get("preview") === "1";
 
   const setActiveTab = (value: string) => {
     const nextTab = normalizeNovelWorkspaceTab(value);
@@ -75,8 +76,9 @@ export function useNovelEditWorkflow(novelId: string) {
       const next = new URLSearchParams(prev);
       next.set("stage", nextTab);
       // Switching the workspace tab closes any open chapter-editor partition
-      // so returning to the chapter tab shows the management list, not a stale editor.
+      // and the preview overlay so returning to a tab shows a clean panel.
       next.delete("editor");
+      next.delete("preview");
       return next;
     }, { replace: true });
   };
@@ -87,6 +89,9 @@ export function useNovelEditWorkflow(novelId: string) {
       next.set("stage", "chapter");
       next.set("chapterId", chapterId);
       next.set("editor", "1");
+      // Opening the chapter-editor partition closes the preview overlay so the
+      // two overlays never show at the same time.
+      next.delete("preview");
       return next;
     }, { replace: true });
   }, [setSearchParams]);
@@ -95,6 +100,25 @@ export function useNovelEditWorkflow(novelId: string) {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("editor");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const openPreview = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      // Opening the preview overlay closes the chapter-editor partition so the
+      // two overlays never show at the same time.
+      next.delete("editor");
+      next.set("preview", "1");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const closePreview = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("preview");
       return next;
     }, { replace: true });
   }, [setSearchParams]);
@@ -152,5 +176,8 @@ export function useNovelEditWorkflow(novelId: string) {
     editorOpen,
     openChapterEditor,
     closeChapterEditor,
+    previewOpen,
+    openPreview,
+    closePreview,
   };
 }

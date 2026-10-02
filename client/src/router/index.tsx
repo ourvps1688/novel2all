@@ -11,7 +11,6 @@ const CreationStudioPage = lazy(() => import("@/pages/creationStudio/CreationStu
 const ShortStoryStudioPage = lazy(() => import("@/pages/shortStory/ShortStoryStudioPage"));
 const AutoDirectorCreatePage = lazy(() => import("@/pages/novels/autoDirector/AutoDirectorCreatePage"));
 const SimpleNovelShelfPage = lazy(() => import("@/pages/novels/simpleCreation/SimpleNovelShelfPage"));
-const NovelPreview = lazy(() => import("@/pages/novels/NovelPreview"));
 const NarrativeFormNovelEditRoute = lazy(() => import("@/pages/novels/NarrativeFormNovelEditRoute"));
 const CreativeHubPage = lazy(() => import("@/pages/creativeHub/CreativeHubPage"));
 const ChatPage = lazy(() => import("@/pages/chat/ChatPage"));
@@ -57,6 +56,23 @@ function ChapterEditorPartitionRedirect() {
   return null;
 }
 
+// The standalone preview route is absorbed into the workspace as a right-side
+// drawer overlay (NovelEditView renders NovelPreviewDrawer when ?preview=1). This
+// redirect keeps any legacy deep links working.
+function PreviewPartitionRedirect() {
+  const params = useParams();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const novelId = params.id;
+    if (novelId) {
+      navigate(`/novels/${novelId}/edit?preview=1`, { replace: true });
+    } else {
+      navigate("/novels", { replace: true });
+    }
+  }, [navigate, params.id]);
+  return null;
+}
+
 const routes: RouteObject[] = [
   {
     path: "/",
@@ -69,7 +85,7 @@ const routes: RouteObject[] = [
       { path: "novels/auto-director", element: <AutoDirectorCreatePage /> },
       { path: "novels/:id/simple", element: <SimpleNovelShelfPage /> },
       { path: "novels/:id/story", element: <ShortStoryStudioPage /> },
-      { path: "novels/:id/preview", element: <NovelPreview /> },
+      { path: "novels/:id/preview", element: <PreviewPartitionRedirect /> },
       { path: "novels/:id/edit", element: <NarrativeFormNovelEditRoute /> },
       { path: "novels/:id/chapters/:chapterId", element: <ChapterEditorPartitionRedirect /> },
       { path: "creative-hub", element: <CreativeHubPage /> },

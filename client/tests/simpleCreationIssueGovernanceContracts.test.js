@@ -35,7 +35,7 @@ test("simple creation shelf exposes issue governance without professional conver
 
 test("simple creation shelf provides a preview shortcut for the current chapter", () => {
   assert.match(shelfSource, /进入预览模式/);
-  assert.match(shelfSource, /\/novels\/\$\{id\}\/preview/);
+  assert.match(shelfSource, /\/novels\/\$\{id\}\/edit\?preview=1/);
   assert.match(shelfSource, /chapterId=\$\{encodeURIComponent\(selectedChapter\.id\)\}/);
 });
 

@@ -73,11 +73,13 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
     onActiveTabChange,
     chapterEditor,
     onOpenChapterEditor,
+    previewOpen,
+    openPreview,
+    closePreview,
   } = props;
 
   const [isProjectToolsOpen, setIsProjectToolsOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const resetChaptersMutation = useMutation({
@@ -391,7 +393,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
               {taskAttentionLabel ? <Badge variant="secondary">{taskAttentionLabel}</Badge> : null}
             </Button>
 
-            <Button variant="outline" onClick={() => setIsPreviewOpen(true)}>
+            <Button variant="outline" onClick={() => openPreview?.()}>
               预览
             </Button>
             </>
@@ -405,12 +407,12 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
 
       <NovelPreviewDrawer
         novelId={id}
-        open={isPreviewOpen}
-        onOpenChange={setIsPreviewOpen}
+        open={previewOpen ?? false}
+        onOpenChange={(open) => (open ? openPreview?.() : closePreview?.())}
         initialChapterId={chapterTab.selectedChapterId}
         onEditChapter={(chapterId) => {
           onOpenChapterEditor?.(chapterId);
-          setIsPreviewOpen(false);
+          closePreview?.();
         }}
       />
     </div>

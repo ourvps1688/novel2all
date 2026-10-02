@@ -177,7 +177,7 @@ export function NovelProjectCard(props: {
           <div className="flex flex-wrap items-center gap-1 opacity-70 transition group-hover:opacity-100 focus-within:opacity-100">
             {props.novel.narrativeForm !== "short_story" ? (
             <Button asChild size="sm" variant="ghost" className="h-8 gap-1 px-2" title="阅读预览" aria-label="阅读预览">
-              <Link to={`/novels/${props.novel.id}/preview`} onClick={stopCardClick}>
+              <Link to={`/novels/${props.novel.id}/edit?preview=1`} onClick={stopCardClick}>
                 <Eye className="h-4 w-4" aria-hidden="true" />
                 <span className="text-xs">预览</span>
               </Link>

@@ -274,6 +274,9 @@ export default function NovelEdit() {
     editorOpen,
     closeChapterEditor,
     openChapterEditor,
+    previewOpen,
+    openPreview,
+    closePreview,
   } = useNovelEditWorkflow(id);
   const [recoveryFocusParams] = useSearchParams();
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -2859,6 +2862,9 @@ export default function NovelEdit() {
       chapterTab={chapterTab}
       chapterEditor={chapterEditor}
       onOpenChapterEditor={openChapterEditor}
+      previewOpen={previewOpen}
+      openPreview={openPreview}
+      closePreview={closePreview}
       pipelineTab={pipelineTab}
       characterTab={characterTab}
       takeover={isTakeoverDismissed ? null : takeover}
