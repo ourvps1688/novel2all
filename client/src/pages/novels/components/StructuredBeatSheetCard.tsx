@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import AiButton from "@/components/common/AiButton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { StructuredTabViewProps } from "./NovelEditView.types";
 import { formatBeatDisplayLabel } from "./structuredOutlineWorkspace.shared";
 
@@ -20,6 +21,7 @@ interface StructuredBeatSheetCardProps {
   visibleRefinedChapterCount: number;
   readiness: StructuredTabViewProps["readiness"];
   isGeneratingBeatSheet: boolean;
+  highlight?: boolean;
   onGenerateBeatSheet: StructuredTabViewProps["onGenerateBeatSheet"];
   chapterListPanel?: ReactNode;
   chapterDetailPanel?: ReactNode;
@@ -45,6 +47,7 @@ export default function StructuredBeatSheetCard(props: StructuredBeatSheetCardPr
     visibleRefinedChapterCount,
     readiness,
     isGeneratingBeatSheet,
+    highlight = false,
     onGenerateBeatSheet,
     chapterListPanel,
     chapterDetailPanel,
@@ -59,9 +62,23 @@ export default function StructuredBeatSheetCard(props: StructuredBeatSheetCardPr
     ? (hasExistingBeatSheet ? "重新生成中..." : "生成中...")
     : (hasExistingBeatSheet ? "重新生成当前卷节奏板" : "生成当前卷节奏板");
 
+  const beatSheetHint = highlight
+    ? readiness.canGenerateBeatSheet
+      ? "恢复流程建议：点击本卡片右上角「重新生成当前卷节奏板」即可补齐全卷节奏板覆盖。如当前不是目标卷，请先在左侧卷选择切换到对应卷。"
+      : readiness.blockingReasons.length > 0
+        ? `暂不能直接生成节奏板：${readiness.blockingReasons.join(" ")}`
+        : "当前卷暂不满足生成条件，请先完成前置步骤。"
+    : null;
+
   return (
     <Card>
       <CardHeader className="pb-3">
+        {beatSheetHint ? (
+          <div className="mb-3 rounded-lg border border-primary/40 bg-primary/[0.06] p-3 text-sm text-foreground">
+            <span className="font-medium">提示：</span>
+            {beatSheetHint}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <CardTitle className="text-base">当前卷节奏</CardTitle>
@@ -69,6 +86,11 @@ export default function StructuredBeatSheetCard(props: StructuredBeatSheetCardPr
           </div>
           <AiButton
             variant="outline"
+            className={cn(
+              highlight && readiness.canGenerateBeatSheet
+                ? "ring-2 ring-primary/50 ring-offset-2"
+                : "",
+            )}
             onClick={() => onGenerateBeatSheet(selectedVolume.id)}
             disabled={isGeneratingBeatSheet || !readiness.canGenerateBeatSheet}
           >

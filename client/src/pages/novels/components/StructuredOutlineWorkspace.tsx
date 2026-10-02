@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AiButton from "@/components/common/AiButton";
 import TensionCurvePanel, { type TensionCurveSeries, type TensionCurveViewportOption } from "@/components/tensionCurve/TensionCurvePanel";
 import { TensionCurveEditDialog } from "@/components/tensionCurve/TensionCurveEditDialog";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useSearchParams } from "react-router-dom";
 import {
   getStructuredOutlineWorkspaceDefaults,
   useStructuredOutlineWorkspaceStore,
@@ -111,6 +112,21 @@ export default function StructuredOutlineWorkspace(props: StructuredTabViewProps
   const workspaceId = novelId || "draft-structured-outline";
   const defaultVolumeId = volumes[0]?.id ?? "";
   const defaultChapterId = volumes[0]?.chapters[0]?.id ?? "";
+  const [searchParams] = useSearchParams();
+  const beatSheetRef = useRef<HTMLDivElement>(null);
+  const [highlightBeatSheet, setHighlightBeatSheet] = useState(false);
+
+  // When arriving from the recovery banner's "重生成节奏板" entry, scroll the
+  // 当前卷节奏 card into view and highlight it so the user knows exactly where
+  // to click.
+  useEffect(() => {
+    if (searchParams.get("focus") === "beat-sheet") {
+      setHighlightBeatSheet(true);
+      requestAnimationFrame(() => {
+        beatSheetRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [searchParams]);
   const ensureWorkspace = useStructuredOutlineWorkspaceStore((state) => state.ensureWorkspace);
   const patchWorkspace = useStructuredOutlineWorkspaceStore((state) => state.patchWorkspace);
   const selectedVolumeId = useStructuredOutlineWorkspaceStore(
@@ -462,7 +478,7 @@ export default function StructuredOutlineWorkspace(props: StructuredTabViewProps
           </div>
         ) : null}
 
-        <div className="space-y-4">
+        <div className="space-y-4" ref={beatSheetRef}>
           <StructuredBeatSheetCard
             selectedVolume={selectedVolume}
             selectedVolumeChapters={selectedVolumeChapters}
@@ -474,6 +490,7 @@ export default function StructuredOutlineWorkspace(props: StructuredTabViewProps
             readiness={readiness}
             isGeneratingBeatSheet={isGeneratingBeatSheet}
             onGenerateBeatSheet={onGenerateBeatSheet}
+            highlight={highlightBeatSheet}
             chapterListPanel={(
               <StructuredChapterListCard
                 selectedVolume={selectedVolume}

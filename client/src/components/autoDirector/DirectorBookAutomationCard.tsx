@@ -48,7 +48,7 @@ export default function DirectorBookAutomationCard({
 
   const handleOpenBeatSheet = () => {
     if (!novelId) return;
-    navigate(`/novels/${novelId}/edit?stage=structured`);
+    navigate(`/novels/${novelId}/edit?stage=structured&focus=beat-sheet`);
   };
 
   const handleAction = (action: DirectorBookAutomationAction) => {
@@ -72,16 +72,21 @@ export default function DirectorBookAutomationCard({
         </div>
       )}
       {showBeatSheetEntry ? (
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="w-full"
-          onClick={handleOpenBeatSheet}
-        >
-          <ListTree className="h-4 w-4" />
-          重生成节奏板
-        </Button>
+        <div className="space-y-1">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="w-full"
+            onClick={handleOpenBeatSheet}
+          >
+            <ListTree className="h-4 w-4" />
+            重生成节奏板
+          </Button>
+          <p className="px-1 text-xs leading-5 text-muted-foreground">
+            进入后在「当前卷节奏」卡片右上角点「重新生成当前卷节奏板」。
+          </p>
+        </div>
       ) : null}
       {onSwitchToProjectNav ? (
         <Button type="button" size="sm" variant="ghost" className="w-full" onClick={onSwitchToProjectNav}>
