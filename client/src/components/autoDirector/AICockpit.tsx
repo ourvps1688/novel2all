@@ -1,25 +1,17 @@
 import type { ReactNode } from "react";
 import type {
   DirectorBookAutomationAction,
-  DirectorBookAutomationDisplayState,
   DirectorBookAutomationProjection,
 } from "@ai-novel/shared/types/directorRuntime";
 import { getDirectorNodeDisplayLabel } from "@ai-novel/shared/types/directorRuntime";
 import {
   Activity,
-  AlertTriangle,
   ChevronDown,
-  CheckCircle2,
-  Clock3,
   Database,
-  ExternalLink,
   History,
-  PauseCircle,
-  ShieldCheck,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import BookAutomationStatusBar from "./BookAutomationStatusBar";
 
 export interface AICockpitProps {
   projection?: DirectorBookAutomationProjection | null;
@@ -32,107 +24,6 @@ export interface AICockpitProps {
   onOpenDetails?: (projection: DirectorBookAutomationProjection) => void;
   onOpenNovel?: (projection: DirectorBookAutomationProjection) => void;
   onOpenFallbackDetails?: () => void;
-}
-
-function displayStateLabel(state: DirectorBookAutomationDisplayState): string {
-  const labels: Record<DirectorBookAutomationDisplayState, string> = {
-    processing: "AI 正在处理",
-    needs_confirmation: "等你确认",
-    paused: "已暂停",
-    needs_attention: "出错需处理",
-    completed: "已完成",
-    idle: "未开启",
-  };
-  return labels[state];
-}
-
-function stateBadgeVariant(state: DirectorBookAutomationDisplayState): "default" | "secondary" | "outline" | "destructive" {
-  if (state === "needs_attention") {
-    return "destructive";
-  }
-  if (state === "processing") {
-    return "default";
-  }
-  if (state === "needs_confirmation" || state === "paused") {
-    return "outline";
-  }
-  return "secondary";
-}
-
-function stateClassName(state: DirectorBookAutomationDisplayState): string {
-  if (state === "processing") {
-    return "border-sky-500/25 bg-sky-500/10";
-  }
-  if (state === "needs_confirmation") {
-    return "border-amber-500/25 bg-amber-500/10";
-  }
-  if (state === "paused") {
-    return "border-indigo-500/25 bg-indigo-500/10";
-  }
-  if (state === "needs_attention") {
-    return "border-destructive/30 bg-destructive/5";
-  }
-  if (state === "completed") {
-    return "border-emerald-500/25 bg-emerald-500/10";
-  }
-  return "border-border/70 bg-muted/20";
-}
-
-function stateIcon(state: DirectorBookAutomationDisplayState) {
-  if (state === "processing") {
-    return <Activity className="h-4 w-4" />;
-  }
-  if (state === "needs_confirmation") {
-    return <PauseCircle className="h-4 w-4" />;
-  }
-  if (state === "paused") {
-    return <Clock3 className="h-4 w-4" />;
-  }
-  if (state === "needs_attention") {
-    return <AlertTriangle className="h-4 w-4" />;
-  }
-  if (state === "completed") {
-    return <CheckCircle2 className="h-4 w-4" />;
-  }
-  return <ShieldCheck className="h-4 w-4" />;
-}
-
-function stateAccentClassName(state: DirectorBookAutomationDisplayState): string {
-  if (state === "processing") {
-    return "text-sky-700 dark:text-sky-300";
-  }
-  if (state === "needs_confirmation") {
-    return "text-amber-700 dark:text-amber-300";
-  }
-  if (state === "paused") {
-    return "text-indigo-700 dark:text-indigo-300";
-  }
-  if (state === "needs_attention") {
-    return "text-destructive";
-  }
-  if (state === "completed") {
-    return "text-emerald-700 dark:text-emerald-300";
-  }
-  return "text-muted-foreground";
-}
-
-function stateSoftSurfaceClassName(state: DirectorBookAutomationDisplayState): string {
-  if (state === "processing") {
-    return "bg-sky-500/10";
-  }
-  if (state === "needs_confirmation") {
-    return "bg-amber-500/10";
-  }
-  if (state === "paused") {
-    return "bg-indigo-500/10";
-  }
-  if (state === "needs_attention") {
-    return "bg-destructive/5";
-  }
-  if (state === "completed") {
-    return "bg-emerald-500/10";
-  }
-  return "bg-muted/20";
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -182,23 +73,6 @@ function formatUsageLine(usage: {
     `总计 ${formatTokenCount(usage.totalTokens)} Tokens`,
     duration ? `累计调用耗时 ${duration}` : null,
   ].filter(Boolean).join(" · ");
-}
-
-function fallbackProjectionReason(props: Pick<AICockpitProps, "fallbackSummary">): string {
-  return props.fallbackSummary?.trim() || "没有需要你处理的 AI 自动推进任务。";
-}
-
-function renderActionLabel(
-  action: DirectorBookAutomationAction,
-  displayState?: DirectorBookAutomationDisplayState,
-): string {
-  if (
-    displayState === "needs_confirmation"
-    && (action.type === "continue" || action.type === "auto_execute_range")
-  ) {
-    return "确认并继续";
-  }
-  return action.label || "继续处理";
 }
 
 function artifactTypeLabel(type: string): string {
@@ -323,28 +197,16 @@ export default function AICockpit(props: AICockpitProps) {
 
   if (!focusProjection) {
     return (
-      <div className="rounded-2xl bg-muted/25 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-start gap-2">
-            <span className="mt-0.5 shrink-0 text-muted-foreground">{stateIcon("idle")}</span>
-              <div className="min-w-0">
-                <div className="text-xs leading-5 text-muted-foreground">{fallbackProjectionReason(props)}</div>
-              </div>
-          </div>
-          <Badge variant="secondary" className="shrink-0">{fallbackStatusLabel ?? "还没开始自动写作"}</Badge>
-        </div>
-        {onOpenFallbackDetails ? (
-          <Button type="button" size="sm" variant="outline" className="mt-3 w-full" onClick={onOpenFallbackDetails}>
-            查看
-          </Button>
-        ) : null}
-      </div>
+      <BookAutomationStatusBar
+        variant="banner"
+        projection={null}
+        fallbackSummary={props.fallbackSummary ?? null}
+        fallbackStatusLabel={fallbackStatusLabel}
+        onOpenFallbackDetails={onOpenFallbackDetails}
+      />
     );
   }
 
-  const primaryAction = focusProjection.primaryAction ?? null;
-  const detailAction = focusProjection.secondaryActions?.find((item) => item.type === "open_details") ?? null;
-  const canOpenDetails = showDetailsAction && Boolean(onOpenDetails || (detailAction && onAction));
   const recentItems = focusProjection.timeline.slice(0, 3);
   const artifactRows = focusProjection.artifactSummary.byType?.slice(0, 3) ?? [];
   const usageSummary = focusProjection.usageSummary ?? null;
@@ -367,89 +229,20 @@ export default function AICockpit(props: AICockpitProps) {
       ? `${focusProjection.artifactSummary.recentVersionedArtifacts.length} 个产物有新版本`
       : null,
   ].filter((line): line is string => Boolean(line));
-  const reason = focusProjection.userReason?.trim()
-    || focusProjection.blockedReason?.trim()
-    || focusProjection.detail?.trim()
-    || focusProjection.automationSummary?.trim()
-    || fallbackProjectionReason(props);
-  const statusHeadline = focusProjection.userHeadline?.trim()
-    || focusProjection.headline?.trim()
-    || displayStateLabel(focusProjection.displayState);
-  const statusDetail = reason === statusHeadline
-    ? focusProjection.progressSummary?.trim() || "AI 会在这里汇总本书自动推进的最新状态。"
-    : reason;
-  const latestRecordText = recentItems[0] ? formatDate(recentItems[0].occurredAt) : "暂无";
-
-  const handlePrimaryAction = () => {
-    if (primaryAction && onAction) {
-      onAction(focusProjection, primaryAction);
-      return;
-    }
-    onOpenNovel?.(focusProjection);
-  };
-
-  const handleDetails = () => {
-    if (detailAction && onAction) {
-      onAction(focusProjection, detailAction);
-      return;
-    }
-    onOpenDetails?.(focusProjection);
-  };
 
   return (
     <div className="space-y-4">
-      <section className={cn("rounded-2xl p-5 shadow-sm", stateSoftSurfaceClassName(focusProjection.displayState))}>
-        <div className="flex items-center justify-between gap-3">
-          <div className={cn("flex min-w-0 items-center gap-2 text-xs font-medium", stateAccentClassName(focusProjection.displayState))}>
-            <span className="shrink-0">
-              {stateIcon(focusProjection.displayState)}
-            </span>
-            <span className="truncate">{displayStateLabel(focusProjection.displayState)}</span>
-          </div>
-          <span className="min-w-0 max-w-[52%] truncate rounded-full bg-background/60 px-2.5 py-1 text-xs text-muted-foreground">
-            {focusProjection.focusNovel.title}
-          </span>
-        </div>
-
-        <div className="mt-4 max-w-[46rem]">
-          <h3 className="text-base font-semibold leading-7 text-foreground">{statusHeadline}</h3>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{statusDetail}</p>
-        </div>
-
-        <div className="mt-5 grid gap-3 rounded-xl bg-background/60 p-3 sm:grid-cols-3">
-          <SummaryMetric
-            label="当前状态"
-            value={displayStateLabel(focusProjection.displayState)}
-            className={stateAccentClassName(focusProjection.displayState)}
-          />
-          <SummaryMetric label="推进概览" value={focusProjection.progressSummary || "暂无进度摘要"} />
-          <SummaryMetric label="最近记录" value={latestRecordText} />
-        </div>
-
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-[11px] text-muted-foreground">下一步</div>
-            <div className="mt-1 text-sm font-medium leading-5 text-foreground">
-              {focusProjection.nextActionLabel || "打开小说查看当前内容"}
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <Button type="button" size="sm" onClick={handlePrimaryAction} disabled={isActionPending}>
-              {isActionPending ? "处理中..." : renderActionLabel(primaryAction ?? {
-                type: "open_novel",
-                label: "打开小说",
-                target: { novelId: focusProjection.novelId },
-              }, focusProjection.displayState)}
-            </Button>
-            {canOpenDetails ? (
-              <Button type="button" size="sm" variant="secondary" onClick={handleDetails}>
-                <ExternalLink className="h-4 w-4" />
-                执行详情
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </section>
+      <BookAutomationStatusBar
+        variant="banner"
+        projection={focusProjection}
+        isActionPending={isActionPending}
+        showDetailsAction={showDetailsAction}
+        onAction={onAction}
+        onOpenDetails={onOpenDetails}
+        onOpenNovel={onOpenNovel}
+        fallbackSummary={props.fallbackSummary ?? null}
+        fallbackStatusLabel={fallbackStatusLabel}
+      />
 
       {circuitBreaker ? (
         <section className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-6 text-destructive">
