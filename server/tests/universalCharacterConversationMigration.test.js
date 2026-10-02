@@ -11,17 +11,13 @@ function readMigration(directory) {
 }
 
 test("universal character conversation migrations preserve legacy dialogue records", () => {
-  const postgres = readMigration("migrations");
   const sqlite = readMigration("migrations.sqlite");
 
-  for (const migration of [postgres, sqlite]) {
-    assert.match(migration, /CharacterConversationSession/);
-    assert.match(migration, /CharacterConversationTurn/);
-    assert.match(migration, /conversationSessionId/);
-    assert.doesNotMatch(migration, /DROP TABLE "CharacterDialogueSession"/);
-    assert.doesNotMatch(migration, /DROP TABLE "CharacterDialogueTurn"/);
-  }
-
+  assert.match(sqlite, /CharacterConversationSession/);
+  assert.match(sqlite, /CharacterConversationTurn/);
+  assert.match(sqlite, /conversationSessionId/);
+  assert.doesNotMatch(sqlite, /DROP TABLE "CharacterDialogueSession"/);
+  assert.doesNotMatch(sqlite, /DROP TABLE "CharacterDialogueTurn"/);
   assert.match(sqlite, /INSERT INTO "new_CharacterDialogueInfluence"/);
   assert.match(sqlite, /FROM "CharacterDialogueInfluence"/);
   assert.match(sqlite, /"sessionId" TEXT/);

@@ -6,9 +6,7 @@
   "main": "dist/app.js",
   "files": [
     "dist",
-    "src/prisma/migrations",
     "src/prisma/migrations.sqlite",
-    "src/prisma/schema.prisma",
     "src/prisma/schema.sqlite.prisma"
   ],
   "prisma": {
@@ -53,7 +51,6 @@
     "@langchain/langgraph": "^1.2.0",
     "@langchain/openai": "^1.2.11",
     "@prisma/adapter-better-sqlite3": "^7.4.2",
-    "@prisma/adapter-pg": "7.4.2",
     "@prisma/client": "^7.4.2",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.6",

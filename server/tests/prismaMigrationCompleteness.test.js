@@ -7,7 +7,6 @@ const Database = require("better-sqlite3");
 const prismaRoot = path.join(__dirname, "..", "src", "prisma");
 const sqliteSchemaPath = path.join(prismaRoot, "schema.sqlite.prisma");
 const sqliteMigrationsDir = path.join(prismaRoot, "migrations.sqlite");
-const postgresMigrationsDir = path.join(prismaRoot, "migrations");
 const visualAssetSchemaRepairMigrations = [
   "20260916090000_comic_character_gender",
   "20260916090100_comic_panel_scene_ref",
@@ -115,17 +114,12 @@ test("SQLite migrations contain every model and column in the SQLite Prisma sche
   }
 });
 
-test("visual asset schema repair migrations exist for SQLite and PostgreSQL", () => {
+test("visual asset schema repair migrations exist for SQLite", () => {
   for (const migrationName of visualAssetSchemaRepairMigrations) {
     assert.equal(
       fs.existsSync(path.join(sqliteMigrationsDir, migrationName, "migration.sql")),
       true,
       `${migrationName} must exist for SQLite`,
-    );
-    assert.equal(
-      fs.existsSync(path.join(postgresMigrationsDir, migrationName, "migration.sql")),
-      true,
-      `${migrationName} must exist for PostgreSQL`,
     );
   }
 });
