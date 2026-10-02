@@ -224,6 +224,10 @@ export async function runDirectorStructuredOutlinePhase(input: {
 
   let workspace = baseWorkspace;
   let previousCursorKey: string | null = null;
+  // 节奏板覆盖不足时，自动/自动驾驶模式下自动补齐（重生成该卷节奏板后重试拆章），
+  // 避免每次都挂起等人工。超过上限则放弃自动补，走原 gate 挂起交人工。
+  const BEAT_SHEET_BACKFILL_CAP = 2;
+  let beatSheetBackfillAttempts = 0;
   while (true) {
     const recoveryCursor = resolveStructuredOutlineRecoveryCursor({
       workspace,
@@ -290,40 +294,97 @@ export async function runDirectorStructuredOutlinePhase(input: {
         throw new Error("自动导演恢复时缺少待生成章节的目标节奏段。");
       }
       const targetBeatKey = recoveryCursor.beatKey;
-      workspace = await runDirectorTrackedStep({
-        taskId,
-        stage: "structured_outline",
-        itemKey: "chapter_list",
-        itemLabel: `正在生成第 ${targetVolume.sortOrder} 卷章节列表`,
-        progress: DIRECTOR_PROGRESS.chapterList,
-        volumeId: targetVolume.id,
-        callbacks,
-        run: async ({ updateStatus, signal }) => dependencies.volumeService.generateVolumes(novelId, {
-          provider: request.provider,
-          model: request.model,
-          temperature: request.temperature,
-          scope: "chapter_list",
-          guidance: fastStartGuidance,
-          targetVolumeId: targetVolume.id,
-          generationMode: "single_beat",
-          targetBeatKey,
-          draftWorkspace: workspace,
+      const autoBackfillAllowed = isDirectorAutoExecutionRunMode(normalizeDirectorRunMode(request.runMode))
+        || isFullBookAutopilotRunMode(request.runMode);
+      try {
+        workspace = await runDirectorTrackedStep({
           taskId,
-          entrypoint: "auto_director",
-          signal,
-          persistIntermediateDocuments: true,
-          onPhaseStart: async (event) => {
-            const update = buildStructuredOutlinePhaseUpdate(event);
-            if (!update) {
-              return;
-            }
-            await updateStatus(update);
-          },
-          onIntermediateDocument: async (event) => {
-            workspace = event.document;
-          },
-        }),
-      });
+          stage: "structured_outline",
+          itemKey: "chapter_list",
+          itemLabel: `正在生成第 ${targetVolume.sortOrder} 卷章节列表`,
+          progress: DIRECTOR_PROGRESS.chapterList,
+          volumeId: targetVolume.id,
+          callbacks,
+          run: async ({ updateStatus, signal }) => dependencies.volumeService.generateVolumes(novelId, {
+            provider: request.provider,
+            model: request.model,
+            temperature: request.temperature,
+            scope: "chapter_list",
+            guidance: fastStartGuidance,
+            targetVolumeId: targetVolume.id,
+            generationMode: "single_beat",
+            targetBeatKey,
+            draftWorkspace: workspace,
+            taskId,
+            entrypoint: "auto_director",
+            signal,
+            persistIntermediateDocuments: true,
+            onPhaseStart: async (event) => {
+              const update = buildStructuredOutlinePhaseUpdate(event);
+              if (!update) {
+                return;
+              }
+              await updateStatus(update);
+            },
+            onIntermediateDocument: async (event) => {
+              workspace = event.document;
+            },
+          }),
+        });
+      } catch (chapterListError) {
+        const gateMessage = chapterListError instanceof Error ? chapterListError.message : String(chapterListError);
+        // 节奏板覆盖不足触发的 gate：自动/自动驾驶模式下自动重生成该卷节奏板后重试拆章，
+        // 避免每次都挂起等人工。超过 BEAT_SHEET_BACKFILL_CAP 仍不足则放弃自动补，按原 gate 挂起交人工。
+        if (
+          autoBackfillAllowed
+          && /重生成节奏板/.test(gateMessage)
+          && beatSheetBackfillAttempts < BEAT_SHEET_BACKFILL_CAP
+        ) {
+          beatSheetBackfillAttempts += 1;
+          workspace = await runDirectorTrackedStep({
+            taskId,
+            stage: "structured_outline",
+            itemKey: "beat_sheet",
+            itemLabel: `自动补齐第 ${targetVolume.sortOrder} 卷节奏板（覆盖不足，第 ${beatSheetBackfillAttempts} 次）`,
+            progress: DIRECTOR_PROGRESS.beatSheet,
+            volumeId: targetVolume.id,
+            callbacks,
+            run: async ({ updateStatus, signal }) => dependencies.volumeService.generateVolumes(novelId, {
+              provider: request.provider,
+              model: request.model,
+              temperature: request.temperature,
+              scope: "beat_sheet",
+              guidance: fastStartGuidance,
+              targetVolumeId: targetVolume.id,
+              draftWorkspace: workspace,
+              taskId,
+              entrypoint: "auto_director",
+              signal,
+              onPhaseStart: async (event) => {
+                const update = buildStructuredOutlinePhaseUpdate(event);
+                if (!update) {
+                  return;
+                }
+                await updateStatus(update);
+              },
+            }),
+          });
+          workspace = await persistStructuredOutlineVolumeSnapshot({
+            taskId,
+            novelId,
+            workspace,
+            itemKey: "beat_sheet",
+            scope: "beat_sheet",
+            volumeId: targetVolume.id,
+            dependencies,
+          });
+          // 重生成节奏板改变了工作区状态（覆盖不足已被补齐），重置进度游标避免被
+          // “恢复没有推进”判定拦截；下一步会重试该卷的章节列表拆章。
+          previousCursorKey = null;
+          continue;
+        }
+        throw chapterListError;
+      }
       const preparedVolume = workspace.volumes.find((item) => item.id === targetVolume.id);
       const titleDiversityIssue = preparedVolume
         ? getChapterTitleDiversityIssue(preparedVolume.chapters.map((chapter) => chapter.title))
