@@ -101,6 +101,36 @@ test("getDatabaseUrl rejects missing DATABASE_URL in production", () => {
   }
 });
 
+test("getDatabaseUrl allows the default sqlite URL in production when running as the desktop app", () => {
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalRuntime = process.env.AI_NOVEL_RUNTIME;
+  delete process.env.DATABASE_URL;
+  process.env.NODE_ENV = "production";
+  process.env.AI_NOVEL_RUNTIME = "desktop";
+
+  try {
+    const { getDatabaseUrl, DEFAULT_SQLITE_DATABASE_URL } = loadDatabaseConfig();
+    assert.equal(getDatabaseUrl(), DEFAULT_SQLITE_DATABASE_URL);
+  } finally {
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    }
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+    if (originalRuntime === undefined) {
+      delete process.env.AI_NOVEL_RUNTIME;
+    } else {
+      process.env.AI_NOVEL_RUNTIME = originalRuntime;
+    }
+  }
+});
+
 test("getDatabaseUrl can prefer the sqlite default for legacy local runtime", () => {
   const originalDatabaseUrl = process.env.DATABASE_URL;
   const originalNodeEnv = process.env.NODE_ENV;

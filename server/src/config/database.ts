@@ -1,3 +1,5 @@
+import { resolveAppRuntimeMode } from "../runtime/appPaths";
+
 export type DatabaseProvider = "sqlite";
 
 const DEFAULT_SQLITE_DATABASE_URL = "file:./dev.db";
@@ -36,7 +38,10 @@ export function getDatabaseUrl(options?: { allowDefault?: boolean; preferSqlite?
     }
     return normalizeDatabaseUrl(normalized);
   }
-  if (options?.allowDefault ?? process.env.NODE_ENV !== "production") {
+  const allowDefault =
+    options?.allowDefault ??
+    (process.env.NODE_ENV !== "production" || resolveAppRuntimeMode() === "desktop");
+  if (allowDefault) {
     return DEFAULT_SQLITE_DATABASE_URL;
   }
   throw new Error("DATABASE_URL is required in production.");
