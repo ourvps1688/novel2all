@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import AiButton from "@/components/common/AiButton";
+import { RecoveryGuidanceBanner } from "@/components/autoDirector/RecoveryGuidanceBanner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -73,12 +74,7 @@ export default function StructuredBeatSheetCard(props: StructuredBeatSheetCardPr
   return (
     <Card>
       <CardHeader className="pb-3">
-        {beatSheetHint ? (
-          <div className="mb-3 rounded-lg border border-primary/40 bg-primary/[0.06] p-3 text-sm text-foreground">
-            <span className="font-medium">提示：</span>
-            {beatSheetHint}
-          </div>
-        ) : null}
+        {beatSheetHint ? <RecoveryGuidanceBanner text={beatSheetHint} /> : null}
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <CardTitle className="text-base">当前卷节奏</CardTitle>

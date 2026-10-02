@@ -4,11 +4,13 @@ import type {
   DirectorBookAutomationAction,
   DirectorBookAutomationProjection,
 } from "@ai-novel/shared/types/directorRuntime";
-import { LayoutDashboard, ListTree } from "lucide-react";
+import { LayoutDashboard, ListTree, MapPin } from "lucide-react";
 import { DirectorAttentionCenter } from "./DirectorAttentionCenter";
 import { Button } from "@/components/ui/button";
 import { mapProjectionToAttention } from "@/lib/mapProjectionToAttention";
 import { useDirectorAttentionActionExecutor } from "@/lib/directorAttentionActions";
+import { isDirectorContinuationAction } from "@/lib/directorContinuationActions";
+import { resolveRecoveryFocusKey } from "@/lib/recoveryFocus";
 
 interface DirectorBookAutomationCardProps {
   projection: DirectorBookAutomationProjection | null | undefined;
@@ -46,6 +48,24 @@ export default function DirectorBookAutomationCard({
       projection?.status === "blocked" ||
       projection?.status === "failed");
 
+  // Generalized recovery-list: every navigation-type recovery action in the
+  // projection becomes a "前往定位" entry that, when clicked, navigates with a
+  // `focus` token so the destination auto-scrolls + highlights the exact card.
+  // Command actions (continue/retry/cancel/auto_execute_range) are excluded —
+  // they run in place and never navigate.
+  const recoveryActions = useMemo(() => {
+    const candidates: DirectorBookAutomationAction[] = [];
+    const primary = projection?.primaryAction ?? null;
+    const secondary = projection?.secondaryActions ?? [];
+    for (const action of [primary, ...secondary]) {
+      if (!action) continue;
+      if (isDirectorContinuationAction(action)) continue;
+      if (resolveRecoveryFocusKey(action) === null) continue;
+      candidates.push(action);
+    }
+    return candidates;
+  }, [projection]);
+
   const handleOpenBeatSheet = () => {
     if (!novelId) return;
     navigate(`/novels/${novelId}/edit?stage=structured&focus=beat-sheet`);
@@ -72,20 +92,39 @@ export default function DirectorBookAutomationCard({
         </div>
       )}
       {showBeatSheetEntry ? (
-        <div className="space-y-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="w-full"
-            onClick={handleOpenBeatSheet}
-          >
-            <ListTree className="h-4 w-4" />
-            重生成节奏板
-          </Button>
-          <p className="px-1 text-xs leading-5 text-muted-foreground">
-            进入后在「当前卷节奏」卡片右上角点「重新生成当前卷节奏板」。
-          </p>
+        <div className="space-y-2">
+          {recoveryActions.map((action) => (
+            <div key={`recovery-${action.type}-${action.label}`} className="space-y-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="w-full"
+                onClick={() => handleAction(action)}
+              >
+                <MapPin className="h-4 w-4" />
+                前往定位 · {action.label}
+              </Button>
+              <p className="px-1 text-xs leading-5 text-muted-foreground">
+                已为你自动定位到需要操作的位置。
+              </p>
+            </div>
+          ))}
+          <div className="space-y-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="w-full"
+              onClick={handleOpenBeatSheet}
+            >
+              <ListTree className="h-4 w-4" />
+              重生成节奏板
+            </Button>
+            <p className="px-1 text-xs leading-5 text-muted-foreground">
+              进入后在「当前卷节奏」卡片右上角点「重新生成当前卷节奏板」。
+            </p>
+          </div>
         </div>
       ) : null}
       {onSwitchToProjectNav ? (

@@ -7,11 +7,26 @@ import {
   getDirectorContinuationMode,
   isDirectorContinuationAction,
 } from "@/lib/directorContinuationActions";
+import { resolveRecoveryFocusKey, withFocus } from "@/lib/recoveryFocus";
 import { queryKeys } from "@/api/queryKeys";
 import { toast } from "@/components/ui/toast";
 
 type NavigateFn = (href: string) => void;
 type InvalidateFn = () => void | Promise<void>;
+
+/**
+ * Ensure a deep link targets a specific workspace stage. If a `stage=` query
+ * parameter already exists it is replaced; otherwise one is appended. Used when
+ * a recovery action's server href points at the pipeline view but we want it to
+ * land on the structured page so the beat-sheet card highlight works.
+ */
+function ensureStageParam(href: string, stage: string): string {
+  if (/[?&]stage=/.test(href)) {
+    return href.replace(/([?&]stage=)[^&]+/, `$1${stage}`);
+  }
+  const separator = href.includes("?") ? "&" : "?";
+  return `${href}${separator}stage=${stage}`;
+}
 
 /**
  * The single allowed normalization point for Phase 5-B (T4).
@@ -41,10 +56,22 @@ export async function executeDirectorAttentionAction(
 
   const href = action.target.href?.trim();
   if (href) {
-    if (/^https?:\/\//i.test(href)) {
-      window.location.assign(href);
+    // Carry the recovery focus token so the destination page can auto-scroll +
+    // highlight the exact card the user needs to act on. Command-type actions
+    // (continue/retry/cancel/auto_execute_range) are handled above via
+    // `continueDirectorRuntime` and never reach this branch.
+    const focus = resolveRecoveryFocusKey(action);
+    let resolvedHref = href;
+    // A pipeline-tagged range should land on the structured page (where the
+    // beat-sheet card lives) instead of the pipeline view.
+    if (action.type === "auto_execute_range" && action.target.tab === "pipeline") {
+      resolvedHref = ensureStageParam(resolvedHref, "structured");
+    }
+    resolvedHref = withFocus(resolvedHref, focus);
+    if (/^https?:\/\//i.test(resolvedHref)) {
+      window.location.assign(resolvedHref);
     } else {
-      navigate(href);
+      navigate(resolvedHref);
     }
     return;
   }

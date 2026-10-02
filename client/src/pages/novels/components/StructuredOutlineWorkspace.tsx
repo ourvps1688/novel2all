@@ -114,16 +114,24 @@ export default function StructuredOutlineWorkspace(props: StructuredTabViewProps
   const defaultChapterId = volumes[0]?.chapters[0]?.id ?? "";
   const [searchParams] = useSearchParams();
   const beatSheetRef = useRef<HTMLDivElement>(null);
+  const chapterDetailRef = useRef<HTMLDivElement>(null);
   const [highlightBeatSheet, setHighlightBeatSheet] = useState(false);
+  const [highlightChapterExecution, setHighlightChapterExecution] = useState(false);
 
-  // When arriving from the recovery banner's "重生成节奏板" entry, scroll the
-  // 当前卷节奏 card into view and highlight it so the user knows exactly where
-  // to click.
+  // When arriving from a recovery entry, scroll the matching card into view and
+  // highlight it so the user knows exactly where to click. `beat-sheet` and
+  // `chapter-execution` are the two destinations rendered on this page.
   useEffect(() => {
-    if (searchParams.get("focus") === "beat-sheet") {
+    const focus = searchParams.get("focus");
+    if (focus === "beat-sheet") {
       setHighlightBeatSheet(true);
       requestAnimationFrame(() => {
         beatSheetRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } else if (focus === "chapter-execution") {
+      setHighlightChapterExecution(true);
+      requestAnimationFrame(() => {
+        chapterDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
   }, [searchParams]);
@@ -516,29 +524,32 @@ export default function StructuredOutlineWorkspace(props: StructuredTabViewProps
               />
             )}
             chapterDetailPanel={(
-              <StructuredChapterDetailCard
-                selectedVolume={selectedVolume}
-                selectedChapter={selectedChapter}
-                visibleChapters={visibleChapters}
-                selectedChapterBeatLabel={selectedChapterBeat?.label ?? null}
-                selectedChapterIndex={selectedChapterIndex}
-                showChapterAdvanced={showChapterAdvanced}
-                onToggleAdvanced={() => patchWorkspace(workspaceId, { showChapterAdvanced: !showChapterAdvanced })}
-                isGeneratingChapterDetail={isGeneratingChapterDetail}
-                isGeneratingChapterDetailBundle={isGeneratingChapterDetailBundle}
-                generatingChapterDetailMode={generatingChapterDetailMode}
-                generatingChapterDetailChapterId={generatingChapterDetailChapterId}
-                chapterDetailFailure={chapterDetailFailure}
-                onGenerateChapterDetail={onGenerateChapterDetail}
-                onGenerateChapterDetailBundle={onGenerateChapterDetailBundle}
-                onRetryFailedChapterDetail={onRetryFailedChapterDetail}
-                onChapterFieldChange={onChapterFieldChange}
-                onChapterNumberChange={onChapterNumberChange}
-                onChapterPayoffRefsChange={onChapterPayoffRefsChange}
-                onMoveChapter={onMoveChapter}
-                onRemoveChapter={onRemoveChapter}
-                locked={locked}
-              />
+              <div ref={chapterDetailRef}>
+                <StructuredChapterDetailCard
+                  selectedVolume={selectedVolume}
+                  selectedChapter={selectedChapter}
+                  visibleChapters={visibleChapters}
+                  selectedChapterBeatLabel={selectedChapterBeat?.label ?? null}
+                  selectedChapterIndex={selectedChapterIndex}
+                  showChapterAdvanced={showChapterAdvanced}
+                  onToggleAdvanced={() => patchWorkspace(workspaceId, { showChapterAdvanced: !showChapterAdvanced })}
+                  isGeneratingChapterDetail={isGeneratingChapterDetail}
+                  isGeneratingChapterDetailBundle={isGeneratingChapterDetailBundle}
+                  generatingChapterDetailMode={generatingChapterDetailMode}
+                  generatingChapterDetailChapterId={generatingChapterDetailChapterId}
+                  chapterDetailFailure={chapterDetailFailure}
+                  onGenerateChapterDetail={onGenerateChapterDetail}
+                  onGenerateChapterDetailBundle={onGenerateChapterDetailBundle}
+                  onRetryFailedChapterDetail={onRetryFailedChapterDetail}
+                  onChapterFieldChange={onChapterFieldChange}
+                  onChapterNumberChange={onChapterNumberChange}
+                  onChapterPayoffRefsChange={onChapterPayoffRefsChange}
+                  onMoveChapter={onMoveChapter}
+                  onRemoveChapter={onRemoveChapter}
+                  locked={locked}
+                  highlight={highlightChapterExecution}
+                />
+              </div>
             )}
           />
 
