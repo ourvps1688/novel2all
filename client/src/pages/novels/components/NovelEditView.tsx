@@ -14,7 +14,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import KnowledgeBindingPanel from "@/components/knowledge/KnowledgeBindingPanel";
-import DirectorAttentionBanner from "@/components/autoDirector/DirectorAttentionBanner";
 import ChapterManagementTab from "./ChapterManagementTab";
 import DirectorFactDebugDialog from "./DirectorFactDebugDialog";
 import NovelCharacterPanel from "./NovelCharacterPanel";
@@ -386,10 +385,7 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
         />
       ) : null}
 
-      <div className="space-y-4 pt-1">
-        <DirectorAttentionBanner novelId={id} />
-        {renderActivePanel()}
-      </div>
+      {renderActivePanel()}
 
       {taskDrawer ? <NovelTaskDrawer {...taskDrawer} /> : null}
     </div>
