@@ -36,7 +36,7 @@
 
 ## 数据与迁移
 
-持久化事实源是 `NovelIntentVersion`、`ShortStoryPlan`、`ShortStorySegment` 和 `NovelWorkflowTask`。PostgreSQL 与 SQLite schema、增量迁移必须同步维护。
+持久化事实源是 `NovelIntentVersion`、`ShortStoryPlan`、`ShortStorySegment` 和 `NovelWorkflowTask`。本程序仅使用 SQLite，只需维护 `schema.sqlite.prisma` 与 `migrations.sqlite/` 一套 Schema 与增量迁移（不再需要 PostgreSQL 与 SQLite 双端同步）。
 
 涉及这些表的迁移属于数据风险操作。执行前必须先完成数据库备份、记录具体备份路径并验证备份文件存在且大小合理；未满足条件时只能生成和校验迁移文件，不能执行迁移。
 

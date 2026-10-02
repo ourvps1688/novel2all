@@ -9,25 +9,23 @@ function loadDatabaseConfig() {
   return require(databaseConfigPath);
 }
 
-test("normalizeDatabaseUrl converts psycopg postgres schemes to Prisma-compatible schemes", () => {
-  const { normalizeDatabaseUrl } = loadDatabaseConfig();
+test("normalizeDatabaseUrl returns the default SQLite URL for empty input", () => {
+  const { normalizeDatabaseUrl, DEFAULT_SQLITE_DATABASE_URL } = loadDatabaseConfig();
 
-  assert.equal(
-    normalizeDatabaseUrl("postgresql+psycopg://user:pass@db.internal:5432/app"),
-    "postgresql://user:pass@db.internal:5432/app",
-  );
-  assert.equal(
-    normalizeDatabaseUrl("postgres+psycopg://user:pass@db.internal:5432/app"),
-    "postgres://user:pass@db.internal:5432/app",
-  );
+  assert.equal(normalizeDatabaseUrl(""), DEFAULT_SQLITE_DATABASE_URL);
+  assert.equal(normalizeDatabaseUrl(undefined), DEFAULT_SQLITE_DATABASE_URL);
 });
 
-test("normalizeDatabaseUrl preserves already compatible postgres URLs", () => {
+test("normalizeDatabaseUrl trims and passthroughs SQLite file: URLs", () => {
   const { normalizeDatabaseUrl } = loadDatabaseConfig();
 
   assert.equal(
-    normalizeDatabaseUrl("  postgresql://user:pass@db.internal:5432/app  "),
-    "postgresql://user:pass@db.internal:5432/app",
+    normalizeDatabaseUrl("  file:./custom.db  "),
+    "file:./custom.db",
+  );
+  assert.equal(
+    normalizeDatabaseUrl("file:./other.db"),
+    "file:./other.db",
   );
 });
 
@@ -171,37 +169,21 @@ test("resolveDatabaseRuntimeConfig selects sqlite schema for desktop legacy mode
   }
 });
 
-test("resolveDatabaseRuntimeConfig keeps postgres schema when a postgres URL is configured", () => {
+test("getDatabaseUrl rejects postgres URLs now that only SQLite is supported", () => {
   const originalDatabaseUrl = process.env.DATABASE_URL;
-  const originalRuntime = process.env.AI_NOVEL_RUNTIME;
-  const originalMode = process.env.AI_NOVEL_DATABASE_MODE;
   process.env.DATABASE_URL = "postgresql://writer:pass@db.internal:5432/ai_novel";
-  process.env.AI_NOVEL_RUNTIME = "desktop";
-  delete process.env.AI_NOVEL_DATABASE_MODE;
 
   try {
-    const { resolveDatabaseRuntimeConfig } = loadDatabaseConfig();
-    const config = resolveDatabaseRuntimeConfig();
-
-    assert.equal(config.provider, "postgresql");
-    assert.equal(config.url, "postgresql://writer:pass@db.internal:5432/ai_novel");
-    assert.equal(config.prismaSchemaPath, "src/prisma/schema.prisma");
-    assert.equal(config.prismaMigrationsPath, "src/prisma/migrations");
+    const { getDatabaseUrl } = loadDatabaseConfig();
+    assert.throws(
+      () => getDatabaseUrl(),
+      /PostgreSQL|postgres/i,
+    );
   } finally {
     if (originalDatabaseUrl === undefined) {
       delete process.env.DATABASE_URL;
     } else {
       process.env.DATABASE_URL = originalDatabaseUrl;
-    }
-    if (originalRuntime === undefined) {
-      delete process.env.AI_NOVEL_RUNTIME;
-    } else {
-      process.env.AI_NOVEL_RUNTIME = originalRuntime;
-    }
-    if (originalMode === undefined) {
-      delete process.env.AI_NOVEL_DATABASE_MODE;
-    } else {
-      process.env.AI_NOVEL_DATABASE_MODE = originalMode;
     }
   }
 });

@@ -65,7 +65,7 @@
 - `novel.chapter.writer` 最终发送给模型的上下文正文必须面向写作任务可读。`{{context.xxx}}` 和保底 required context 可以在模板、诊断和结构字段中保留原始 group key，但渲染到 human message 时，区块标题和主要字段应使用中文标签，例如 `timeline_context` 显示为 `时间线`、`Title` 显示为 `标题`、角色状态显示为 `目标 / 状态 / 情绪`。内部数据库 ID、风格规则 id 和 `effective_style_profile_id` 这类调试字段不得进入 writer-facing 正文上下文；如需排查，应保留在 diagnostics、日志或专用 meta 文本中。
 - 高级模板版本历史属于本书覆盖数据，不是官方版本库。每次保存创建不可变版本并设为 active；回滚只切换 activeVersionId；恢复官方模板只把 mode 切回 `official` 并保留历史版本，真实生成随即回到 `PromptAsset.render()`。
 - Slot override 的解析优先级固定为：本书覆盖或本书 `official_default` 标记 > 全局覆盖 > `PromptAsset.slots` 官方默认。旧数据中只有 `{ value, baseHash }` 的槽位视为 `custom`，保持兼容。
-- Prompt slot 或高级模板新增持久化模型时，PostgreSQL 与 SQLite schema、迁移和桌面运行时迁移验证必须同步提交。只有 Prisma schema 而没有增量迁移，会让已安装桌面版启动正常但在首次保存时稳定报缺表错误。
+- Prompt slot 或高级模板新增持久化模型时，只需为 SQLite（`schema.sqlite.prisma` 与 `migrations.sqlite/`）提交 Prisma schema 与增量迁移，并验证桌面运行时迁移；不再需要 PostgreSQL 双端同步。只有 Prisma schema 而没有增量迁移，会让已安装桌面版启动正常但在首次保存时稳定报缺表错误。
 - `official_default` 只表示“当前作用域明确采用官方默认值”。全局层保存官方默认值应删除该槽位覆盖；本书层保存官方默认值时，如果全局层存在自定义覆盖，必须写入 `official_default` 标记来遮蔽全局值；如果没有全局覆盖，则删除本书覆盖即可。
 - “恢复官方当前版”必须通过官方恢复动作处理，而不是简单删除本书覆盖。删除本书覆盖的含义是回到继承链；在有全局覆盖时，这会重新继承全局值，不等于恢复官方默认。
 - “保留我的设置”只能更新当前槽位的 `baseHash/baseVersion`，用于确认用户接受自己的覆盖与当前官方版本的差异；不能顺手改写官方默认值、schema 或上下文策略。

@@ -134,9 +134,8 @@ test("short story audit cannot accept a draft with critical causal contradiction
   }), /关键因果或事实问题/);
 });
 
-test("PostgreSQL and SQLite keep the short story persistence contract aligned", () => {
+test("SQLite keeps the short story persistence contract aligned", () => {
   const schemas = [
-    path.join(PRISMA_ROOT, "schema.prisma"),
     path.join(PRISMA_ROOT, "schema.sqlite.prisma"),
   ].map((filePath) => fs.readFileSync(filePath, "utf8"));
 
@@ -149,13 +148,12 @@ test("PostgreSQL and SQLite keep the short story persistence contract aligned", 
   }
 });
 
-test("short story migrations exist for both database providers", () => {
+test("short story migrations exist for SQLite", () => {
   const migrationNames = [
     "20260730120000_creation_studio_short_story",
     "20260730121000_creation_studio_confirmation",
   ];
   for (const migrationName of migrationNames) {
-    assert.ok(fs.existsSync(path.join(PRISMA_ROOT, "migrations", migrationName, "migration.sql")));
     assert.ok(fs.existsSync(path.join(PRISMA_ROOT, "migrations.sqlite", migrationName, "migration.sql")));
   }
 });

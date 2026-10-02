@@ -20,7 +20,6 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 WORKDIR /app
-ENV AI_NOVEL_DATABASE_MODE=postgresql
 COPY shared/package.json shared/tsconfig.json ./shared/
 COPY shared/*.ts ./shared/
 COPY shared/types ./shared/types
@@ -40,7 +39,6 @@ COPY shared/package.json ./shared/package.json
 COPY server/prisma.config.ts ./server/prisma.config.ts
 COPY server/src/config/database.ts ./server/src/config/database.ts
 COPY server/src/prisma ./server/src/prisma
-ENV AI_NOVEL_DATABASE_MODE=postgresql
 RUN pnpm install --frozen-lockfile \
     && pnpm --filter @ai-novel/server prisma:generate
 

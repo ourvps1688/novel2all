@@ -41,7 +41,7 @@ category 说明：
 
 ## 升级兼容
 
-事实账本属于章节生成的必经读取链路。发布该能力时，`NovelFactEntry` 必须同时具备 PostgreSQL 与桌面 SQLite 的 Prisma 迁移；桌面端会在本地服务启动前执行 SQLite 迁移，已有作品库也必须能补建该表和索引。不得只更新 Prisma schema，否则升级后的旧数据库会在章节生成时因缺表中断。
+事实账本属于章节生成的必经读取链路。发布该能力时，`NovelFactEntry` 必须具备 SQLite（`schema.sqlite.prisma` 与 `migrations.sqlite/`）的 Prisma 迁移；桌面端会在本地服务启动前执行 SQLite 迁移，已有作品库也必须能补建该表和索引。不得只更新 Prisma schema，否则升级后的旧数据库会在章节生成时因缺表中断。
 
 ## 写入路径
 

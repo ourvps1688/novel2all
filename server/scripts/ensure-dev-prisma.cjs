@@ -16,24 +16,17 @@ function normalizeDatabaseMode(rawValue) {
   if (normalized === "sqlite" || normalized === "file") {
     return "sqlite";
   }
-  if (normalized === "postgres" || normalized === "postgresql" || normalized === "pg") {
-    return "postgresql";
-  }
   return null;
 }
 
 function resolveDatabaseRuntimeConfig() {
   const normalizedDatabaseUrl = process.env.DATABASE_URL?.trim();
-  const explicitMode = normalizeDatabaseMode(process.env.AI_NOVEL_DATABASE_MODE);
-  const provider = normalizedDatabaseUrl
-    ? (normalizedDatabaseUrl.startsWith("file:") ? "sqlite" : "postgresql")
-    : (explicitMode ?? "sqlite");
+  const provider = "sqlite";
 
   return {
     provider,
-    url: normalizedDatabaseUrl
-      ?? (provider === "sqlite" ? "file:./dev.db" : "postgresql://postgres:postgres@127.0.0.1:5432/ai_novel"),
-    prismaSchemaPath: provider === "sqlite" ? "src/prisma/schema.sqlite.prisma" : "src/prisma/schema.prisma",
+    url: normalizedDatabaseUrl ?? "file:./dev.db",
+    prismaSchemaPath: "src/prisma/schema.sqlite.prisma",
   };
 }
 

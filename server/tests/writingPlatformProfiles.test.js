@@ -53,9 +53,9 @@ test("short story advanced template keeps all five formal context blocks", () =>
   assert.equal(asset.outputSchema.safeParse({ content: "只有正文，缺少连续性摘要。".repeat(20) }).success, false);
 });
 
-test("PostgreSQL and SQLite schemas and migrations stay aligned", () => {
+test("SQLite schema and migrations stay aligned", () => {
   const root = path.join(__dirname, "..", "src", "prisma");
-  for (const schemaName of ["schema.prisma", "schema.sqlite.prisma"]) {
+  for (const schemaName of ["schema.sqlite.prisma"]) {
     const schema = fs.readFileSync(path.join(root, schemaName), "utf8");
     assert.match(schema, /writingPlatform\s+String\?/);
     assert.match(schema, /writingPlatformSnapshotJson\s+String\?/);
@@ -63,6 +63,5 @@ test("PostgreSQL and SQLite schemas and migrations stay aligned", () => {
     assert.match(schema, /model WritingPlatformProfileVersion/);
   }
   const migration = "20260803120000_writing_platform_profiles";
-  assert.ok(fs.existsSync(path.join(root, "migrations", migration, "migration.sql")));
   assert.ok(fs.existsSync(path.join(root, "migrations.sqlite", migration, "migration.sql")));
 });

@@ -239,7 +239,7 @@ test("chapter runtime keeps lifecycle persistence behind one service", () => {
 });
 
 test("RAG keeps its dedicated persisted index queue", () => {
-  const schema = readSource("prisma", "schema.prisma");
+  const schema = readSource("prisma", "schema.sqlite.prisma");
   const ragService = readSource("services", "rag", "RagIndexService.ts");
 
   assert.equal(schema.includes("model RagIndexJob"), true);
