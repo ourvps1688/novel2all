@@ -20,6 +20,7 @@ import PipelineTab from "../components/PipelineTab";
 import StoryMacroPlanTab from "../components/StoryMacroPlanTab";
 import StructuredOutlineTab from "../components/StructuredOutlineTab";
 import VersionHistoryTab from "../components/VersionHistoryTab";
+import ChapterEditorShell from "../components/chapterEditor/ChapterEditorShell";
 import type { NovelEditViewProps } from "../components/NovelEditView.types";
 import {
   getNovelWorkspaceTabLabel,
@@ -51,6 +52,7 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
     takeover,
     taskDrawer,
     activeStepTakeoverEntry,
+    chapterEditor,
   } = props;
   const [isToolsOpen, setIsToolsOpen] = useState(false);
 
@@ -107,7 +109,11 @@ export default function MobileNovelEditView(props: NovelEditViewProps) {
       case "structured":
         return <StructuredOutlineTab {...structuredTab} />;
       case "chapter":
-        return <ChapterManagementTab {...chapterTab} />;
+        return chapterEditor ? (
+          <ChapterEditorShell {...chapterEditor} />
+        ) : (
+          <ChapterManagementTab {...chapterTab} />
+        );
       case "pipeline":
         return <PipelineTab {...pipelineTab} />;
       case "history":

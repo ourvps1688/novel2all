@@ -1,6 +1,6 @@
-import { lazy } from "react";
+import { lazy, useEffect } from "react";
 import type { RouteObject } from "react-router-dom";
-import { Navigate, useRoutes } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useRoutes } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { featureFlags } from "@/config/featureFlags";
 
@@ -13,7 +13,6 @@ const AutoDirectorCreatePage = lazy(() => import("@/pages/novels/autoDirector/Au
 const SimpleNovelShelfPage = lazy(() => import("@/pages/novels/simpleCreation/SimpleNovelShelfPage"));
 const NovelPreview = lazy(() => import("@/pages/novels/NovelPreview"));
 const NarrativeFormNovelEditRoute = lazy(() => import("@/pages/novels/NarrativeFormNovelEditRoute"));
-const NovelChapterEdit = lazy(() => import("@/pages/novels/NovelChapterEdit"));
 const CreativeHubPage = lazy(() => import("@/pages/creativeHub/CreativeHubPage"));
 const ChatPage = lazy(() => import("@/pages/chat/ChatPage"));
 const BookAnalysisPage = lazy(() => import("@/pages/bookAnalysis/BookAnalysisPage"));
@@ -37,6 +36,27 @@ const WritingFormulaPage = lazy(() => import("@/pages/writingFormula/WritingForm
 const CharacterLibrary = lazy(() => import("@/pages/characters/CharacterLibrary"));
 const AssetHubPage = lazy(() => import("@/pages/assets/AssetHubPage"));
 
+// The standalone chapter-editor route is absorbed into the workspace as a
+// partition (NovelEditView renders ChapterEditorShell when ?stage=chapter&
+// chapterId=<id>&editor=1). This redirect keeps any legacy deep links working.
+function ChapterEditorPartitionRedirect() {
+  const params = useParams();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const novelId = params.id;
+    const chapterId = params.chapterId;
+    if (novelId && chapterId) {
+      navigate(
+        `/novels/${novelId}/edit?stage=chapter&chapterId=${encodeURIComponent(chapterId)}&editor=1`,
+        { replace: true },
+      );
+    } else {
+      navigate("/novels", { replace: true });
+    }
+  }, [navigate, params.id, params.chapterId]);
+  return null;
+}
+
 const routes: RouteObject[] = [
   {
     path: "/",
@@ -51,7 +71,7 @@ const routes: RouteObject[] = [
       { path: "novels/:id/story", element: <ShortStoryStudioPage /> },
       { path: "novels/:id/preview", element: <NovelPreview /> },
       { path: "novels/:id/edit", element: <NarrativeFormNovelEditRoute /> },
-      { path: "novels/:id/chapters/:chapterId", element: <NovelChapterEdit /> },
+      { path: "novels/:id/chapters/:chapterId", element: <ChapterEditorPartitionRedirect /> },
       { path: "creative-hub", element: <CreativeHubPage /> },
       { path: "chat-legacy", element: <ChatPage /> },
       { path: "chat", element: <Navigate to="/creative-hub" replace /> },

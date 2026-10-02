@@ -119,7 +119,7 @@ function resolvePrimaryAction(params: {
       label: "打开章节编辑器",
       reason: "这章已经有正文。即使审核发现问题，也不应阻塞继续编辑；你可以先进入编辑器，或在下方一键修复。",
       variant: "default",
-      href: `/novels/${novelId}/chapters/${selectedChapter.id}`,
+      href: `/novels/${novelId}/edit?stage=chapter&chapterId=${selectedChapter.id}&editor=1`,
     };
   }
 
@@ -316,7 +316,7 @@ export default function ChapterExecutionActionPanel(props: ChapterExecutionActio
           <div className="mt-3 grid gap-2">
             {showQuickEditorAction ? (
               <Button asChild variant="outline" className="w-full">
-                <Link to={`/novels/${novelId}/chapters/${selectedChapter!.id}`}>打开章节编辑器</Link>
+                <Link to={`/novels/${novelId}/edit?stage=chapter&chapterId=${selectedChapter!.id}&editor=1`}>打开章节编辑器</Link>
               </Button>
             ) : null}
             {showQuickAuditAction ? (

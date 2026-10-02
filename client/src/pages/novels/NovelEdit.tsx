@@ -43,6 +43,7 @@ import {
   getNovelCharacterResources,
   getNovelPayoffLedger,
   getNovelDetail,
+  getChapterEditorWorkspace,
   setNovelCreationExperience,
   downloadNovelExport,
   getNovelPipelineJob,
@@ -73,6 +74,7 @@ import { useNovelStoryMacro } from "./hooks/useNovelStoryMacro";
 import { useNovelVolumePlanning } from "./hooks/useNovelVolumePlanning";
 import { useVolumeVersionControl } from "./hooks/useVolumeVersionControl";
 import { useNovelEditWorkflow } from "./hooks/useNovelEditWorkflow";
+import type { ChapterEditorShellProps } from "./components/chapterEditor/chapterEditorTypes";
 import { buildNovelEditPlanningTabs } from "./novelEditPlanningTabs";
 import type { ChapterReviewResult } from "./chapterPlanning.shared";
 import type { NovelEditTakeoverState, NovelTaskDrawerState } from "./components/NovelEditView.types";
@@ -269,6 +271,9 @@ export default function NovelEdit() {
     workflowTaskId,
     taskPanelOpen,
     clearTaskPanelOpen,
+    editorOpen,
+    closeChapterEditor,
+    openChapterEditor,
   } = useNovelEditWorkflow(id);
   const [recoveryFocusParams] = useSearchParams();
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -447,6 +452,11 @@ export default function NovelEdit() {
     queryFn: () => getChapterAuditReports(id, selectedChapterId),
     enabled: Boolean(id && shouldLoadChapterContext),
   });
+  const chapterEditorWorkspaceQuery = useQuery({
+    queryKey: queryKeys.novels.chapterEditorWorkspace(id, selectedChapterId || "none"),
+    queryFn: () => getChapterEditorWorkspace(id, selectedChapterId),
+    enabled: Boolean(id && selectedChapterId && editorOpen),
+  });
   const baseCharacterListQuery = useQuery({
     queryKey: queryKeys.baseCharacters.all,
     queryFn: () => getBaseCharacterList(),
@@ -568,6 +578,32 @@ export default function NovelEdit() {
     () => chapters.find((item) => item.id === selectedChapterId),
     [chapters, selectedChapterId],
   );
+  const chapterEditor = useMemo<ChapterEditorShellProps | null>(() => {
+    if (!editorOpen || !selectedChapter) {
+      return null;
+    }
+    return {
+      novelId: id,
+      chapter: selectedChapter,
+      workspace: chapterEditorWorkspaceQuery.data?.data ?? null,
+      workspaceStatus: chapterEditorWorkspaceQuery.isLoading
+        ? "loading"
+        : chapterEditorWorkspaceQuery.isError
+          ? "error"
+          : "ready",
+      onBack: () => closeChapterEditor(),
+      onOpenVersionHistory: () => setActiveTab("history"),
+    };
+  }, [
+    editorOpen,
+    selectedChapter,
+    chapterEditorWorkspaceQuery.data,
+    chapterEditorWorkspaceQuery.isLoading,
+    chapterEditorWorkspaceQuery.isError,
+    id,
+    closeChapterEditor,
+    setActiveTab,
+  ]);
   const characters = novelDetailQuery.data?.data?.characters ?? [];
   const baseCharacters = baseCharacterListQuery.data?.data ?? [];
   const selectedCharacter = useMemo(
@@ -2821,6 +2857,8 @@ export default function NovelEdit() {
       outlineTab={outlineTab}
       structuredTab={structuredTab}
       chapterTab={chapterTab}
+      chapterEditor={chapterEditor}
+      onOpenChapterEditor={openChapterEditor}
       pipelineTab={pipelineTab}
       characterTab={characterTab}
       takeover={isTakeoverDismissed ? null : takeover}

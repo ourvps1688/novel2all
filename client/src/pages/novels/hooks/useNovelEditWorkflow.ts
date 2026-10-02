@@ -67,15 +67,37 @@ export function useNovelEditWorkflow(novelId: string) {
     () => searchParams.get("chapterId") ?? "",
     [searchParams],
   );
+  const editorOpen = searchParams.get("editor") === "1";
 
   const setActiveTab = (value: string) => {
     const nextTab = normalizeNovelWorkspaceTab(value);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("stage", nextTab);
+      // Switching the workspace tab closes any open chapter-editor partition
+      // so returning to the chapter tab shows the management list, not a stale editor.
+      next.delete("editor");
       return next;
     }, { replace: true });
   };
+
+  const openChapterEditor = useCallback((chapterId: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("stage", "chapter");
+      next.set("chapterId", chapterId);
+      next.set("editor", "1");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const closeChapterEditor = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("editor");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const setSelectedChapterId = (value: string) => {
     setSearchParams((prev) => {
@@ -127,5 +149,8 @@ export function useNovelEditWorkflow(novelId: string) {
     workflowTaskId,
     taskPanelOpen,
     clearTaskPanelOpen,
+    editorOpen,
+    openChapterEditor,
+    closeChapterEditor,
   };
 }

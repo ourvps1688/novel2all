@@ -341,7 +341,7 @@ export default function SimpleNovelShelfPage() {
                                   <span>{formatQualityDebtTime(selectedChapter.qualityDebt.evaluatedAt)}</span>
                                 </div>
                                 <Button asChild size="sm" variant="outline" className="mt-3 bg-background text-foreground">
-                                  <Link to={`/novels/${id}/chapters/${encodeURIComponent(selectedChapter.id)}`}>修改并重新审校</Link>
+                                  <Link to={`/novels/${id}/edit?stage=chapter&chapterId=${encodeURIComponent(selectedChapter.id)}&editor=1`}>修改并重新审校</Link>
                                 </Button>
                               </>
                             ) : null}
