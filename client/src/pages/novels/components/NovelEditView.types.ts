@@ -666,6 +666,9 @@ export interface NovelEditViewProps {
   previewOpen?: boolean;
   openPreview?: () => void;
   closePreview?: () => void;
+  assetsDrawerOpen?: boolean;
+  openAssetsDrawer?: () => void;
+  closeAssetsDrawer?: () => void;
   pipelineTab: PipelineTabViewProps;
   characterTab: CharacterTabViewProps;
   takeover?: NovelEditTakeoverState | null;

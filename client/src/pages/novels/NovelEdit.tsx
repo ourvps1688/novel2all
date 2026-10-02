@@ -277,6 +277,9 @@ export default function NovelEdit() {
     previewOpen,
     openPreview,
     closePreview,
+    assetsDrawerOpen,
+    openAssetsDrawer,
+    closeAssetsDrawer,
   } = useNovelEditWorkflow(id);
   const [recoveryFocusParams] = useSearchParams();
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -2865,6 +2868,9 @@ export default function NovelEdit() {
       previewOpen={previewOpen}
       openPreview={openPreview}
       closePreview={closePreview}
+      assetsDrawerOpen={assetsDrawerOpen}
+      openAssetsDrawer={openAssetsDrawer}
+      closeAssetsDrawer={closeAssetsDrawer}
       pipelineTab={pipelineTab}
       characterTab={characterTab}
       takeover={isTakeoverDismissed ? null : takeover}

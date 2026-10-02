@@ -20,6 +20,7 @@ import DirectorFactDebugDialog from "./DirectorFactDebugDialog";
 import NovelCharacterPanel from "./NovelCharacterPanel";
 import NovelTaskDrawer from "./NovelTaskDrawer";
 import NovelPreviewDrawer from "./NovelPreviewDrawer";
+import NovelAssetsDrawer from "./NovelAssetsDrawer";
 import OutlineTab from "./OutlineTab";
 import PipelineTab from "./PipelineTab";
 import StoryMacroPlanTab from "./StoryMacroPlanTab";
@@ -76,6 +77,9 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
     previewOpen,
     openPreview,
     closePreview,
+    assetsDrawerOpen,
+    openAssetsDrawer,
+    closeAssetsDrawer,
   } = props;
 
   const [isProjectToolsOpen, setIsProjectToolsOpen] = useState(false);
@@ -396,6 +400,10 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
             <Button variant="outline" onClick={() => openPreview?.()}>
               预览
             </Button>
+
+            <Button variant="outline" onClick={() => openAssetsDrawer?.()}>
+              素材库
+            </Button>
             </>
           )}
         />
@@ -414,6 +422,11 @@ function DesktopNovelEditView(props: NovelEditViewProps) {
           onOpenChapterEditor?.(chapterId);
           closePreview?.();
         }}
+      />
+
+      <NovelAssetsDrawer
+        open={assetsDrawerOpen ?? false}
+        onOpenChange={(open) => (open ? openAssetsDrawer?.() : closeAssetsDrawer?.())}
       />
     </div>
   );
