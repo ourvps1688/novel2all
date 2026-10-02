@@ -87,6 +87,13 @@ Wiki 不替代计划、检查点或发布说明：
 - [Project Init Spec](./archive/project-init-spec.md)
 - [Outdated Docs Index](./archive/outdated/README.md)
 
+### `docs/simplification`
+
+交互重构思专项的规划文档（只读方案）。原始"Simplify 活动"的过程性分析稿已随对应 PR（#28–#39）落地而清理，本目录仅保留两份经核对的规划正本：
+
+- [极简交互信息架构（IA）规划](./simplification/10-minimal-interaction-ia.md)
+- [端到端交互模型重构思](./simplification/11-interaction-model-redesign.md)
+
 ## 新文档命名规则
 
 - 统一使用小写英文文件名，单词之间用 `-` 连接。
