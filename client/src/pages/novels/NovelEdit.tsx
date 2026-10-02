@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BOOK_ANALYSIS_SECTIONS } from "@ai-novel/shared/types/bookAnalysis";
 import type { DirectorContinuationMode, DirectorLockScope, DirectorSessionState, DirectorStepCalibrationAction } from "@ai-novel/shared/types/novelDirector";
@@ -270,6 +270,7 @@ export default function NovelEdit() {
     taskPanelOpen,
     clearTaskPanelOpen,
   } = useNovelEditWorkflow(id);
+  const [recoveryFocusParams] = useSearchParams();
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
   const [autoOpenedFailedTaskId, setAutoOpenedFailedTaskId] = useState("");
   const [retryOverride, setRetryOverride] = useState<LLMSelectorValue>({
@@ -758,6 +759,26 @@ export default function NovelEdit() {
     }
     useDirectorRealtimeStore.getState().setFromAutoDirectorTask(id, activeAutoDirectorTask);
   }, [id, activeAutoDirectorTask, activeAutoDirectorTaskQuery.isSuccess]);
+
+  // Auto-locate recovery destinations that arrive with a `focus` token. The
+  // token is derived from the recovery action type on the sender side, so the
+  // user lands exactly where they need to act instead of being dropped on a page.
+  useEffect(() => {
+    const focus = recoveryFocusParams.get("focus");
+    if (!focus) return;
+    if (focus === "task-panel") {
+      if (!isTaskDrawerOpen) {
+        setIsTaskDrawerOpen(true);
+      }
+      requestAnimationFrame(() => {
+        document
+          .getElementById("auto-director-task-panel")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } else if (focus === "quality-repair") {
+      setActiveTab("pipeline");
+    }
+  }, [recoveryFocusParams, isTaskDrawerOpen, setActiveTab]);
   const activeDirectorSession = useMemo(() => {
     if (
       !activeAutoDirectorTask

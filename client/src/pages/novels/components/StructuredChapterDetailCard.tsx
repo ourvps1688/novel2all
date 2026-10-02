@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { UnlockKeyhole } from "lucide-react";
 import AiButton from "@/components/common/AiButton";
+import { RecoveryGuidanceBanner } from "@/components/autoDirector/RecoveryGuidanceBanner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +61,8 @@ interface StructuredChapterDetailCardProps {
   onMoveChapter: StructuredTabViewProps["onMoveChapter"];
   onRemoveChapter: StructuredTabViewProps["onRemoveChapter"];
   locked: boolean;
+  /** When true, ring the primary action and show a guidance banner (auto-located from a recovery action). */
+  highlight?: boolean;
 }
 
 export default function StructuredChapterDetailCard(props: StructuredChapterDetailCardProps) {
@@ -85,6 +88,7 @@ export default function StructuredChapterDetailCard(props: StructuredChapterDeta
     onMoveChapter,
     onRemoveChapter,
     locked,
+    highlight = false,
   } = props;
 
   const [batchMode, setBatchMode] = useState<BatchMode>("count");
@@ -205,6 +209,7 @@ export default function StructuredChapterDetailCard(props: StructuredChapterDeta
             {selectedVolume && selectedChapter ? (
               <AiButton
                 size="sm"
+                className={cn(highlight ? "ring-2 ring-primary/50 ring-offset-2" : "")}
                 onClick={() => onGenerateChapterDetailBundle(selectedVolume.id, selectedChapter.id)}
                 disabled={isGeneratingChapterDetail || locked}
               >
@@ -218,6 +223,9 @@ export default function StructuredChapterDetailCard(props: StructuredChapterDeta
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {highlight ? (
+          <RecoveryGuidanceBanner text="恢复流程建议：在此卡片点击「细化当前章」或「批量细化」即可继续章节细化；如需先补节奏板，请回到上方「当前卷节奏」卡片。" />
+        ) : null}
         {chapterDetailFailure ? (
           <div className="flex flex-col gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">

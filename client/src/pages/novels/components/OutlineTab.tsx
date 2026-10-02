@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import AiButton from "@/components/common/AiButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -157,6 +158,7 @@ export default function OutlineTab(props: OutlineTabViewProps) {
   const outlineStageReady = completedReadinessCount === readinessSteps.length;
   const [selectedVolumeId, setSelectedVolumeId] = useState(volumes[0]?.id ?? "");
   const [workspaceTab, setWorkspaceTab] = useState<OutlineWorkspaceTab>("current");
+  const [recoveryFocusParams] = useSearchParams();
   const volumeCountModeLabel = volumeCountGuidance.userPreferredVolumeCount != null
     ? `当前固定 ${volumeCountGuidance.userPreferredVolumeCount} 卷`
     : volumeCountGuidance.respectedExistingVolumeCount != null
@@ -169,6 +171,19 @@ export default function OutlineTab(props: OutlineTabViewProps) {
       setSelectedVolumeId(volumes[0]?.id ?? "");
     }
   }, [selectedVolumeId, volumes]);
+
+  // Auto-locate the strategy-plan card when a recovery action points here.
+  useEffect(() => {
+    if (recoveryFocusParams.get("focus") !== "strategy-plan") {
+      return;
+    }
+    setWorkspaceTab("strategy");
+    requestAnimationFrame(() => {
+      document
+        .getElementById("strategy-plan-anchor")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [recoveryFocusParams]);
 
   const selectedVolume = volumes.find((volume) => volume.id === selectedVolumeId) ?? volumes[0];
 
@@ -534,7 +549,7 @@ export default function OutlineTab(props: OutlineTabViewProps) {
           </TabsList>
 
         <TabsContent value="strategy" className="mt-0 space-y-4">
-        <Card className="border-0 bg-muted/15 shadow-none">
+        <Card id="strategy-plan-anchor" className="border-0 bg-muted/15 shadow-none">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div>
