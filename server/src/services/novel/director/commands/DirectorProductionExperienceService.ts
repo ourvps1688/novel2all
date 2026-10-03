@@ -138,4 +138,41 @@ export class DirectorProductionExperienceService {
       commandId: command?.commandId,
     };
   }
+
+  /**
+   * 全自动（full_book_autopilot）运行下的「创作界面选择」硬门自动通过。
+   *
+   * 幂等：若任务已不在 `production_experience_required` 状态（已被人工点击过、
+   * 或已被本方法处理过），则只返回当前选择结果，绝不二次入队 continue 命令，
+   * 避免重复驱动流水线。
+   *
+   * 仅在仍处于硬门状态时才执行与 `select` 完全相同的状态转换（默认 experience 为 "simple"）。
+   */
+  async autoPassForAutopilot(
+    taskId: string,
+    experience: NovelProductionExperience = "simple",
+  ): Promise<NovelProductionExperienceSelectionResponse> {
+    const task = await prisma.novelWorkflowTask.findUnique({ where: { id: taskId } });
+    if (!task) {
+      throw new AppError("自动导演任务不存在。", 404);
+    }
+    if (!task.novelId) {
+      throw new AppError("自动导演任务还没有绑定小说项目。", 409);
+    }
+    // 幂等安全出口：硬门已解除（或被解析过）→ 不二次入队，仅报告当前选择。
+    if (task.checkpointType !== "production_experience_required") {
+      const seed = parseSeedPayload<DirectorWorkflowSeedPayload>(task.seedPayloadJson) ?? {};
+      const selected = parseSelectedExperience(seed) ?? experience;
+      return {
+        experience: selected,
+        workflowTaskId: task.id,
+        novelId: task.novelId,
+        targetRoute: selected === "simple"
+          ? `/novels/${task.novelId}/simple`
+          : `/novels/${task.novelId}/edit`,
+        backgroundStarted: false,
+      };
+    }
+    return this.select(taskId, experience);
+  }
 }

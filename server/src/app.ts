@@ -59,12 +59,14 @@ import onboardingRoutes from "./modules/setup/onboarding/http/onboardingRoutes";
 import { qualityDebtSettingsService } from "./services/settings/QualityDebtSettingsService";
 import { marketRadarService } from "./modules/marketRadar/application/MarketRadarService";
 import { DirectorWorker } from "./workers/directorWorker";
+import { AutopilotCheckpointWatchdog } from "./services/novel/director/runtime/autopilotCheckpointWatchdog";
 import { cleanupLogDirectory, resolveLogRetentionConfig } from "./platform/logging/logRetention";
 import { resolveLogsRoot } from "./runtime/appPaths";
 
 getSharedNovelServices();
 registerNovelEventHandlers(novelEventBus);
 const novelPipelineRuntimeService = new NovelPipelineRuntimeService();
+const autopilotCheckpointWatchdog = new AutopilotCheckpointWatchdog();
 
 morgan.token("error-message", (_req, res) => {
   const response = res as typeof res & {
@@ -292,11 +294,21 @@ function initializeBackgroundServices(): BackgroundServicesHandle {
     .then(() => {
       bookAnalysisService.startWatchdog();
       novelPipelineRuntimeService.startWatchdog();
+      try {
+        autopilotCheckpointWatchdog.startWatchdog();
+      } catch (error) {
+        console.warn("Failed to start autopilot checkpoint watchdog.", error);
+      }
     })
     .catch((error) => {
       console.warn("Failed to prepare pending recovery candidates.", error);
       bookAnalysisService.startWatchdog();
       novelPipelineRuntimeService.startWatchdog();
+      try {
+        autopilotCheckpointWatchdog.startWatchdog();
+      } catch (error) {
+        console.warn("Failed to start autopilot checkpoint watchdog.", error);
+      }
     });
 
   return {
@@ -307,6 +319,7 @@ function initializeBackgroundServices(): BackgroundServicesHandle {
       ragServices.ragRetrievalTraceRetention.stop();
       bookAnalysisService.stopWatchdog();
       novelPipelineRuntimeService.stopWatchdog();
+      autopilotCheckpointWatchdog.stopWatchdog();
     },
   };
 }

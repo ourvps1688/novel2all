@@ -35,6 +35,7 @@ import {
 import { runDirectorTrackedStep } from "../projections/directorProgressTracker";
 import type { DirectorPhaseCallbacks, DirectorPhaseDependencies } from "./novelDirectorPhaseTypes";
 import { resetDirectorDownstreamChapterState } from "../recovery/novelDirectorDownstreamReset";
+import { DirectorProductionExperienceService } from "../commands/DirectorProductionExperienceService";
 
 function buildChapterOrderRangeLabel(startOrder: number, endOrder: number): string {
   return startOrder === endOrder ? `第 ${startOrder} 章` : `第 ${startOrder}-${endOrder} 章`;
@@ -704,6 +705,12 @@ export async function runDirectorStructuredOutlinePhase(input: {
     phase: "chapter_execution",
     isBackgroundRunning: false,
   });
+  // 全自动（full_book_autopilot）运行：消除「选择创作界面」人工硬门，
+  // 直接自动通过并终止本次 runPipeline 传递；select() 内部已入队 continue 命令。
+  if (isFullBookAutopilotRunMode(request.runMode)) {
+    await new DirectorProductionExperienceService().autoPassForAutopilot(taskId);
+    return;
+  }
   await dependencies.workflowService.recordCheckpoint(taskId, {
     stage: "chapter_execution",
     checkpointType: "production_experience_required",

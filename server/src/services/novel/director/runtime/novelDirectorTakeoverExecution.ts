@@ -19,6 +19,7 @@ import {
   buildContinueExistingDownstreamReset,
   buildRestartCurrentStepDownstreamReset,
 } from "./novelDirectorTakeoverContinue";
+import { DirectorProductionExperienceService } from "../commands/DirectorProductionExperienceService";
 
 interface TakeoverBootstrapTaskResult {
   id: string;
@@ -478,7 +479,13 @@ export async function startDirectorTakeoverExecution(
         });
       });
     } else {
-      await input.workflowService.recordCheckpoint(workflowTask.id, {
+      if (isFullBookAutopilot) {
+        // 全自动（full_book_autopilot）运行：消除「选择创作界面」人工硬门，
+        // 直接自动通过（autoPassForAutopilot 内部已入队 continue 命令），
+        // 跳过人工关卡后继续返回本次接管执行结果。
+        await new DirectorProductionExperienceService().autoPassForAutopilot(workflowTask.id);
+      } else {
+        await input.workflowService.recordCheckpoint(workflowTask.id, {
         stage: "chapter_execution",
         checkpointType: "production_experience_required",
         checkpointSummary: "自动导演已确认现有章节执行资源可用，请选择正文生产方式。",
@@ -494,6 +501,7 @@ export async function startDirectorTakeoverExecution(
           }),
         }),
       });
+      }
     }
 
     return {
