@@ -1,7 +1,7 @@
 # 10 · 极简交互信息架构（IA）规划
 
 > 只读方案，不改代码。目标：重新构思交互，而非修 bug。
-> 所有结论均经 `grep`/`wc` 实测（命令见附录）。HEAD = `0d96b54`（2026-10-03 更新；原 `9dea824` → `2c964aa` → `82b3ce3` → `71c53bf` → `1c9477a` 已过期）。
+> 所有结论均经 `grep`/`wc` 实测（命令见附录）。HEAD = `161115b`（2026-10-03 更新；原 `9dea824` → `2c964aa` → `82b3ce3` → `71c53bf` → `1c9477a` → `0d96b54` 已过期）。
 >
 > **落地进度速览**（四阶段 A/B/C/D；截至 2026-10-03）
 >
@@ -9,7 +9,7 @@
 > |---|---|---|---|
 > | **A · 恢复/注意态统一** | 单 `<BookAutomationStatusBar>` + 调色板 `bookAutomationStatusMeta` + 消费已有 locator；删 2/3 横幅面 | 已完成 | PR #39 `46a59b6` |
 > | **D · 枢纽加固（白屏）** | 修 `/assets` 嵌套 invariant 白屏（根因：合成 location + `<Routes location>` 机制触发 invariant） | 已完成 | PR #37 `c0df852` |
-> | **D · 枢纽加固（子项）** | 把 `knowledge`/`book-analysis` 也改为 inline（参数命名空间化） | 未做 / 可选 | — |
+> | **D · 枢纽加固（子项）** | 把 `knowledge` 改为 inline（子页签参数命名空间化为 `?knowledgeTab=`；`book-analysis` 已用 `?view=` 无需改） | 已完成 | PR #48 `1d52c84` |
 > | **B · 运行模式收敛** | 隐藏 runMode/policyMode 选择器，给默认；单一"智能自动" | 已完成 | 见本次 PR（接管对话框冗余选择器已删；实测入口从无 3×4 矩阵，启动 payload 从不携带 policyMode，runMode 由服务端按缺省 `auto_to_ready` + 就绪度推导） |
 > | **C · 单工作台** | 合并散落界面 → `/novels/:id` 工作区；切片1 预览→右侧 Drawer 已落地，切片2 单章编辑器吸收为工作区分区（?stage=chapter&chapterId&editor=1）已落地，切片3 独立预览路由折叠为工作区 ?preview=1 抽屉（复用 NovelPreviewDrawer）已落地，切片4 creative-hub 从工作区 1 跳可达（不吸收，仅增 novelId 绑定入口）已落地 | 已完成（切片1、2、3、4 已落地） | PR #42 / PR #43 / PR #44 / PR #45 |
 >
@@ -80,7 +80,7 @@
 | **A · 恢复/注意态统一** | 单 `<BookAutomationStatusBar>` + Context Drawer；删 2/3 横幅面；全走 locator | 低（纯前端，locator 已建） | 否 |
 | **B · 运行模式收敛** | 隐藏 runMode/policyMode 选择器，给默认；单一"智能自动" | 低（纯前端交互） | 否 |
 | **C · 单工作台** | 合并 auto-director/create/edit/story/preview/chapters/\*/creative-hub → `/novels/:id` + Drawer | 中（界面重组，0 测试兜底，需手工回归） | 否 |
-| **D · 枢纽加固** | 修 `/assets` 嵌套 invariant；把 knowledge/book-analysis 也改为 inline（参数命名空间化） | 中（回归白屏风险） | 否 |
+| **D · 枢纽加固** | 修 `/assets` 嵌套 invariant；把 `knowledge` 改为 inline（`?knowledgeTab=` 命名空间化；`book-analysis` 已用 `?view=` 无需改） | 低（已 typecheck + 196 测试通过） | 否 |
 
 每阶段独立可回滚；A 不依赖 B/C/D。
 
