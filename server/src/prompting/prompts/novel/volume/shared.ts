@@ -1,4 +1,5 @@
 import type {
+  CrossVolumeContinuityPackage,
   VolumeBeat,
   VolumeBeatSheet,
   VolumeCountGuidance,
@@ -61,6 +62,7 @@ export interface VolumeChapterListPromptInput {
   nextBeat?: VolumeBeat | null;
   previousVolume?: VolumePlan;
   nextVolume?: VolumePlan;
+  crossVolumeContinuity?: CrossVolumeContinuityPackage;
   guidance?: string;
   targetBeatChapterCount: number;
   targetChapterStartOrder: number;
@@ -507,4 +509,89 @@ export function buildChapterDetailDraft(
     `payoff refs: ${chapter.payoffRefs.join(" | ") || "none"}`,
     `current task sheet draft: ${chapter.taskSheet?.trim() || "none"}`,
   ].join("\n");
+}
+
+function toCompactVolumeCardInput(
+  entry: CrossVolumeContinuityPackage["volumeArc"][number],
+): VolumePlan {
+  return {
+    id: `cross-volume-prior-${entry.sortOrder}`,
+    novelId: "",
+    sortOrder: entry.sortOrder,
+    title: entry.title,
+    openPayoffs: entry.openPayoffs,
+    status: "",
+    chapters: [],
+    createdAt: "",
+    updatedAt: "",
+    summary: entry.summary ?? undefined,
+    climax: entry.climax ?? undefined,
+    protagonistChange: entry.protagonistChange ?? undefined,
+    nextVolumeHook: entry.nextVolumeHook ?? undefined,
+    resetPoint: entry.resetPoint ?? undefined,
+  } as VolumePlan;
+}
+
+/**
+ * Render the consolidated cross-volume continuity package into prompt text.
+ * Returns "" when no package is supplied so the block stays empty and is dropped.
+ */
+export function buildCrossVolumeContinuityText(pkg?: CrossVolumeContinuityPackage): string {
+  if (!pkg) {
+    return "";
+  }
+  const sections: string[] = [];
+
+  if (pkg.volumeArc.length > 0) {
+    sections.push(
+      `Prior volume arcs (volumes before volume ${pkg.targetVolumeSortOrder}):\n` +
+        pkg.volumeArc
+          .map((entry) => buildCompactVolumeCard(toCompactVolumeCardInput(entry)))
+          .join("\n\n"),
+    );
+  }
+
+  if (pkg.characterStates.length > 0) {
+    sections.push(
+      "Carried character states:\n" +
+        pkg.characterStates
+          .map((character) => {
+            const lines = [`${character.name} | ${character.role}`];
+            if (character.currentState) {
+              lines.push(`current state: ${character.currentState}`);
+            }
+            if (character.currentGoal) {
+              lines.push(`current goal: ${character.currentGoal}`);
+            }
+            if (character.mindSnapshot) {
+              lines.push(`mind snapshot: ${character.mindSnapshot}`);
+            }
+            return lines.join("\n");
+          })
+          .join("\n"),
+    );
+  }
+
+  if (pkg.pendingPayoffs.length > 0) {
+    sections.push(
+      "Pending payoffs across the book:\n" +
+        pkg.pendingPayoffs
+          .map((payoff) => `[${payoff.scopeType}/${payoff.status}] ${payoff.title}: ${payoff.summary}`)
+          .join("\n"),
+    );
+  }
+
+  if (pkg.worldRules) {
+    sections.push(`World rules:\n${pkg.worldRules}`);
+  }
+
+  if (pkg.consistencyFacts.length > 0) {
+    sections.push(`Consistency facts:\n${pkg.consistencyFacts.join("\n")}`);
+  }
+
+  if (pkg.priorChapterSummaries.length > 0) {
+    sections.push(`Final chapter summaries of prior volumes:\n${pkg.priorChapterSummaries.join("\n---\n")}`);
+  }
+
+  return sections.join("\n\n");
 }

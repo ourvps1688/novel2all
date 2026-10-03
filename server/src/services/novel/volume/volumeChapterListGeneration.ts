@@ -27,6 +27,7 @@ import {
   setVolumeChapterListPartialStatus,
 } from "./volumeGenerationHelpers";
 import { assertChapterTitleDiversity } from "./chapterTitleDiversity";
+import { buildCrossVolumeContinuityPackage } from "./volumeContinuityContext";
 import type {
   VolumeGenerateOptions,
   VolumeGenerationNovel,
@@ -250,6 +251,11 @@ export async function generateBeatChapterBlock(params: {
     nextVolume: targetIndex >= 0 && targetIndex < params.document.volumes.length - 1
       ? params.document.volumes[targetIndex + 1]
       : undefined,
+    crossVolumeContinuity: await buildCrossVolumeContinuityPackage({
+      novelId: params.document.novelId,
+      targetVolumeSortOrder: params.targetVolume.sortOrder,
+      document: params.document,
+    }),
     guidance: params.options.guidance,
     targetBeatChapterCount: params.beatPlan.chapterCount,
     targetChapterStartOrder: params.beatPlan.chapterStartOrder,
