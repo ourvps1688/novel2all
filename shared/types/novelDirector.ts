@@ -128,6 +128,39 @@ export const DIRECTOR_CIRCUIT_BREAKER_REASONS = [
 
 export type DirectorCircuitBreakerReason = typeof DIRECTOR_CIRCUIT_BREAKER_REASONS[number];
 
+/**
+ * T3.4: Map the runtime circuit-breaker reason (7 values) onto the
+ * full_book_autopilot interrupt reason (5 values) surfaced to operators.
+ *
+ * Shared reasons (model_unavailable / service_unavailable / protected_user_content /
+ * unrecoverable_data_risk / auto_repair_exhausted) map 1:1. The two circuit-breaker-only
+ * reasons have no dedicated interrupt slot, so they collapse onto the closest interrupt
+ * reason: `replan_loop` and `usage_anomaly` both indicate the run exhausted a recovery
+ * path, so they map to `auto_repair_exhausted`. Returns null when there is no reason.
+ */
+export function mapCircuitBreakerReasonToInterruptReason(
+  reason: DirectorCircuitBreakerReason | null | undefined,
+): DirectorFullBookAutopilotInterruptReason | null {
+  switch (reason) {
+    case "model_unavailable":
+      return "model_unavailable";
+    case "service_unavailable":
+      return "service_unavailable";
+    case "protected_user_content":
+      return "protected_user_content";
+    case "unrecoverable_data_risk":
+      return "unrecoverable_data_risk";
+    case "auto_repair_exhausted":
+      return "auto_repair_exhausted";
+    case "replan_loop":
+      return "auto_repair_exhausted";
+    case "usage_anomaly":
+      return "auto_repair_exhausted";
+    default:
+      return null;
+  }
+}
+
 export interface DirectorCircuitBreakerState {
   status: "closed" | "open";
   reason?: DirectorCircuitBreakerReason | null;
@@ -434,6 +467,8 @@ export interface DirectorTaskNotice {
   code: string;
   summary: string;
   action?: DirectorTaskNoticeAction | null;
+  /** T3.4: why an autopilot run stopped/interrupted, surfaced to operators via notices. */
+  interruptReason?: DirectorFullBookAutopilotInterruptReason | null;
 }
 
 export interface DirectorTaskSeedPayloadSnapshot {

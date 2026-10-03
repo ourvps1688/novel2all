@@ -20,6 +20,8 @@ export type DirectorPipelineCommandIntent =
   | "calibrate_step"
   | "accept_manual_changes_and_continue"
   | "repair_chapter_titles"
+  | "backfill_execution_contracts"
+  | "pause_autopilot"
   | "cancel";
 
 export interface DirectorPipelineCommand {
@@ -50,6 +52,8 @@ const SUPPORTED_COMMANDS = new Set<DirectorPipelineCommandIntent>([
   "calibrate_step",
   "accept_manual_changes_and_continue",
   "repair_chapter_titles",
+  "backfill_execution_contracts",
+  "pause_autopilot",
   "cancel",
 ]);
 
@@ -72,7 +76,7 @@ export class DirectorCommandInterpreter {
       forceResume: intent === "continue" || intent === "resume_from_checkpoint" || intent === "retry" || intent === "approve_gate" || intent === "accept_manual_changes_and_continue"
         ? true
         : Boolean(payload.forceResume),
-      isControlOnly: intent === "cancel" || intent === "policy_update",
+      isControlOnly: intent === "cancel" || intent === "policy_update" || intent === "pause_autopilot",
     };
   }
 }

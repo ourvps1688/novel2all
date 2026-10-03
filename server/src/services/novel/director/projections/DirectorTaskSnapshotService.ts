@@ -4,6 +4,10 @@ import type {
   DirectorTaskSnapshot,
   DirectorTaskSnapshotResponse,
 } from "@ai-novel/shared/types/directorRuntime";
+import {
+  mapCircuitBreakerReasonToInterruptReason,
+  type DirectorCircuitBreakerReason,
+} from "@ai-novel/shared/types/novelDirector";
 import { DirectorEventProjectionService } from "../runtime/DirectorEventProjectionService";
 import { DirectorRuntimeStore } from "../runtime/DirectorRuntimeStore";
 import { DirectorStateReader } from "../DirectorStateReader";
@@ -232,6 +236,16 @@ export class DirectorTaskSnapshotService {
         }
         : null,
     });
+    // T3.4: surface the circuit-breaker / interrupt reason on the runtime projection. The
+    // circuit breaker state is already persisted in the task seed payload (autoExecution
+    // .circuitBreaker), so we map it onto the 5-value interrupt reason here, zero migration.
+    if (projection) {
+      const circuitBreakerReason = ((
+        state.seedPayload as { autoExecution?: { circuitBreaker?: { reason?: unknown } | null } | null }
+      )?.autoExecution?.circuitBreaker?.reason ?? null) as DirectorCircuitBreakerReason | null;
+      projection.circuitBreakerReason = circuitBreakerReason;
+      projection.interruptReason = mapCircuitBreakerReasonToInterruptReason(circuitBreakerReason);
+    }
     const displayState = buildDirectorDisplayState({
       task: state.task,
       projection,

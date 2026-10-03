@@ -139,6 +139,8 @@ export async function repairDirectorChapterTitles(input: {
   const persistedWorkspace = await input.volumeService.updateVolumes(input.novelId, {
     ...workingWorkspace,
     syncToChapterExecution: true,
+    // Director repair path may push incomplete historical contracts back into the execution zone.
+    allowIncompleteExecutionContracts: true,
   });
   const repairedVolume = persistedWorkspace.volumes.find((volume) => volume.id === targetVolume.id);
   if (!repairedVolume) {

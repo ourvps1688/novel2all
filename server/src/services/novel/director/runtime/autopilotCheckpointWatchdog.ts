@@ -4,6 +4,7 @@ import { prisma as defaultPrisma } from "../../../../db/prisma";
 import { parseSeedPayload } from "../../workflow/novelWorkflow.shared";
 import {
   resolveAutopilotWaitingCheckpoint,
+  isAutopilotCheckpointPaused,
   type AutopilotCheckpointResolverDeps,
 } from "./autopilotCheckpointResolver";
 
@@ -72,6 +73,12 @@ export class AutopilotCheckpointWatchdog {
     });
     const resolved: string[] = [];
     for (const row of rows) {
+      // T3.3: a paused autopilot run (waiting_approval + pendingManualRecovery) must never be
+      // auto-resolved. The findMany query already filters pendingManualRecovery:false, but we
+      // guard here as well so any caller handing in rows is also protected.
+      if (isAutopilotCheckpointPaused(row)) {
+        continue;
+      }
       const runMode = parseSeedPayload<{ runMode?: string }>(row.seedPayloadJson)?.runMode;
       if (runMode !== "full_book_autopilot") {
         continue;

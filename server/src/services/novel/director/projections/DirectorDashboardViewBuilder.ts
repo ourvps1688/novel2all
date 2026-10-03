@@ -421,6 +421,10 @@ export function buildDirectorDashboardView(input: {
       : null,
     primaryAction: actions.primaryAction,
     secondaryActions: actions.secondaryActions,
+    // T3.4: surface the interrupt reason on the dashboard view when the runtime projection
+    // carries one (populated from the persisted circuit-breaker state).
+    interruptReason: input.projection?.interruptReason ?? null,
+    circuitBreakerReason: input.projection?.circuitBreakerReason ?? null,
     stageKey: input.displayState.stageKey,
     stageLabel: input.displayState.stageLabel,
     stepIndex: input.displayState.stepIndex,

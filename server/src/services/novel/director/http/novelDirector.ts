@@ -318,6 +318,20 @@ const appendCommandSchema = z.discriminatedUnion("commandType", [
   z.object({ commandType: z.literal("policy_update"), payload: runtimePolicySchema }),
   z.object({ commandType: z.literal("cancel"), payload: z.object({}).optional() }),
   z.object({ commandType: z.literal("repair_chapter_titles"), payload: z.object({ volumeId: z.string().trim().optional() }).optional() }),
+  z.object({ commandType: z.literal("backfill_execution_contracts"), payload: z.object({
+    novelId: z.string().trim().optional(),
+    options: z.object({
+      provider: z.string().trim().optional(),
+      model: z.string().trim().optional(),
+      temperature: z.number().optional(),
+      guidance: z.string().trim().optional(),
+      entrypoint: z.string().trim().optional(),
+      taskStyleProfileId: z.string().trim().optional(),
+    }).optional(),
+  }).optional() }),
+  z.object({ commandType: z.literal("pause_autopilot"), payload: z.object({
+    reason: z.string().trim().optional(),
+  }).optional() }),
 ]);
 
 function accepted<T>(data: T, message: string) {
@@ -453,6 +467,15 @@ router.post("/tasks/:taskId/commands", validate({ params: taskParamsSchema, body
         break;
       case "repair_chapter_titles":
         data = await commandService.enqueueChapterTitleRepairCommand(taskId, body.payload ?? {});
+        break;
+      case "backfill_execution_contracts":
+        data = await commandService.enqueueBackfillExecutionContractsCommand(taskId, {
+          novelId: body.payload?.novelId ?? undefined,
+          options: body.payload?.options,
+        });
+        break;
+      case "pause_autopilot":
+        data = await commandService.enqueuePauseAutopilotCommand(taskId);
         break;
       default:
         throw new Error("Unsupported director command type.");

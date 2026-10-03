@@ -156,6 +156,20 @@ export class DirectorCommandExecutor {
           volumeId: pipelineCommand.payload.volumeId,
         });
         return this.resolveCommandOutcome(pipelineCommand.taskId);
+      case "backfill_execution_contracts": {
+        const request = pipelineCommand.payload.backfillExecutionContractsRequest;
+        const targetNovelId = request?.novelId ?? pipelineCommand.novelId ?? state.task.novelId;
+        if (!targetNovelId) {
+          throw new AppError("Backfill execution contracts requires a novelId.", 400);
+        }
+        const result = await this.directorService.backfillExecutionContracts(targetNovelId, request?.options);
+        await this.recordCommandResult(pipelineCommand.taskId, pipelineCommand.id, { result });
+        return this.resolveCommandOutcome(pipelineCommand.taskId);
+      }
+      case "pause_autopilot": {
+        await this.commandService.enqueuePauseAutopilotCommand(pipelineCommand.taskId);
+        return this.resolveCommandOutcome(pipelineCommand.taskId);
+      }
       case "policy_update": {
         const request = pipelineCommand.payload.policyUpdateRequest;
         if (!request) {
