@@ -14,7 +14,7 @@ import {
   resolveLengthBudgetContract,
 } from "@ai-novel/shared/types/chapterLengthControl";
 import { sanitizeCreativeMustAdvanceItems } from "@ai-novel/shared/types/chapterCreativeContract";
-import type { ReviewIssue } from "@ai-novel/shared/types/novel";
+import type { CrossVolumeContinuityPackage, ReviewIssue } from "@ai-novel/shared/types/novel";
 import type { StoryMacroPlan } from "@ai-novel/shared/types/storyMacro";
 import {
   hasReaderExperienceContractValue,
@@ -312,6 +312,7 @@ export function buildChapterWriteContext(input: {
   productionFoundationPrompt?: string | null;
   macroConstraints: MacroConstraintContext | null;
   volumeWindow: VolumeWindowContext | null;
+  crossVolumeContinuity?: CrossVolumeContinuityPackage | null;
   contextPackage: GenerationContextPackage;
 }): ChapterWriteContext {
   const dynamicCharacterGuidance = buildDynamicCharacterGuidance(input.contextPackage);
@@ -347,6 +348,7 @@ export function buildChapterWriteContext(input: {
     productionFoundationPrompt: compactText(input.productionFoundationPrompt),
     macroConstraints: input.macroConstraints,
     volumeWindow: input.volumeWindow,
+    crossVolumeContinuity: input.crossVolumeContinuity ?? null,
     narrativeProgressHint: input.contextPackage.narrativeProgressHint ?? null,
     chapterMission,
     nextAction: input.contextPackage.nextAction,
