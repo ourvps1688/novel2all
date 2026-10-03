@@ -58,6 +58,7 @@ const EXECUTION_COMMAND_TYPES: DirectorRunCommandType[] = [
   "calibrate_step",
   "accept_manual_changes_and_continue",
   "repair_chapter_titles",
+  "backfill_execution_contracts",
 ];
 
 export type DirectorRunCommandRow = Awaited<ReturnType<DirectorCommandService["getCommandById"]>>;
@@ -533,6 +534,29 @@ export class DirectorCommandService {
         volumeId: input.volumeId?.trim() || null,
       },
       preserveLastError: true,
+    });
+  }
+
+  async enqueueBackfillExecutionContractsCommand(taskId: string, input: {
+    novelId?: string | null;
+    options?: {
+      provider?: string;
+      model?: string;
+      temperature?: number;
+      guidance?: string;
+      entrypoint?: string;
+      taskStyleProfileId?: string;
+    };
+  } = {}): Promise<DirectorCommandAcceptedResponse> {
+    return this.enqueueExecutionCommand({
+      taskId,
+      commandType: "backfill_execution_contracts",
+      payload: {
+        backfillExecutionContractsRequest: {
+          novelId: input.novelId?.trim() || null,
+          options: input.options ?? {},
+        },
+      },
     });
   }
 

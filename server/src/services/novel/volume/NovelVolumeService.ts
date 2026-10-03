@@ -73,17 +73,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function extractVolumeWorkspaceUpdateInput(input: unknown): {
   workspaceInput: unknown;
   syncToChapterExecution: boolean;
+  allowIncompleteExecutionContracts: boolean;
 } {
   if (!isRecord(input)) {
     return {
       workspaceInput: input,
       syncToChapterExecution: false,
+      allowIncompleteExecutionContracts: false,
     };
   }
-  const { syncToChapterExecution, ...workspaceInput } = input;
+  const { syncToChapterExecution, allowIncompleteExecutionContracts, ...workspaceInput } = input;
   return {
     workspaceInput,
     syncToChapterExecution: syncToChapterExecution === true,
+    allowIncompleteExecutionContracts: allowIncompleteExecutionContracts === true,
   };
 }
 
@@ -398,9 +401,14 @@ export class NovelVolumeService {
   }
 
   async updateVolumes(novelId: string, input: unknown): Promise<VolumePlanDocument> {
-    const { workspaceInput, syncToChapterExecution } = extractVolumeWorkspaceUpdateInput(input);
+    const {
+      workspaceInput,
+      syncToChapterExecution,
+      allowIncompleteExecutionContracts,
+    } = extractVolumeWorkspaceUpdateInput(input);
     return this.updateVolumesWithOptions(novelId, workspaceInput, {
       syncToChapterExecution,
+      allowIncompleteExecutionContracts,
     });
   }
 
@@ -411,6 +419,7 @@ export class NovelVolumeService {
       volumeUpdateReason?: VolumeUpdateReason;
       syncPayoffLedger?: boolean;
       syncToChapterExecution?: boolean;
+      allowIncompleteExecutionContracts?: boolean;
       emitEvent?: boolean;
       memoryTelemetry?: VolumeMemoryTelemetry;
     } = {},
@@ -430,6 +439,7 @@ export class NovelVolumeService {
           volumes: persistedDocument.volumes,
           preserveContent: true,
           applyDeletes: false,
+          allowIncompleteExecutionContracts: options.allowIncompleteExecutionContracts === true,
         }, {
           emitEvent: false,
           syncPayoffLedger: false,

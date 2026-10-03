@@ -87,6 +87,8 @@ async function syncPreparedChapterExecutionContext(input: {
     volumes: input.workspace.volumes,
     preserveContent: true,
     applyDeletes: false,
+    // Historical/autopilot chapters may carry incomplete execution contracts; allow them through.
+    allowIncompleteExecutionContracts: true,
     executionContractChapterRange: {
       startOrder: targetChapter.chapterOrder,
       endOrder: targetChapter.chapterOrder,
@@ -593,6 +595,8 @@ export async function runDirectorStructuredOutlinePhase(input: {
     // Structured outline sync refreshes execution contracts; generated prose stays protected.
     preserveContent: true,
     applyDeletes: false,
+    // Autopilot historical chapters may carry incomplete execution contracts; allow them through.
+    allowIncompleteExecutionContracts: true,
     executionContractChapterRange: targetChapterRange ?? undefined,
   }, {
     emitEvent: false,

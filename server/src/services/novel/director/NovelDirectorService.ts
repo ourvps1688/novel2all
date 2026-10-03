@@ -47,6 +47,10 @@ import {
   buildDirectorWorkflowSeedPayload,
 } from "./runtime/novelDirectorHelpers";
 import {
+  backfillMissingExecutionContracts,
+  listNovelChaptersForContractBackfill,
+} from "./runtime/historicalExecutionContractBackfill";
+import {
   buildDirectorTakeoverInput,
   buildDirectorTakeoverReadiness,
   isTakeoverStructuredOutlineReadyForValidation,
@@ -454,6 +458,40 @@ export class NovelDirectorService {
     volumeId?: string | null;
   }): Promise<void> {
     return this.chapterTitleRepairRuntime.repairChapterTitles(taskId, input);
+  }
+
+  /**
+   * Backfill missing execution contracts (task sheet + scene cards) for historical
+   * chapters that predate the autopilot runtime. Best-effort, idempotent repair
+   * utility: it never creates a checkpoint, never enqueues a continue, and never
+   * requires user approval. Persistence is handled by the reused generator.
+   */
+  async backfillExecutionContracts(novelId: string, options?: {
+    provider?: string;
+    model?: string;
+    temperature?: number;
+    guidance?: string;
+    entrypoint?: string;
+    taskStyleProfileId?: string;
+  }): Promise<{
+    novelId: string;
+    totalChapters: number;
+    backfilled: number;
+    skipped: number;
+    errors: Array<{ chapterId: string; chapterOrder?: number; error: string }>;
+  }> {
+    return backfillMissingExecutionContracts(
+      {
+        listChapters: listNovelChaptersForContractBackfill,
+        ensureChapterExecutionContract: (targetNovelId, chapterId, contractOptions) =>
+          this.volumeService.ensureChapterExecutionContract(
+            targetNovelId,
+            chapterId,
+            (contractOptions ?? {}) as Parameters<NovelVolumeService["ensureChapterExecutionContract"]>[2],
+          ),
+      },
+      { novelId, options: options ?? {} },
+    );
   }
 
   async getTakeoverReadiness(novelId: string): Promise<DirectorTakeoverReadinessResponse> {

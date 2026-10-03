@@ -20,6 +20,7 @@ export type DirectorPipelineCommandIntent =
   | "calibrate_step"
   | "accept_manual_changes_and_continue"
   | "repair_chapter_titles"
+  | "backfill_execution_contracts"
   | "cancel";
 
 export interface DirectorPipelineCommand {
@@ -50,6 +51,7 @@ const SUPPORTED_COMMANDS = new Set<DirectorPipelineCommandIntent>([
   "calibrate_step",
   "accept_manual_changes_and_continue",
   "repair_chapter_titles",
+  "backfill_execution_contracts",
   "cancel",
 ]);
 

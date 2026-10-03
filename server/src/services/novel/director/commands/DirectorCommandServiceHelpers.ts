@@ -41,6 +41,17 @@ export interface DirectorCommandPayload {
   stepCalibrationRequest?: DirectorStepCalibrationRequest;
   acceptManualChanges?: boolean;
   volumeId?: string | null;
+  backfillExecutionContractsRequest?: {
+    novelId?: string | null;
+    options?: {
+      provider?: string;
+      model?: string;
+      temperature?: number;
+      guidance?: string;
+      entrypoint?: string;
+      taskStyleProfileId?: string;
+    };
+  };
 }
 
 export function stableJson(value: unknown): string {
