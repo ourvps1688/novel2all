@@ -715,7 +715,7 @@ model Chapter {
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
-  @@index([novelId, order])
+  @@unique([novelId, order])
 }
 
 model ChapterArtifactSyncCheckpoint {

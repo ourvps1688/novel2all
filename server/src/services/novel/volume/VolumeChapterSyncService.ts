@@ -108,23 +108,36 @@ export class VolumeChapterSyncService {
       const { versionId } = await this.deps.ensureActiveVersionRecord(tx, novelId, mergedDocument);
       const linkUpdates: Array<{ volumeChapterId: string; chapterId: string }> = [...plan.links];
       for (const item of plan.creates) {
-        const created = await tx.chapter.create({
-          data: {
-            novelId,
-            title: item.chapter.title,
-            order: item.chapter.chapterOrder,
-            content: "",
-            expectation: item.chapter.summary,
-            targetWordCount: item.chapter.targetWordCount ?? null,
-            conflictLevel: item.chapter.conflictLevel ?? null,
-            revealLevel: item.chapter.revealLevel ?? null,
-            mustAvoid: item.chapter.mustAvoid ?? null,
-            taskSheet: item.chapter.taskSheet?.trim() || null,
-            sceneCards: item.chapter.sceneCards ?? null,
-          },
+        // Idempotent materialization: re-check existence INSIDE the transaction and
+        // reuse the existing row when present. This closes the TOCTOU race where two
+        // concurrent syncs both snapshot "absent" and then both create a duplicate
+        // (novelId, order). The @@unique([novelId, order]) constraint is the hard
+        // backstop that turns any residual race into a catchable error instead of a
+        // silent duplicate row.
+        const existing = await tx.chapter.findUnique({
+          where: { novelId_order: { novelId, order: item.chapter.chapterOrder } },
         });
-        item.chapter.chapterId = created.id;
-        linkUpdates.push({ volumeChapterId: item.chapter.id, chapterId: created.id });
+        const chapterId = existing
+          ? existing.id
+          : (
+            await tx.chapter.create({
+              data: {
+                novelId,
+                title: item.chapter.title,
+                order: item.chapter.chapterOrder,
+                content: "",
+                expectation: item.chapter.summary,
+                targetWordCount: item.chapter.targetWordCount ?? null,
+                conflictLevel: item.chapter.conflictLevel ?? null,
+                revealLevel: item.chapter.revealLevel ?? null,
+                mustAvoid: item.chapter.mustAvoid ?? null,
+                taskSheet: item.chapter.taskSheet?.trim() || null,
+                sceneCards: item.chapter.sceneCards ?? null,
+              },
+            })
+          ).id;
+        item.chapter.chapterId = chapterId;
+        linkUpdates.push({ volumeChapterId: item.chapter.id, chapterId });
       }
       for (const item of plan.updates) {
         item.chapter.chapterId = item.chapterId;
