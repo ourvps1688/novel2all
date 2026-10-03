@@ -22,7 +22,7 @@ export default function KnowledgeSettingsPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">向量模型、资料库地址、索引和召回参数都在同一个检索配置页维护。</p>
-          <Button asChild variant="outline"><Link to="/knowledge?tab=settings">配置检索<ExternalLink className="h-4 w-4" /></Link></Button>
+          <Button asChild variant="outline"><Link to="/knowledge?knowledgeTab=settings">配置检索<ExternalLink className="h-4 w-4" /></Link></Button>
         </CardContent>
       </Card>
       <StyleEngineRuntimeSettingsCard />

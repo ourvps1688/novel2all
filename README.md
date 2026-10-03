@@ -461,7 +461,7 @@ Copy-Item client/.env.example client/.env
   配置供应商 API Key、默认模型、连通性测试
 - `/settings/model-routes`
   给不同任务分配不同 provider / model
-- `/knowledge?tab=settings`
+- `/knowledge?knowledgeTab=settings`
   配置 Embedding provider、Embedding model、集合命名和自动重建策略
 
 所以环境变量里的 `OPENAI_MODEL`、`DEEPSEEK_MODEL`、`EMBEDDING_MODEL` 等，更适合当作：
@@ -491,7 +491,7 @@ pnpm dev
 
 1. 打开 `http://localhost:5173/settings`，至少配置一组可用的模型供应商 API Key
 2. 打开 `http://localhost:5173/settings/model-routes`，检查各任务实际使用的模型路由
-3. 如果要启用知识库，打开 `http://localhost:5173/knowledge?tab=settings`，保存 Embedding / Collection 设置
+3. 如果要启用知识库，打开 `http://localhost:5173/knowledge?knowledgeTab=settings`，保存 Embedding / Collection 设置
 
 ### 4. 如果你使用 Qdrant Cloud
 

@@ -86,7 +86,9 @@ export default function KnowledgePage() {
     httpTimeoutMs: 30000,
   });
 
-  const activeTab = normalizeTab(searchParams.get("tab"));
+  // 在资产中枢内联渲染时，枢纽自身已占用 ?tab= 选择资产分类（如 tab=knowledge），
+  // 故知识库内部子页签改用 ?knowledgeTab=，并用函数式 updater 保留其它参数，避免冲掉 ?tab=。
+  const activeTab = normalizeTab(searchParams.get("knowledgeTab"));
   const documentListQueryKey = queryKeys.knowledge.documents(`${keyword}-${status || "default"}`);
   const ragJobsQueryKey = queryKeys.knowledge.ragJobs("latest");
 
@@ -378,14 +380,22 @@ export default function KnowledgePage() {
   const hasDocumentFilters = Boolean(keyword.trim() || status);
 
   const openDocumentsSection = () => {
-    setSearchParams({ tab: "documents" });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("knowledgeTab", "documents");
+      return next;
+    });
     window.requestAnimationFrame(() => {
       document.getElementById("knowledge-documents")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
 
   const openUploadDialog = () => {
-    setSearchParams({ tab: "documents" });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("knowledgeTab", "documents");
+      return next;
+    });
     setUploadDialogOpen(true);
   };
 
@@ -532,14 +542,26 @@ export default function KnowledgePage() {
           setStatus("");
         }}
         onOpenDocuments={openDocumentsSection}
-        onOpenOps={() => setSearchParams({ tab: "ops" })}
+        onOpenOps={() =>
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("knowledgeTab", "ops");
+            return next;
+          })
+        }
         onRetry={() => void documentsQuery.refetch()}
         onUpload={openUploadDialog}
       />
 
       <Tabs
         value={activeTab}
-        onValueChange={(value) => setSearchParams({ tab: value })}
+        onValueChange={(value) =>
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("knowledgeTab", value);
+            return next;
+          })
+        }
         className="space-y-4"
       >
         <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto rounded-full bg-muted/30 p-1">
@@ -595,7 +617,13 @@ export default function KnowledgePage() {
             deletingJobId={deleteRagJobMutation.isPending ? deleteRagJobMutation.variables : undefined}
             onClearFinishedJobs={handleClearFinishedRagJobs}
             onDeleteJob={handleDeleteRagJob}
-            onOpenSettings={() => setSearchParams({ tab: "settings" })}
+            onOpenSettings={() =>
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set("knowledgeTab", "settings");
+                return next;
+              })
+            }
           />
         </TabsContent>
 

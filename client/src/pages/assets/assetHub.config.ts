@@ -25,9 +25,10 @@ export type AssetTabKey =
 
 /**
  * 渲染模式：
- * - "inline"：在枢纽内联渲染既有页面组件（经由合成 location，使其表现得像在自己的原路由上）。
- * - "link"：该页会在壳内改写 ?tab=，会冲掉枢纽自身的 ?tab= 选择器，
- *            因此不内联渲染，改为一条跳转到原路由的入口（契约 §4.4 兜底路径）。
+ * - "inline"：在枢纽内联渲染既有页面组件。组件直接读取真实 URL 的 search params，
+ *             因此其内部子页签参数必须命名空间化（如知识库用 ?knowledgeTab=），
+ *             以避免与枢纽自身的 ?tab= 分类选择器冲突（契约 §4）。
+ * - "link"：该页更适合作为独立整页（含多个子模块），故改为一条跳转到原路由的入口（契约 §4.4 兜底路径）。
  */
 export type AssetTabRenderMode = "inline" | "link";
 
@@ -76,8 +77,9 @@ export const ASSET_TABS: AssetTab[] = [
     label: "知识库",
     icon: Database,
     originalPath: "/knowledge",
-    component: null,
-    mode: "link",
+    // 子页签参数已命名空间为 ?knowledgeTab=，可在枢纽内联渲染而不冲掉 ?tab=。
+    component: lazy(() => import("@/pages/knowledge/KnowledgePage")),
+    mode: "inline",
   },
   {
     key: "worlds",
