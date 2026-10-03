@@ -50,6 +50,8 @@ export type DirectorAssetFirstRecovery =
   | {
     type: "phase";
     phase: "story_macro" | "book_contract" | "world_setup" | "character_setup" | "volume_strategy" | "structured_outline";
+    /** 当处于卷规划已耗尽、卡在确认循环的续写场景时为 "extend_outline"。 */
+    intent?: "extend_outline";
   }
   | null;
 
@@ -398,6 +400,9 @@ export class NovelDirectorContinueRuntime {
     const phase = assetFirstRecovery?.type === "phase"
       ? assetFirstRecovery.phase
       : inferredPhase ?? await this.resolveResumePhase({ novelId });
+    const extendIntent = assetFirstRecovery?.type === "phase"
+      ? assetFirstRecovery.intent
+      : undefined;
     const directorSessionPhase = phase === "book_contract" ? "story_macro" : phase;
     const directorSession = buildDirectorSessionState({
       runMode: effectiveDirectorInput.runMode,
@@ -448,6 +453,7 @@ export class NovelDirectorContinueRuntime {
         batchAlreadyStartedCount: input?.batchAlreadyStartedCount,
         approveCurrentGate,
         approveAutoExecutionScope: requestedAutoExecutionContinue || isFullBookAutopilot,
+        intent: extendIntent,
       });
     });
   }
@@ -498,7 +504,14 @@ export class NovelDirectorContinueRuntime {
       latestAutoExecutionState?.volumeChapterListComplete === false
       && (latestAutoExecutionState.remainingChapterCount ?? 0) === 0
     ) {
-      return { type: "phase", phase: "structured_outline" };
+      const isBookModeAutoExecution =
+        input.directorInput.autoExecutionPlan?.mode === "book"
+        || isDirectorAutoExecutionRunMode(normalizeDirectorRunMode(input.directorInput.runMode));
+      return {
+        type: "phase",
+        phase: "structured_outline",
+        ...(isBookModeAutoExecution ? { intent: "extend_outline" as const } : {}),
+      };
     }
     const autoExecutionRecovery = resolveAssetFirstRecoveryFromSnapshot({
       runMode: input.directorInput.runMode,

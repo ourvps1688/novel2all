@@ -58,6 +58,7 @@ import {
   generateBeatSheet,
   resolveBeatSheetTargetChapterCount,
 } from "./volumeBeatSheetGeneration";
+import { generateExtend } from "./volumeExtendGeneration";
 import {
   MAX_VOLUME_COUNT,
   buildVolumeCountGuidance,
@@ -91,7 +92,7 @@ async function notifyVolumeGenerationPhase(input: {
   });
 }
 
-async function loadGenerationContext(params: {
+export async function loadGenerationContext(params: {
   novelId: string;
   workspace: VolumeWorkspace;
   storyMacroPlanService: Pick<StoryMacroPlanService, "getPlan">;
@@ -584,6 +585,14 @@ export async function generateVolumePlanDocument(params: {
 }): Promise<VolumePlanDocument> {
   const { novelId, workspace, options = {}, storyMacroPlanService } = params;
   const scope = normalizeScope(options.scope);
+  if (scope === "extend") {
+    return generateExtend({
+      novelId,
+      workspace,
+      options,
+      storyMacroPlanService,
+    });
+  }
   const baseDocument = buildVolumeWorkspaceDocument({
     novelId,
     volumes: options.draftVolumes

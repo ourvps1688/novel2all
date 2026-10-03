@@ -213,6 +213,11 @@ export function assertScopeReadiness(
   scope: VolumeGenerationScope,
   targetVolumeId?: string,
 ): void {
+  if (scope === "extend") {
+    // 续写（extend）在最后卷内追加章节规划，无需目标卷或既有阶段就绪校验；
+    // 其写入逻辑（volumeExtendPlanning）自行保证 @unique 不变量。
+    return;
+  }
   if (scope === "strategy") {
     return;
   }

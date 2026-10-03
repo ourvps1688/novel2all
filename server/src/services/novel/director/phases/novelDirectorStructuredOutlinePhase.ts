@@ -171,8 +171,24 @@ export async function runDirectorStructuredOutlinePhase(input: {
   baseWorkspace: VolumePlanDocument;
   dependencies: DirectorPhaseDependencies;
   callbacks: DirectorPhaseCallbacks;
+  /** 续写意图：在最后卷内追加新章节规划，而不是原地打转。 */
+  intent?: "extend_outline";
 }): Promise<void> {
-  const { taskId, novelId, request, baseWorkspace, dependencies, callbacks } = input;
+  const { taskId, novelId, request, dependencies, callbacks } = input;
+  let baseWorkspace = input.baseWorkspace;
+  if (input.intent === "extend_outline") {
+    // 卷规划已耗尽且卡在确认循环：直接在最后卷内续写主线，追加新节奏段与章节规划。
+    // generateVolumes(scope: "extend") 会复用既有 beat sheet / chapter list prompt，
+    // 从 max(chapterOrder)+1 继续编号，绝不改动已有卷与章节。
+    baseWorkspace = await dependencies.volumeService.generateVolumes(novelId, {
+      scope: "extend",
+      taskId,
+      provider: request.provider,
+      model: request.model,
+      temperature: request.temperature,
+      entrypoint: "auto_director",
+    });
+  }
   logMemoryUsage({
     event: "start",
     component: "runDirectorStructuredOutlinePhase",
