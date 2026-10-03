@@ -164,6 +164,27 @@ async function persistStructuredOutlineVolumeSnapshot(input: {
   });
 }
 
+/**
+ * 续写（extend_outline）场景下，计算「仅覆盖新增章节」的区间。
+ * startOrder 来自续写前的最后一章序号 +1；endOrder 取续写后全书最大章序。
+ * 历史章节（order <= 续写前最大序）一律排除，使质量门禁与同步只校验新增章节，
+ * 不被历史章节的执行合同不完整（如早期数据缺字段）阻塞整次续写。
+ */
+export function resolveExtendOutlineChapterRange(
+  preExtendWorkspace: VolumePlanDocument,
+  postExtendWorkspace: VolumePlanDocument,
+): { startOrder: number; endOrder: number } {
+  const preExtendMaxChapterOrder = Math.max(
+    0,
+    ...preExtendWorkspace.volumes.flatMap((volume) => volume.chapters.map((chapter) => chapter.chapterOrder)),
+  );
+  const postExtendMaxChapterOrder = Math.max(
+    preExtendMaxChapterOrder,
+    ...postExtendWorkspace.volumes.flatMap((volume) => volume.chapters.map((chapter) => chapter.chapterOrder)),
+  );
+  return { startOrder: preExtendMaxChapterOrder + 1, endOrder: postExtendMaxChapterOrder };
+}
+
 export async function runDirectorStructuredOutlinePhase(input: {
   taskId: string;
   novelId: string;
@@ -189,6 +210,13 @@ export async function runDirectorStructuredOutlinePhase(input: {
       entrypoint: "auto_director",
     });
   }
+
+  // 续写场景：仅针对「续写新增的章节区间」做质量门禁与同步，不重新校验既有全书章节，
+  // 避免历史章节的执行合同不完整（如早期生成数据缺字段）阻塞整次续写。
+  const extendChapterRange = input.intent === "extend_outline"
+    ? resolveExtendOutlineChapterRange(input.baseWorkspace, baseWorkspace)
+    : null;
+
   logMemoryUsage({
     event: "start",
     component: "runDirectorStructuredOutlinePhase",
@@ -517,7 +545,10 @@ export async function runDirectorStructuredOutlinePhase(input: {
     0,
     ...flattenPreparedOutlineChapters(workspace).map((chapter) => chapter.chapterOrder),
   );
-  const targetChapterRange = resolveDirectorAutoExecutionPlanChapterRange(detailPlan);
+  let targetChapterRange = resolveDirectorAutoExecutionPlanChapterRange(detailPlan);
+  if (input.intent === "extend_outline" && extendChapterRange) {
+    targetChapterRange = extendChapterRange;
+  }
   const allowIncrementalExecutionWindow = isDirectorAutoExecutionRunMode(normalizeDirectorRunMode(request.runMode));
   if (targetChapterRange && maxPreparedChapterOrder < targetChapterRange.endOrder && !allowIncrementalExecutionWindow) {
     throw new Error(
@@ -571,7 +602,13 @@ export async function runDirectorStructuredOutlinePhase(input: {
     plan: detailPlan,
     allowPartialChapterListReady: allowIncrementalExecutionWindow,
   });
-  const selectedChapters = syncCursor.selectedChapters;
+  let selectedChapters = syncCursor.selectedChapters;
+  if (input.intent === "extend_outline" && extendChapterRange) {
+    selectedChapters = selectedChapters.filter((chapter) => (
+      chapter.chapterOrder >= extendChapterRange.startOrder
+      && chapter.chapterOrder <= extendChapterRange.endOrder
+    ));
+  }
   if (selectedChapters.length === 0) {
     throw new Error("自动导演未能准备出可执行的章节范围。");
   }
@@ -602,7 +639,12 @@ export async function runDirectorStructuredOutlinePhase(input: {
       volumeId: selectedChapters[0]?.volumeId ?? null,
     },
   );
-  const persistedChapters = await dependencies.novelContextService.listChapters(novelId);
+  let persistedChapters = await dependencies.novelContextService.listChapters(novelId);
+  if (input.intent === "extend_outline" && extendChapterRange) {
+    persistedChapters = persistedChapters.filter((chapter) => (
+      chapter.order >= extendChapterRange.startOrder && chapter.order <= extendChapterRange.endOrder
+    ));
+  }
   if (persistedChapters.length === 0) {
     throw new Error("自动导演已生成拆章结果，但章节资源没有成功同步到执行区。");
   }
