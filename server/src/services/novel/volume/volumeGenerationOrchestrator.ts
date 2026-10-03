@@ -577,6 +577,96 @@ async function generateChapterDetail(params: {
   });
 }
 
+/**
+ * T2.1 — Whole-book upfront planning orchestration.
+ *
+ * Plans the ENTIRE book at book-opening: for every volume (in sortOrder) generate the
+ * beat sheet, then for every beat in that volume generate its chapter list. This mirrors
+ * exactly the incremental per-volume / per-beat sequence used by the existing autopilot
+ * JIT path in runDirectorStructuredOutlinePhase, so the produced document is identical
+ * in shape and the subsequent execution path finds nothing pending and runs end-to-end.
+ *
+ * Designed to be testable: `generateBeatSheet` / `generateChapterList` are injectable and
+ * default to the module-level production functions. `novel` / `storyMacroPlan` are also
+ * injectable so the function can run without a database in unit tests.
+ */
+export async function generateWholeBookPlan(params: {
+  novelId: string;
+  workspace: VolumeWorkspace;
+  options?: VolumeGenerateOptions;
+  storyMacroPlanService: Pick<StoryMacroPlanService, "getPlan">;
+  generateBeatSheet?: typeof generateBeatSheet;
+  generateChapterList?: typeof generateChapterList;
+  novel?: VolumeGenerationNovel;
+  storyMacroPlan?: StoryMacroPlanResult;
+}): Promise<VolumePlanDocument> {
+  const { novelId, workspace, options = {}, storyMacroPlanService } = params;
+
+  // Readiness: strategy + skeleton must have run first.
+  if (!workspace.strategyPlan) {
+    throw new Error("book scope requires strategy+skeleton to be planned first");
+  }
+  if (workspace.volumes.length === 0) {
+    throw new Error("book scope requires at least one planned volume");
+  }
+
+  const beatSheetFn = params.generateBeatSheet ?? generateBeatSheet;
+  const chapterListFn = params.generateChapterList ?? generateChapterList;
+
+  // In production we load the novel + story macro plan from the DB. When both are injected
+  // (unit tests) we skip the DB call entirely. Presence is checked via `!== undefined` so a
+  // deliberately injected `null` story macro plan is honored.
+  const { novel, storyMacroPlan } = params.novel !== undefined && params.storyMacroPlan !== undefined
+    ? { novel: params.novel, storyMacroPlan: params.storyMacroPlan }
+    : await loadGenerationContext({ novelId, workspace, storyMacroPlanService });
+
+  const baseDocument = buildVolumeWorkspaceDocument({
+    novelId,
+    volumes: workspace.volumes,
+    strategyPlan: workspace.strategyPlan,
+    critiqueReport: workspace.critiqueReport,
+    beatSheets: workspace.beatSheets,
+    rebalanceDecisions: workspace.rebalanceDecisions,
+    source: workspace.source,
+    activeVersionId: workspace.activeVersionId,
+  });
+  const currentWorkspace: VolumeWorkspace = { ...workspace, ...baseDocument };
+
+  const sortedVolumes = workspace.volumes
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+
+  let document = baseDocument;
+  for (const volume of sortedVolumes) {
+    document = await beatSheetFn({
+      document,
+      novel,
+      workspace: currentWorkspace,
+      storyMacroPlan,
+      options: { ...options, scope: "beat_sheet", targetVolumeId: volume.id },
+      notifyVolumeGenerationPhase,
+    });
+    const beatSheet = document.beatSheets.find((sheet) => sheet.volumeId === volume.id);
+    const beats = beatSheet?.beats ?? [];
+    for (const beat of beats) {
+      document = await chapterListFn({
+        document,
+        novel,
+        workspace: currentWorkspace,
+        storyMacroPlan,
+        options: {
+          ...options,
+          scope: "chapter_list",
+          targetVolumeId: volume.id,
+          generationMode: "single_beat",
+          targetBeatKey: beat.key,
+        },
+      });
+    }
+  }
+  return document;
+}
+
 export async function generateVolumePlanDocument(params: {
   novelId: string;
   workspace: VolumeWorkspace;
@@ -584,6 +674,12 @@ export async function generateVolumePlanDocument(params: {
   storyMacroPlanService: Pick<StoryMacroPlanService, "getPlan">;
 }): Promise<VolumePlanDocument> {
   const { novelId, workspace, options = {}, storyMacroPlanService } = params;
+  // T2.1 whole-book upfront planning: intercept "book" before normalizeScope so other
+  // direct callers of normalizeScope keep their existing behavior. The strategy+skeleton
+  // step must have run first (workspace.strategyPlan + skeleton volumes present).
+  if (options?.scope === "book") {
+    return generateWholeBookPlan({ novelId, workspace, options, storyMacroPlanService });
+  }
   const scope = normalizeScope(options.scope);
   if (scope === "extend") {
     return generateExtend({
