@@ -16,6 +16,7 @@ import {
   normalizeDirectorAutoApprovalConfig,
   shouldAutoApproveDirectorCheckpoint,
 } from "@ai-novel/shared/types/autoDirectorApproval";
+import { isFullBookAutopilotRunMode } from "@ai-novel/shared/types/novelDirector";
 import { recordAutoDirectorAutoApproval } from "../../../task/autoDirectorAttentions/autoDirectorAutoApprovalAudit";
 import { runDirectorTrackedStep } from "../projections/directorProgressTracker";
 import type { DirectorPhaseCallbacks, DirectorPhaseDependencies } from "./novelDirectorPhaseTypes";
@@ -339,6 +340,45 @@ export async function runDirectorVolumeStrategyPhase(input: {
     }),
   });
   const persistedStrategyWorkspace = await dependencies.volumeService.updateVolumes(novelId, workspace);
+
+  // T2.1 — Whole-book upfront planning: under full-book autopilot, pre-plan the ENTIRE book
+  // (every volume's beat sheet + chapter list) right here, so the structured-outline phase
+  // finds nothing pending and execution can run end-to-end without mid-flight planning.
+  // The skeleton is persisted above first so the subsequent beat sheets survive persistence
+  // (mergeVolumeWorkspaceInput resets beatSheets only when volume-level structure changes).
+  if (isFullBookAutopilotRunMode(request.runMode)) {
+    workspace = await runDirectorTrackedStep({
+      taskId,
+      stage: "volume_strategy",
+      itemKey: "volume_skeleton",
+      itemLabel: "正在预规划全书节奏板与章节列表",
+      progress: DIRECTOR_PROGRESS.volumeSkeleton,
+      callbacks,
+      run: async ({ updateStatus, signal }) => dependencies.volumeService.generateVolumes(novelId, {
+        provider: request.provider,
+        model: request.model,
+        temperature: request.temperature,
+        scope: "book",
+        taskId,
+        entrypoint: "auto_director",
+        estimatedChapterCount: request.estimatedChapterCount
+          ?? toBookSpec(request.candidate, request.idea, request.estimatedChapterCount).targetChapterCount,
+        draftWorkspace: workspace,
+        signal,
+        onPhaseStart: async (event) => {
+          const update = buildVolumeStrategyPhaseUpdate(event);
+          if (!update) {
+            return;
+          }
+          await updateStatus(update);
+        },
+      }),
+    });
+    await dependencies.volumeService.updateVolumes(novelId, workspace);
+    if (normalizeDirectorRunMode(request.runMode) !== "stage_review") {
+      return workspace;
+    }
+  }
 
   if (normalizeDirectorRunMode(request.runMode) !== "stage_review") {
     return persistedStrategyWorkspace;
