@@ -220,7 +220,7 @@ function isMergedVolumeChapterListComplete(params: {
   });
 }
 
-async function generateBeatChapterBlock(params: {
+export async function generateBeatChapterBlock(params: {
   document: VolumePlanDocument;
   workspace: VolumeWorkspace;
   novel: VolumeGenerationNovel;

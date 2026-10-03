@@ -56,6 +56,8 @@ export interface DirectorPipelineRunInput {
   batchAlreadyStartedCount?: number;
   approveCurrentGate?: boolean;
   approveAutoExecutionScope?: boolean;
+  /** 续写意图：当卷规划已耗尽、卡在确认循环时，要求结构化大纲阶段在最后卷内追加新章节规划。 */
+  intent?: "extend_outline";
 }
 
 function isDirectorCharacterSetupPauseResult(value: unknown): value is Extract<
@@ -225,7 +227,16 @@ export class NovelDirectorPipelineRuntime {
       if (!currentWorkspace) {
         return;
       }
-      if (await this.runStructuredOutlineNode(input, currentWorkspace)) {
+      if (input.intent === "extend_outline") {
+        // 续写路径：直接进入结构化大纲阶段，在最后卷内追加新章节规划，随后继续同步与自动执行。
+        await this.executeStructuredOutlineStep(
+          input.taskId,
+          input.novelId,
+          input.input,
+          currentWorkspace,
+          input.intent,
+        );
+      } else if (await this.runStructuredOutlineNode(input, currentWorkspace)) {
         return;
       }
       const executionContractSyncModule = getDirectorExecutionContractSyncStepModule();
@@ -651,12 +662,14 @@ export class NovelDirectorPipelineRuntime {
     novelId: string,
     input: DirectorConfirmRequest,
     baseWorkspace: VolumePlanDocument,
+    intent?: "extend_outline",
   ): Promise<void> {
     await runDirectorStructuredOutlinePhase({
       taskId,
       novelId,
       request: input,
       baseWorkspace,
+      intent,
       dependencies: {
         workflowService: this.deps.workflowService,
         novelContextService: this.deps.novelContextService,

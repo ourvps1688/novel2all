@@ -67,7 +67,9 @@ export type VolumeGenerationScope =
   | "beat_sheet"
   | "chapter_list"
   | "chapter_detail"
-  | "rebalance";
+  | "rebalance"
+  // 在【最后卷】内续写主线：继续追加新节奏段与章节规划，不新建卷、不改动已有章节。
+  | "extend";
 export type VolumeGenerationScopeInput = VolumeGenerationScope | "book" | "volume";
 export type VolumeChapterListGenerationMode = "full_volume" | "single_beat";
 export type StoryPlanLevel = "book" | "arc" | "chapter";
