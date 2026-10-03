@@ -49,26 +49,17 @@ function runPrisma(args) {
   }
 }
 
-function runNodeProbe(script, cwd) {
-  return spawnSync(process.execPath, ["-e", script], {
-    cwd,
-    env: process.env,
-    encoding: "utf8",
-  });
-}
-
+// 直接在当前进程内探测依赖是否可加载：原先的 spawnSync(process.execPath, ["-e", …])
+// 在 Windows / Git-Bash 环境下会偶发返回 status:null（spawn 直接失败而非真正的加载错误），
+// 导致 canLoad* 永远返回 false、误删可用的 better-sqlite3 原生 binding。改为 try/catch 内联
+// require，既能准确反映当前 Node 下 binding 是否真的可用，也彻底规避了子进程 spawn 的坑。
 function canLoadPrismaClient() {
-  const result = runNodeProbe(
-    `
+  try {
     const client = require("@prisma/client");
-    if (typeof client.PrismaClient !== "function") {
-      throw new Error("PrismaClient export is unavailable.");
-    }
-    console.log("ok");
-    `,
-    rootDir,
-  );
-  return result.status === 0;
+    return typeof client.PrismaClient === "function";
+  } catch {
+    return false;
+  }
 }
 
 function resolveBetterSqlite3Dir() {
@@ -96,16 +87,15 @@ function resolvePrebuildInstallCliPath() {
 }
 
 function canLoadBetterSqlite3Binding(betterSqlite3Dir) {
-  const result = runNodeProbe(
-    `
-    const Database = require(process.cwd());
+  try {
+    const Database = require(betterSqlite3Dir);
     const db = new Database(":memory:");
-    console.log(db.prepare("select 1 as x").get().x);
+    db.prepare("select 1 as x").get();
     db.close();
-    `,
-    betterSqlite3Dir,
-  );
-  return result.status === 0;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function repairBetterSqlite3Binding(betterSqlite3Dir) {
