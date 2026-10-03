@@ -11,6 +11,7 @@ import {
   buildCommonNovelContext,
   buildConflictLevelCurveContext,
   buildCompactVolumeCard,
+  buildCrossVolumeContinuityText,
   buildRecentChapterExecutionContext,
   buildVolumeCountGuidanceContext,
   buildSoftFutureVolumeSummary,
@@ -270,6 +271,12 @@ export function buildVolumeChapterListContextBlocks(input: VolumeChapterListProm
       priority: 96,
       required: true,
       content: `Conflict level anchors and curve:\n${buildConflictLevelCurveContext(input.targetVolume, undefined, { includeChapterTitles: false })}`,
+    }),
+    createContextBlock({
+      id: "cross_volume_continuity",
+      group: "cross_volume_continuity",
+      priority: 93,
+      content: buildCrossVolumeContinuityText(input.crossVolumeContinuity),
     }),
     guidanceBlock(input.guidance),
   ].filter((block): block is PromptContextBlock => Boolean(block));

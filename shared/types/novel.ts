@@ -998,6 +998,46 @@ export interface VolumePlanDocument {
   activeVersionId: string | null;
 }
 
+/**
+ * Consolidated cross-volume continuity package.
+ *
+ * Built while planning a new volume's chapter list so the generation prompt
+ * stays coherent with every prior volume (1..N-1). All fields are computed on
+ * the fly from the in-memory planning document or the database — no new
+ * persisted tables/columns are introduced.
+ */
+export interface CrossVolumeContinuityPackage {
+  targetVolumeSortOrder: number;
+  priorVolumeCount: number;
+  volumeArc: Array<{
+    sortOrder: number;
+    title: string;
+    summary: string | null;
+    climax: string | null;
+    protagonistChange: string | null;
+    nextVolumeHook: string | null;
+    resetPoint: string | null;
+    openPayoffs: string[];
+  }>;
+  characterStates: Array<{
+    name: string;
+    role: string;
+    currentState: string | null;
+    currentGoal: string | null;
+    mindSnapshot?: string | null;
+  }>;
+  pendingPayoffs: Array<{
+    ledgerKey: string;
+    title: string;
+    summary: string;
+    scopeType: string;
+    status: string;
+  }>;
+  worldRules: string | null;
+  consistencyFacts: string[];
+  priorChapterSummaries: string[];
+}
+
 export interface VolumePlanDiffVolume {
   sortOrder: number;
   title: string;
