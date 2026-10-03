@@ -41,6 +41,7 @@ export const chapterWriterPrompt: PromptAsset<ChapterWriterPromptInput, string, 
       "recent_chapters",
       "opening_constraints",
       "rag_context",
+      "cross_volume_continuity",
     ],
     dropOrder: [
       "rag_context",

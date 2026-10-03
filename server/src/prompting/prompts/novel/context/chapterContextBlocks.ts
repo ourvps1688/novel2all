@@ -18,6 +18,7 @@ import {
   toListBlock,
 } from "../chapterLayeredContextShared";
 import { normalizeChapterWriteContext } from "./chapterContextPolicies";
+import { buildCrossVolumeContinuityText } from "../volume/shared";
 
 export const WRITER_FORBIDDEN_GROUPS = [
   "full_outline",
@@ -390,6 +391,14 @@ export function buildChapterWriterContextBlocks(
                 : "",
             ].filter(Boolean).join("\n")
           : "Current volume: none",
+      })
+      : null,
+    writeContext.crossVolumeContinuity
+      ? createContextBlock({
+        id: "cross_volume_continuity",
+        group: "cross_volume_continuity",
+        priority: 93,
+        content: buildCrossVolumeContinuityText(writeContext.crossVolumeContinuity),
       })
       : null,
     writeContext.narrativeProgressHint

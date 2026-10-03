@@ -1,4 +1,4 @@
-import type { GenerationContextPackage } from "@ai-novel/shared/types/chapterRuntime";
+import type { CrossVolumeContinuityPackage, GenerationContextPackage } from "@ai-novel/shared/types/chapterRuntime";
 import { buildDirectorCompletionProfile } from "@ai-novel/shared/types/directorCompletion";
 import { buildCompressionLog } from "../../../prompting/core/contextBudget";
 import { prisma } from "../../../db/prisma";
@@ -51,6 +51,7 @@ import {
   buildRuntimeVolumeWindowSeed,
   resolveActiveMilestonePayoffs,
 } from "./context/bookAndVolumeRewardContext";
+import { buildCrossVolumeContinuityPackage } from "../volume/volumeContinuityContext";
 import {
   extractChapterOpening,
   extractChapterTail,
@@ -277,19 +278,25 @@ export class GenerationContextAssembler {
     const previousChaptersSummary = buildPreviousChaptersSummary(request.previousChaptersSummary, summaries);
     const mappedOpenConflicts = buildRuntimeOpenConflictsFromCanonical(canonicalState);
     const storyMacroPlan = novel.storyMacroPlan ? mapRowToPlan(novel.storyMacroPlan) : null;
-    const volumeWindow = buildVolumeWindowContext(buildRuntimeVolumeWindowSeed(
-      novel.volumePlans.map((volume) => ({
-        id: volume.id,
-        sortOrder: volume.sortOrder,
-        title: volume.title,
-        summary: volume.summary,
-        mainPromise: volume.mainPromise,
-        openPayoffsJson: volume.openPayoffsJson,
-        sourceVersion: volume.sourceVersion,
-        chapters: volume.chapters,
-      })),
-      chapter.order,
-    ));
+    const runtimeVolumeRows = novel.volumePlans.map((volume) => ({
+      id: volume.id,
+      sortOrder: volume.sortOrder,
+      title: volume.title,
+      summary: volume.summary,
+      mainPromise: volume.mainPromise,
+      openPayoffsJson: volume.openPayoffsJson,
+      sourceVersion: volume.sourceVersion,
+      chapters: volume.chapters,
+    }));
+    const volumeSeed = buildRuntimeVolumeWindowSeed(runtimeVolumeRows, chapter.order);
+    const volumeWindow = buildVolumeWindowContext(volumeSeed);
+    const targetVolumeSortOrder = volumeSeed.currentVolume?.sortOrder ?? 0;
+    let crossVolumeContinuity: CrossVolumeContinuityPackage | null = null;
+    try {
+      crossVolumeContinuity = await buildCrossVolumeContinuityPackage({ novelId, targetVolumeSortOrder });
+    } catch {
+      crossVolumeContinuity = null;
+    }
     const activeStyleProfileId = styleContext.matchedBindings[0]?.styleProfileId?.trim()
       || styleContext.matchedBindings[0]?.styleProfile?.id?.trim()
       || request.taskStyleProfileId?.trim()
@@ -560,6 +567,7 @@ export class GenerationContextAssembler {
       productionFoundationPrompt,
       macroConstraints,
       volumeWindow,
+      crossVolumeContinuity,
       contextPackage: {
         ...sharedFields,
         ragContext: "",

@@ -16,6 +16,8 @@ import {
   EMPTY_READER_EXPERIENCE_CONTRACT,
   readerExperienceContractSchema,
 } from "./novel/readerExperience.js";
+import type { CrossVolumeContinuityPackage } from "@ai-novel/shared/types/novel";
+export type { CrossVolumeContinuityPackage } from "@ai-novel/shared/types/novel";
 import type { LLMProvider } from "./llm.js";
 import {
   dynamicCharacterRiskLevelSchema,
@@ -472,6 +474,7 @@ export const chapterWriteContextSchema = z.object({
   productionFoundationPrompt: z.string().default(""),
   macroConstraints: macroConstraintContextSchema.nullable(),
   volumeWindow: volumeWindowContextSchema.nullable(),
+  crossVolumeContinuity: z.custom<CrossVolumeContinuityPackage>().nullable().optional(),
   narrativeProgressHint: z.string().nullable().optional(),
   chapterMission: chapterMissionContextSchema,
   nextAction: generationNextActionSchema.default("write_chapter"),
