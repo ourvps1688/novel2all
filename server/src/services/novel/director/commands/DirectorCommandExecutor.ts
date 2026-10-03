@@ -166,6 +166,10 @@ export class DirectorCommandExecutor {
         await this.recordCommandResult(pipelineCommand.taskId, pipelineCommand.id, { result });
         return this.resolveCommandOutcome(pipelineCommand.taskId);
       }
+      case "pause_autopilot": {
+        await this.commandService.enqueuePauseAutopilotCommand(pipelineCommand.taskId);
+        return this.resolveCommandOutcome(pipelineCommand.taskId);
+      }
       case "policy_update": {
         const request = pipelineCommand.payload.policyUpdateRequest;
         if (!request) {

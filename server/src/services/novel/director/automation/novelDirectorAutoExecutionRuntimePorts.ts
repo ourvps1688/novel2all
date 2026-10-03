@@ -23,7 +23,7 @@ export interface NovelDirectorAutoExecutionWorkflowPort {
     title: string;
     seedPayload?: Record<string, unknown>;
   }): Promise<unknown>;
-  getTaskById(taskId: string): Promise<{ status: string } | null>;
+  getTaskById(taskId: string): Promise<{ status: string; pendingManualRecovery?: boolean | null } | null>;
   markTaskRunning(taskId: string, input: {
     stage: "chapter_execution" | "quality_repair";
     itemLabel: string;

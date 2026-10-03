@@ -329,6 +329,9 @@ const appendCommandSchema = z.discriminatedUnion("commandType", [
       taskStyleProfileId: z.string().trim().optional(),
     }).optional(),
   }).optional() }),
+  z.object({ commandType: z.literal("pause_autopilot"), payload: z.object({
+    reason: z.string().trim().optional(),
+  }).optional() }),
 ]);
 
 function accepted<T>(data: T, message: string) {
@@ -470,6 +473,9 @@ router.post("/tasks/:taskId/commands", validate({ params: taskParamsSchema, body
           novelId: body.payload?.novelId ?? undefined,
           options: body.payload?.options,
         });
+        break;
+      case "pause_autopilot":
+        data = await commandService.enqueuePauseAutopilotCommand(taskId);
         break;
       default:
         throw new Error("Unsupported director command type.");

@@ -4,6 +4,8 @@ import type { WorkflowStepCatalogDisplayStage } from "./directorWorkflowStepCata
 import { resolveDirectorNodeDisplayLabel } from "./directorWorkflowStepCatalog.js";
 import type {
   DirectorCircuitBreakerState,
+  DirectorCircuitBreakerReason,
+  DirectorFullBookAutopilotInterruptReason,
   DirectorQualityLoopBudgetNextAction,
   DirectorStartupPreparation,
 } from "./novelDirector.js";
@@ -592,6 +594,10 @@ export interface DirectorRuntimeProjection {
   stepUsage?: DirectorStepUsageSummary[];
   promptUsage?: DirectorPromptUsageSummary[];
   circuitBreaker?: DirectorCircuitBreakerState | null;
+  /** T3.4: raw circuit-breaker reason (7-value set) when the run tripped/stopped. */
+  circuitBreakerReason?: DirectorCircuitBreakerReason | null;
+  /** T3.4: mapped full_book_autopilot interrupt reason (5-value set) surfaced to operators. */
+  interruptReason?: DirectorFullBookAutopilotInterruptReason | null;
   recentIssues?: Array<{
     occurrence: import("./directorIssue.js").DirectorIssueOccurrence;
     decision?: import("./directorIssue.js").DirectorIssueDecision | null;
@@ -809,6 +815,10 @@ export interface DirectorBookAutomationProjection {
   stepUsage?: DirectorStepUsageSummary[];
   promptUsage?: DirectorPromptUsageSummary[];
   circuitBreaker?: DirectorCircuitBreakerState | null;
+  /** T3.4: raw circuit-breaker reason (7-value set) when the run tripped/stopped. */
+  circuitBreakerReason?: DirectorCircuitBreakerReason | null;
+  /** T3.4: mapped full_book_autopilot interrupt reason (5-value set) surfaced to operators. */
+  interruptReason?: DirectorFullBookAutopilotInterruptReason | null;
   workerHealth?: DirectorWorkerHealthSummary | null;
   activeCommandCount: number;
   pendingCommandCount: number;
@@ -950,6 +960,10 @@ export interface DirectorDashboardView {
   userActionReason?: string | null;
   primaryAction?: DirectorDashboardAction | null;
   secondaryActions: DirectorDashboardAction[];
+  /** T3.4: raw circuit-breaker reason (7-value set) when the run tripped/stopped. */
+  circuitBreakerReason?: DirectorCircuitBreakerReason | null;
+  /** T3.4: mapped full_book_autopilot interrupt reason (5-value set) surfaced to operators. */
+  interruptReason?: DirectorFullBookAutopilotInterruptReason | null;
   stageKey: DirectorDisplayStageKey;
   stageLabel: string;
   stepIndex: number;
@@ -1052,6 +1066,7 @@ export const DIRECTOR_RUN_COMMAND_TYPES = [
   "accept_manual_changes_and_continue",
   "repair_chapter_titles",
   "backfill_execution_contracts",
+  "pause_autopilot",
   "cancel",
 ] as const;
 

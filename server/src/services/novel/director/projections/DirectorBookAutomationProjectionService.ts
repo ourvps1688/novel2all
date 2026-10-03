@@ -33,6 +33,7 @@ import {
   toIso,
   workflowStatusToBookStatus,
 } from "./DirectorBookAutomationProjectionModel";
+import { mapCircuitBreakerReasonToInterruptReason } from "@ai-novel/shared/types/novelDirector";
 import { buildDirectorDashboardView } from "./DirectorDashboardViewBuilder";
 import { buildDirectorDisplayState } from "./DirectorDisplayStateBuilder";
 
@@ -355,6 +356,11 @@ export class DirectorBookAutomationProjectionService {
       ?? parseJsonOrNull<{ mode?: DirectorPolicyMode }>(latestRun?.policyJson)?.mode
       ?? null;
     const circuitBreaker = extractCircuitBreaker(latestTask?.seedPayloadJson);
+    // T3.4: surface the circuit-breaker reason (already persisted in seedPayloadJson via
+    // autoExecution.circuitBreaker) on the projection. Expose both the raw 7-value circuit
+    // breaker reason and the mapped 5-value full_book_autopilot interrupt reason.
+    const circuitBreakerReason = circuitBreaker?.reason ?? null;
+    const interruptReason = mapCircuitBreakerReasonToInterruptReason(circuitBreakerReason);
     const taskStatus = latestTask?.pendingManualRecovery
       ? "waiting_recovery"
       : workflowStatusToBookStatus(latestTask?.status);
@@ -393,6 +399,11 @@ export class DirectorBookAutomationProjectionService {
         workerHealth,
       })
       : null;
+    // T3.4: carry the interrupt reason onto the dashboard view as well.
+    if (dashboardView) {
+      dashboardView.interruptReason = interruptReason ?? null;
+      dashboardView.circuitBreakerReason = circuitBreakerReason;
+    }
     const status: DirectorBookAutomationStatus = latestTask?.status === "cancelled"
       ? "cancelled"
       : dashboardView
@@ -597,6 +608,8 @@ export class DirectorBookAutomationProjectionService {
       stepUsage: usageTelemetry.stepUsage,
       promptUsage: usageTelemetry.promptUsage,
       circuitBreaker,
+      circuitBreakerReason,
+      interruptReason,
       workerHealth,
       activeCommandCount,
       pendingCommandCount,

@@ -52,6 +52,9 @@ export interface DirectorCommandPayload {
       taskStyleProfileId?: string;
     };
   };
+  pauseAutopilotRequest?: {
+    reason?: string | null;
+  } | null;
 }
 
 export function stableJson(value: unknown): string {

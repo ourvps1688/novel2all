@@ -93,11 +93,23 @@ export async function shouldStopAutoExecution(
   pipelineJobId?: string | null,
 ): Promise<boolean> {
   const row = await deps.workflowService.getTaskById(taskId);
-  if (!row || row.status !== "cancelled") {
+  if (!row) {
     return false;
   }
-  if (pipelineJobId) {
-    await deps.novelService.cancelPipelineJob(pipelineJobId).catch(() => null);
+  // Regression: a cancelled task always stops the autopilot loop.
+  if (row.status === "cancelled") {
+    if (pipelineJobId) {
+      await deps.novelService.cancelPipelineJob(pipelineJobId).catch(() => null);
+    }
+    return true;
   }
-  return true;
+  // T3.3 global pause: a paused autopilot run is a `waiting_approval` task that also
+  // carries `pendingManualRecovery`. Treat this combination as a STOP so the auto-execution
+  // loop exits (here and at the in-loop checks in novelDirectorAutoExecutionRuntime.ts)
+  // and the checkpoint watchdog never auto-resumes it — without a new status enum value
+  // or DB column.
+  if (row.status === "waiting_approval" && row.pendingManualRecovery === true) {
+    return true;
+  }
+  return false;
 }

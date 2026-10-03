@@ -560,6 +560,44 @@ export class DirectorCommandService {
     });
   }
 
+  /**
+   * T3.3 global pause control (zero migration).
+   *
+   * Best-effort control utility: it flips the target autopilot task into a
+   * `waiting_approval` state that also carries `pendingManualRecovery = true`.
+   * The autopilot loop (`shouldStopAutoExecution`) treats that combination as a STOP,
+   * and the checkpoint watchdog is excluded from auto-resolving it, so the run pauses
+   * without a new status enum value or DB column.
+   *
+   * It deliberately does NOT enqueue a continue command, does NOT create a checkpoint,
+   * and does NOT require user approval — it is a control-only operation.
+   */
+  async enqueuePauseAutopilotCommand(taskId: string): Promise<DirectorCommandAcceptedResponse> {
+    const row = await this.workflowService.getTaskById(taskId);
+    if (!row) {
+      throw new AppError("Task not found.", 404);
+    }
+    if (row.lane !== "auto_director") {
+      throw new AppError("Only auto director workflow tasks can be paused.", 400);
+    }
+    await prisma.novelWorkflowTask.update({
+      where: { id: taskId },
+      data: {
+        status: "waiting_approval",
+        pendingManualRecovery: true,
+        heartbeatAt: new Date(),
+      },
+    }).catch(() => null);
+    return toAcceptedResponse({
+      id: `pause:${taskId}`,
+      taskId,
+      novelId: row.novelId,
+      commandType: "pause_autopilot",
+      status: "succeeded",
+      leaseExpiresAt: null,
+    }, null);
+  }
+
   private async ensureCandidateTask(
     input: DirectorCandidatesRequest | DirectorRefinementRequest | DirectorCandidatePatchRequest | DirectorCandidateTitleRefineRequest,
     candidateStage: {
