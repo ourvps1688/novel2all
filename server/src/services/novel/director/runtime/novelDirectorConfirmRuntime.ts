@@ -8,6 +8,8 @@ import type {
   DirectorConfirmRequest,
 } from "@ai-novel/shared/types/novelDirector";
 import { buildDirectorCompletionProfile } from "@ai-novel/shared/types/directorCompletion";
+import { computeAutopilotBookBudget } from "./autopilotBookBudget";
+import type { AutopilotBookBudgetSummary } from "@ai-novel/shared/types/autopilotBookBudget";
 import type { NovelContextService } from "../../NovelContextService";
 import type { NovelWorkflowService } from "../../workflow/NovelWorkflowService";
 import {
@@ -100,9 +102,35 @@ export class NovelDirectorConfirmRuntime {
       summary: "自动导演确认方案后进入统一运行时。",
     });
 
+    let budgetPlan: AutopilotBookBudgetSummary | undefined;
+    if (isFullBookAutopilotRunMode(runMode)) {
+      try {
+        budgetPlan = computeAutopilotBookBudget({
+          modelId: resolvedInput.model,
+          expectedVolumes: resolvedInput.estimatedChapterCount
+            ? Math.max(1, Math.round(resolvedInput.estimatedChapterCount / 15))
+            : undefined,
+          expectedChaptersPerVolume: resolvedInput.estimatedChapterCount ? 15 : undefined,
+        });
+        // 最佳努力：把估算摘要写回已有的 seedPayloadJson（零迁移，仅更新既有 JSON 列）。
+        const currentPayload = parseSeedPayload<DirectorWorkflowSeedPayload & { budgetPlan?: unknown }>(
+          workflowTask.seedPayloadJson,
+        ) ?? ({} as DirectorWorkflowSeedPayload & { budgetPlan?: unknown });
+        currentPayload.budgetPlan = budgetPlan;
+        await prisma.novelWorkflowTask.update({
+          where: { id: workflowTask.id },
+          data: { seedPayloadJson: JSON.stringify(currentPayload) },
+        });
+      } catch {
+        // 预算摘要纯属估算、可选；任何失败都不得阻塞建书流程。
+      }
+    }
+
     if (workflowTask.novelId) {
       await this.deps.ensurePrimaryNovelStyleBinding(workflowTask.novelId, resolvedInput.styleProfileId);
-      return this.buildExistingConfirmResponse(workflowTask, resolvedInput, bookSpec);
+      const existingConfirm = await this.buildExistingConfirmResponse(workflowTask, resolvedInput, bookSpec);
+      existingConfirm.budgetPlan = budgetPlan;
+      return existingConfirm;
     }
 
     const novelCreationClaim = await this.deps.workflowService.claimAutoDirectorNovelCreation(workflowTask.id, {
@@ -124,7 +152,9 @@ export class NovelDirectorConfirmRuntime {
         });
         await this.deps.ensurePrimaryNovelStyleBinding(attachedTask.novelId, resolvedInput.styleProfileId);
       }
-      return this.buildExistingConfirmResponse(attachedTask, resolvedInput, bookSpec);
+      const attachedConfirm = await this.buildExistingConfirmResponse(attachedTask, resolvedInput, bookSpec);
+      attachedConfirm.budgetPlan = budgetPlan;
+      return attachedConfirm;
     }
     if (novelCreationClaim.status === "in_progress") {
       const existingTask = await this.waitForExistingConfirmedNovel(workflowTask.id);
@@ -137,7 +167,9 @@ export class NovelDirectorConfirmRuntime {
           summary: "自动导演复用正在创建完成的小说项目并进入统一运行时。",
         });
         await this.deps.ensurePrimaryNovelStyleBinding(existingTask.novelId, resolvedInput.styleProfileId);
-        return this.buildExistingConfirmResponse(existingTask, resolvedInput, bookSpec);
+        const inProgressConfirm = await this.buildExistingConfirmResponse(existingTask, resolvedInput, bookSpec);
+        inProgressConfirm.budgetPlan = budgetPlan;
+        return inProgressConfirm;
       }
       if (existingTask?.status === "failed" || existingTask?.status === "cancelled") {
         throw new Error(existingTask.lastError?.trim() || "当前导演建书流程已中断，请重新尝试。");
@@ -347,6 +379,7 @@ export class NovelDirectorConfirmRuntime {
           novel,
           storyMacroPlan: null,
           bookSpec,
+          budgetPlan,
           batch: {
             id: input.batchId,
             round: input.round,

@@ -26,6 +26,7 @@ import type { StyleIntentSummary } from "./styleEngine.js";
 import type { DirectorAutoApprovalConfig } from "./autoDirectorApproval.js";
 import type { DirectorIssuePolicy } from "./directorIssue.js";
 import type { DirectorRiskAssessment } from "./directorRisk.js";
+import type { AutopilotBookBudgetSummary } from "./autopilotBookBudget.js";
 
 export const DIRECTOR_CORRECTION_PRESETS = [
   {
@@ -851,6 +852,8 @@ export interface DirectorConfirmApiResponse extends DirectorConfirmResponse {
     arcs: DirectorPlanDigest[];
     chapters: DirectorPlanDigest[];
   };
+  /** 非阻塞、可跳过的全本预算估算摘要；仅作参考，绝不作为审批检查点。 */
+  budgetPlan?: AutopilotBookBudgetSummary;
 }
 
 export interface DirectorBookContractDraft extends BookContractDraft {}
