@@ -158,10 +158,12 @@ export function buildDirectorAutoExecutionScopeLabel(
 export function resolveDirectorAutoExecutionBookRange(
   chapters: DirectorAutoExecutionChapterRef[],
 ): DirectorAutoExecutionRange | null {
-  const selected = chapters
+  const ordered = chapters
     .slice()
     .filter((chapter) => chapter.order >= DIRECTOR_DEFAULT_RANGE_START_ORDER)
     .sort((left, right) => left.order - right.order);
+  const seenOrder = new Set<number>();
+  const selected = ordered.filter((chapter) => (seenOrder.has(chapter.order) ? false : (seenOrder.add(chapter.order), true)));
   if (selected.length === 0) {
     return null;
   }
@@ -377,9 +379,11 @@ export function buildDirectorAutoExecutionState(input: {
   const skippedChapterOrders = new Set((input.plan as DirectorAutoExecutionState | null | undefined)?.skippedChapterOrders ?? []);
   const qualityDebtChapterIds = new Set((input.plan as DirectorAutoExecutionState | null | undefined)?.qualityDebtChapterIds ?? []);
   const qualityDebtChapterOrders = new Set((input.plan as DirectorAutoExecutionState | null | undefined)?.qualityDebtChapterOrders ?? []);
-  const selected = input.chapters
+  const selectedAll = input.chapters
     .filter((chapter) => chapter.order >= input.range.startOrder && chapter.order <= input.range.endOrder)
     .sort((left, right) => left.order - right.order);
+  const seenOrder = new Set<number>();
+  const selected = selectedAll.filter((chapter) => (seenOrder.has(chapter.order) ? false : (seenOrder.add(chapter.order), true)));
   const skipped = selected.filter((chapter) => {
     const isSkippedChapter = skippedChapterIds.has(chapter.id) || skippedChapterOrders.has(chapter.order);
     if (!isSkippedChapter) {
