@@ -124,6 +124,9 @@ export const DIRECTOR_WORKFLOW_STEP_IDS = {
   },
   takeover: "workflow.takeover.execute",
   confirmNovelCreate: "book.project.create",
+  bridge: {
+    analysis_to_planning_bridge: "book.analysis.planning_bridge",
+  },
 } as const;
 
 export const WORKFLOW_STEP_CATALOG: readonly WorkflowStepCatalogEntry[] = [
@@ -293,6 +296,31 @@ export const WORKFLOW_STEP_CATALOG: readonly WorkflowStepCatalogEntry[] = [
     aliases: {
       nodeKeys: ["story_macro"],
       currentItemKeys: ["story_macro", "constraint_engine"],
+      currentStages: ["story_macro", "story_planning"],
+    },
+  },
+  {
+    id: DIRECTOR_WORKFLOW_STEP_IDS.bridge.analysis_to_planning_bridge,
+    stage: "analysis_to_planning_bridge",
+    displayStage: "story_planning",
+    workflowStage: "story_macro",
+    tab: "story_macro",
+    checkpoint: null,
+    approvalPoint: null,
+    defaultProgress: 0.3,
+    nodeKey: "analysis_planning_bridge",
+    label: "基于书析生成规划",
+    targetType: "novel",
+    reads: ["book_analysis"],
+    writes: ["story_macro", "volume_strategy", "beat_sheet"],
+    mayModifyUserContent: true,
+    requiresApprovalByDefault: false,
+    supportsAutoRetry: false,
+    orchestrationOrder: 150,
+    prerequisiteStepIds: [],
+    aliases: {
+      nodeKeys: ["analysis_planning_bridge"],
+      currentItemKeys: ["analysis_to_planning_bridge"],
       currentStages: ["story_macro", "story_planning"],
     },
   },

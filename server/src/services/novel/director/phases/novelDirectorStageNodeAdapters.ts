@@ -8,7 +8,8 @@ export type DirectorPlanningStage =
   | "world_setup"
   | "character_setup"
   | "volume_strategy"
-  | "structured_outline";
+  | "structured_outline"
+  | "analysis_to_planning_bridge";
 
 export interface DirectorStageNodeAdapter {
   nodeKey: string;
@@ -122,6 +123,22 @@ export const DIRECTOR_STAGE_NODE_ADAPTERS: Record<DirectorPlanningStage, Directo
       itemKey: "chapter_detail_bundle",
       itemLabel: "等待确认章节任务单",
       progress: DIRECTOR_PROGRESS.chapterDetailStart,
+    },
+  },
+  analysis_to_planning_bridge: {
+    nodeKey: "analysis_planning_bridge",
+    label: "基于书析生成规划",
+    targetType: "novel",
+    reads: ["book_analysis"],
+    writes: ["story_macro", "volume_strategy", "beat_sheet"],
+    mayModifyUserContent: true,
+    requiresApprovalByDefault: false,
+    supportsAutoRetry: false,
+    waitingState: {
+      stage: "story_macro",
+      itemKey: "story_macro",
+      itemLabel: "等待基于书析生成规划",
+      progress: 0.3,
     },
   },
 };

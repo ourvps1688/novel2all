@@ -1,6 +1,7 @@
 /**
  * Standalone, dependency-light dispatch for the `analyze_reference_book`
- * director command (Phase 4 — foundation, task 4c).
+ * director command (Phase 4 — foundation, task 4c; autopilot bridge added in
+ * task T4.5).
  *
  * This is intentionally a *pure* function with **type-only** imports so the
  * compiled module has no runtime dependency on the heavy director service
@@ -11,13 +12,23 @@
  * dispatch logic here, tests can cover the real execution behavior of
  * `analyze_reference_book` without loading that fragile graph.
  *
- * No Prisma / LLM calls happen here: the orchestration and the result recorder
- * are injected.
+ * No Prisma / LLM calls happen here: the orchestration, the result recorder,
+ * and the novel-binding collaborators are injected.
+ *
+ * When a `novelId` is supplied and the novel has a known writing mode, the
+ * produced `analysisId` is bound to the matching column on the `Novel` row
+ * (`referenceBookAnalysisId` for `original`, `continuationBookAnalysisId` for
+ * `continuation`) via `bindAnalysisToNovel`, and the same column is written
+ * into the task seed payload (`seedPatch`) so the downstream director stages
+ * can reach the bound analysis from the `DirectorConfirmRequest`.
  */
 
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { BookAnalysisOrchestration } from "../runtime/bookAnalysisOrchestration";
 import type { DirectorCommandExecutionOutcome } from "./DirectorCommandExecutor";
+
+/** The two writing modes that map to a distinct bound-analysis column. */
+export type NovelWritingMode = "original" | "continuation";
 
 /** Parsed payload of the `analyze_reference_book` command. */
 export interface AnalyzeReferenceBookDispatchRequest {
@@ -27,6 +38,8 @@ export interface AnalyzeReferenceBookDispatchRequest {
   provider?: string | null;
   model?: string | null;
   temperature?: number | null;
+  /** Target novel whose bound analysis column should be updated (optional). */
+  novelId?: string | null;
 }
 
 /** Collaborators the dispatch needs, all injectable for testing. */
@@ -40,18 +53,24 @@ export interface AnalyzeReferenceBookDispatchDeps {
     candidateSelectionReady?: boolean,
   ) => Promise<void>;
   resolveCommandOutcome: (taskId: string) => Promise<DirectorCommandExecutionOutcome>;
+  /** Resolve the novel's writing mode, or null if unknown / not found. */
+  getNovelWritingMode: (novelId: string) => Promise<NovelWritingMode | null>;
+  /** Bind the produced analysis id to the novel's matching analysis column. */
+  bindAnalysisToNovel: (
+    novelId: string,
+    analysisId: string,
+    mode: NovelWritingMode,
+  ) => Promise<void>;
 }
 
 /**
  * Execute the `analyze_reference_book` command:
  *  - ingest (or reuse) the reference text as a knowledge document,
  *  - run a book analysis to completion,
+ *  - when a `novelId` is present, bind the produced `analysisId` to the novel's
+ *    matching analysis column and write that column into the task seed payload,
  *  - record the produced `analysisId` + `documentId` on the task,
  *  - resolve the command outcome.
- *
- * This is a *utility* command: it records its result with only three arguments
- * (no `seedPatch`, no `candidateSelectionReady`), so it does NOT create a
- * checkpoint, enqueue a continue, or require an approval gate.
  */
 export async function dispatchAnalyzeReferenceBook(
   taskId: string,
@@ -70,10 +89,22 @@ export async function dispatchAnalyzeReferenceBook(
     },
   );
 
-  await deps.recordCommandResult(taskId, commandId, {
-    analysisId: result.analysisId,
-    documentId: result.documentId,
-  });
+  let seedPatch: Record<string, unknown> = {};
+  if (request.novelId) {
+    const mode = await deps.getNovelWritingMode(request.novelId);
+    if (mode) {
+      const analysisColumn = mode === "continuation" ? "continuationBookAnalysisId" : "referenceBookAnalysisId";
+      seedPatch = { [analysisColumn]: result.analysisId };
+      await deps.bindAnalysisToNovel(request.novelId, result.analysisId, mode);
+    }
+  }
+
+  await deps.recordCommandResult(
+    taskId,
+    commandId,
+    { analysisId: result.analysisId, documentId: result.documentId },
+    seedPatch,
+  );
 
   return deps.resolveCommandOutcome(taskId);
 }

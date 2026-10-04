@@ -183,9 +183,34 @@ export class DirectorCommandExecutor {
         return dispatchAnalyzeReferenceBook(
           pipelineCommand.taskId,
           pipelineCommand.id,
-          request,
+          {
+            ...request,
+            novelId: pipelineCommand.novelId ?? state.task.novelId ?? null,
+          },
           {
             bookAnalysisOrchestration: this.bookAnalysisOrchestration,
+            getNovelWritingMode: async (targetNovelId) => {
+              const novel = await prisma.novel.findUnique({
+                where: { id: targetNovelId },
+                select: { writingMode: true },
+              });
+              return (novel?.writingMode === "original" || novel?.writingMode === "continuation")
+                ? novel.writingMode
+                : null;
+            },
+            bindAnalysisToNovel: async (targetNovelId, analysisId, mode) => {
+              if (mode === "continuation") {
+                await prisma.novel.update({
+                  where: { id: targetNovelId },
+                  data: { continuationBookAnalysisId: analysisId },
+                });
+              } else {
+                await prisma.novel.update({
+                  where: { id: targetNovelId },
+                  data: { referenceBookAnalysisId: analysisId },
+                });
+              }
+            },
             recordCommandResult: (taskId, commandId, result, seedPatch, candidateSelectionReady) =>
               this.recordCommandResult(taskId, commandId, result, seedPatch, candidateSelectionReady),
             resolveCommandOutcome: (taskId) => this.resolveCommandOutcome(taskId),

@@ -266,6 +266,14 @@ export class DirectorCoreStepModuleRuntime {
     return this.pipelineRuntime.executeVolumeStrategyStep(input.taskId, input.novelId, input.request);
   }
 
+  async executeAnalysisToPlanningBridgeStep(input: {
+    taskId: string;
+    novelId: string;
+    request: DirectorConfirmRequest;
+  }): Promise<void> {
+    return this.pipelineRuntime.executeAnalysisToPlanningBridgeStep(input.taskId, input.novelId, input.request);
+  }
+
   async executeStructuredOutlineStep(input: {
     taskId: string;
     novelId: string;
