@@ -55,6 +55,17 @@ export interface DirectorCommandPayload {
   pauseAutopilotRequest?: {
     reason?: string | null;
   } | null;
+  analyzeReferenceBookRequest?: {
+    /** Optional display title for the ingested knowledge document. */
+    title?: string;
+    /** Raw reference book text to ingest and analyze. */
+    referenceText: string;
+    /** If set, analyze this already-ingested document instead of ingesting. */
+    documentId?: string;
+    provider?: string;
+    model?: string;
+    temperature?: number;
+  };
 }
 
 export function stableJson(value: unknown): string {
