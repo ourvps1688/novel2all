@@ -1,11 +1,15 @@
-// Phase 4 (4c) — analyze_reference_book director command tests.
+// Phase 4 (4c / T4.5) — analyze_reference_book director command tests.
 //
 // Verifies the command is registered (part of DirectorRunCommandType and the
 // command interpreter) and that the dispatch path:
 //   - calls the headless orchestration with the reference text,
 //   - records { analysisId, documentId } on the task,
+//   - when a `novelId` is supplied and the novel has a known writing mode,
+//     binds the produced `analysisId` to the matching `Novel` analysis column
+//     (referenceBookAnalysisId for `original`, continuationBookAnalysisId for
+//     `continuation`) and writes that column into the task seed payload,
 //   - does NOT create a checkpoint / enqueue a continue / require approval
-//     (it records the result with only 3 args).
+//     (it records the result with at most a non-gating seedPatch).
 //
 // IMPORTANT: this test deliberately does NOT require `DirectorCommandExecutor`.
 // That class cannot be loaded in a standalone test process because its
@@ -62,7 +66,7 @@ test("dispatch calls the orchestration with the reference text and records analy
 
   // The recorded result carries the analysis + document ids.
   assert.equal(captured.length, 1);
-  assert.equal(captured[0].callArity, 3, "recordCommandResult should be called with only 3 args (no seedPatch / candidateSelectionReady)");
+  assert.equal(captured[0].callArity, 4, "recordCommandResult is called with a seedPatch (4th arg)");
   assert.equal(captured[0].taskId, "task-1");
   assert.equal(captured[0].commandId, "cmd-1");
   assert.deepEqual(captured[0].result, { analysisId: "analysis-1", documentId: "doc-1" });
@@ -108,13 +112,83 @@ test("analyze_reference_book is a utility command — no checkpoint, no approval
     buildDeps(orchestrationMock, captured),
   );
 
-  // 3-arg recordCommandResult call => seedPatch (4th) and candidateSelectionReady
-  // (5th) arrive as undefined => default to {} / false => no checkpoint /
-  // no approval gate is created.
+  // 4-arg recordCommandResult call => seedPatch (4th) arrives as an empty object
+  // and candidateSelectionReady (5th) arrives as undefined => default to {} /
+  // false => no checkpoint / no approval gate is created.
   assert.equal(captured.length, 1);
-  assert.equal(captured[0].callArity, 3);
+  assert.equal(captured[0].callArity, 4);
   assert.deepEqual(captured[0].seedPatch, {});
   assert.equal(captured[0].candidateSelectionReady, false);
+});
+
+test("dispatch binds the analysis to referenceBookAnalysisId for an original novel", async () => {
+  const orchestrationMock = makeOrchestrationMock();
+  const captured = [];
+  const bindCalls = [];
+  await dispatchAnalyzeReferenceBook(
+    "task-1",
+    "cmd-1",
+    { referenceText: "内容", novelId: "novel-original" },
+    buildDeps(orchestrationMock, captured, { bindCalls, writingMode: "original" }),
+  );
+
+  assert.equal(bindCalls.length, 1);
+  assert.deepEqual(bindCalls[0], { novelId: "novel-original", analysisId: "analysis-1", mode: "original" });
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].callArity, 4);
+  assert.deepEqual(captured[0].seedPatch, { referenceBookAnalysisId: "analysis-1" });
+});
+
+test("dispatch binds the analysis to continuationBookAnalysisId for a continuation novel", async () => {
+  const orchestrationMock = makeOrchestrationMock();
+  const captured = [];
+  const bindCalls = [];
+  await dispatchAnalyzeReferenceBook(
+    "task-1",
+    "cmd-1",
+    { referenceText: "内容", novelId: "novel-continuation" },
+    buildDeps(orchestrationMock, captured, { bindCalls, writingMode: "continuation" }),
+  );
+
+  assert.equal(bindCalls.length, 1);
+  assert.deepEqual(bindCalls[0], { novelId: "novel-continuation", analysisId: "analysis-1", mode: "continuation" });
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].callArity, 4);
+  assert.deepEqual(captured[0].seedPatch, { continuationBookAnalysisId: "analysis-1" });
+});
+
+test("dispatch does not bind any analysis when novelId is absent", async () => {
+  const orchestrationMock = makeOrchestrationMock();
+  const captured = [];
+  const bindCalls = [];
+  await dispatchAnalyzeReferenceBook(
+    "task-1",
+    "cmd-1",
+    { referenceText: "内容" },
+    buildDeps(orchestrationMock, captured, { bindCalls }),
+  );
+
+  assert.equal(bindCalls.length, 0, "no bind should happen without a novelId");
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].callArity, 4);
+  assert.deepEqual(captured[0].seedPatch, {});
+});
+
+test("dispatch does not bind when the novel writing mode is unknown", async () => {
+  const orchestrationMock = makeOrchestrationMock();
+  const captured = [];
+  const bindCalls = [];
+  await dispatchAnalyzeReferenceBook(
+    "task-1",
+    "cmd-1",
+    { referenceText: "内容", novelId: "novel-unknown-mode" },
+    buildDeps(orchestrationMock, captured, { bindCalls, writingMode: null }),
+  );
+
+  assert.equal(bindCalls.length, 0, "no bind should happen for an unknown writing mode");
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].callArity, 4);
+  assert.deepEqual(captured[0].seedPatch, {});
 });
 
 function makeOrchestrationMock() {
@@ -131,11 +205,15 @@ function makeOrchestrationMock() {
   return { ingestAndAnalyze, calls };
 }
 
-function buildDeps(orchestrationMock, captured) {
+function buildDeps(orchestrationMock, captured, options = {}) {
+  const bindCalls = options.bindCalls ?? [];
+  const writingMode = options.writingMode === undefined ? "original" : options.writingMode;
   return {
-    bookAnalysisOrchestration: { ingestAndAnalyze: orchestrationMock.ingestAndAnalyze },
+    bookAnalysisOrchestration: { ingestAndAnalyze: orchestrationMock.ingestAnalyze ?? orchestrationMock.ingestAndAnalyze },
     // Regular function (not arrow) so we can read `arguments.length` and prove
-    // the dispatch passed exactly 3 args — the utility-command contract.
+    // the dispatch passed a seedPatch (4th arg). When no novelId is supplied the
+    // seedPatch arrives as an empty object, which still keeps the utility-command
+    // contract ({}, false => no checkpoint / no approval gate).
     recordCommandResult: function (taskId, commandId, result, seedPatch, candidateSelectionReady) {
       captured.push({
         taskId,
@@ -147,6 +225,10 @@ function buildDeps(orchestrationMock, captured) {
         seedPatch: seedPatch ?? {},
         candidateSelectionReady: candidateSelectionReady ?? false,
       });
+    },
+    getNovelWritingMode: async () => writingMode,
+    bindAnalysisToNovel: async (novelId, analysisId, mode) => {
+      bindCalls.push({ novelId, analysisId, mode });
     },
     resolveCommandOutcome: async () => "completed",
   };

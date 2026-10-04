@@ -43,6 +43,7 @@ export const DIRECTOR_WORKFLOW_STEP_MODULES = uniqueModules([
   DIRECTOR_PLANNING_STEP_MODULES.world_setup,
   DIRECTOR_PLANNING_STEP_MODULES.character_setup,
   DIRECTOR_PLANNING_STEP_MODULES.volume_strategy,
+  DIRECTOR_PLANNING_STEP_MODULES.analysis_to_planning_bridge,
   DIRECTOR_STRUCTURED_OUTLINE_STEP_MODULES.beat_sheet,
   DIRECTOR_STRUCTURED_OUTLINE_STEP_MODULES.chapter_list,
   DIRECTOR_STRUCTURED_OUTLINE_STEP_MODULES.chapter_detail_bundle,
@@ -125,6 +126,10 @@ export function getDirectorPlanningStepModule(
   stage: DirectorPlanningStage,
 ): WorkflowStepModuleDescriptor {
   return DIRECTOR_PLANNING_STEP_MODULES[stage];
+}
+
+export function getDirectorAnalysisToPlanningBridgeStepModule(): WorkflowStepModuleDescriptor {
+  return DIRECTOR_PLANNING_STEP_MODULES.analysis_to_planning_bridge;
 }
 
 export function getDirectorStructuredOutlineStepModules(): WorkflowStepModuleDescriptor[] {

@@ -8,6 +8,7 @@ const {
 
 test("director planning stages expose standard node adapter contracts", () => {
   assert.deepEqual(Object.keys(DIRECTOR_STAGE_NODE_ADAPTERS).sort(), [
+    "analysis_to_planning_bridge",
     "book_contract",
     "character_setup",
     "story_macro",
@@ -40,6 +41,17 @@ test("structured outline adapter declares chapter task sheet output", () => {
   assert.deepEqual(adapter.writes, ["chapter_task_sheet"]);
   assert.equal(adapter.waitingState.stage, "structured_outline");
   assert.equal(adapter.waitingState.itemKey, "chapter_detail_bundle");
+});
+
+test("analysis to planning bridge adapter declares book analysis input and planning outputs", () => {
+  const adapter = getDirectorStageNodeAdapter("analysis_to_planning_bridge");
+
+  assert.equal(adapter.nodeKey, "analysis_planning_bridge");
+  assert.equal(adapter.label, "基于书析生成规划");
+  assert.deepEqual(adapter.reads, ["book_analysis"]);
+  assert.deepEqual(adapter.writes, ["story_macro", "volume_strategy", "beat_sheet"]);
+  assert.equal(adapter.waitingState.stage, "story_macro");
+  assert.equal(adapter.waitingState.itemKey, "story_macro");
 });
 
 test("story macro and book contract use independent write contracts", () => {

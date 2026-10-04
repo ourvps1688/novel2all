@@ -17,6 +17,7 @@ export const DIRECTOR_PLANNING_STEP_IDS: Record<DirectorPlanningStage, string> =
   character_setup: DIRECTOR_WORKFLOW_STEP_IDS.planning.character_setup,
   volume_strategy: DIRECTOR_WORKFLOW_STEP_IDS.planning.volume_strategy,
   structured_outline: DIRECTOR_WORKFLOW_STEP_IDS.planning.structured_outline,
+  analysis_to_planning_bridge: DIRECTOR_WORKFLOW_STEP_IDS.bridge.analysis_to_planning_bridge,
 };
 
 export const DIRECTOR_STRUCTURED_OUTLINE_STEP_IDS = {

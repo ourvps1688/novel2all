@@ -510,6 +510,20 @@ export class NovelDirectorPipelineRuntime {
     });
   }
 
+  async executeAnalysisToPlanningBridgeStep(
+    taskId: string,
+    novelId: string,
+    input: DirectorConfirmRequest,
+  ): Promise<void> {
+    const analysisId = input.referenceBookAnalysisId ?? input.continuationBookAnalysisId;
+    if (!analysisId) {
+      throw new Error(
+        "analysis_to_planning_bridge requires a bound book analysis (referenceBookAnalysisId / continuationBookAnalysisId).",
+      );
+    }
+    await this.runPipeline({ taskId, novelId, input, startPhase: "story_macro" });
+  }
+
   async executeBookContractStep(
     taskId: string,
     novelId: string,

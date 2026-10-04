@@ -606,6 +606,107 @@ function createVolumeStrategyExecutableModule(
   );
 }
 
+function createAnalysisToPlanningBridgeExecutableModule(
+  descriptor: WorkflowStepModuleDescriptor,
+): WorkflowStepModule<{ taskId: string; novelId: string; request: DirectorConfirmRequest }, void> {
+  return createWorkflowStepModule(
+    descriptor,
+    async (input) => getDirectorCoreStepRuntime().executeAnalysisToPlanningBridgeStep(input),
+    {
+      inspectReadiness: async (context) => {
+        const { novelId, request } = await loadDirectorModuleState(context);
+        const analysisId = request?.referenceBookAnalysisId ?? request?.continuationBookAnalysisId;
+        if (!analysisId) {
+          return blockedState("A bound book analysis is required before the analysis-to-planning bridge.", {
+            code: "missing_book_analysis",
+            evidence: {},
+            nextAction: "analyze_reference_book",
+          });
+        }
+        return readyState({
+          evidence: { artifactType: "book_analysis", hasAnalysis: Boolean(analysisId) },
+        });
+      },
+      inspectCompletion: async (context) => {
+        const { novelId } = await loadDirectorModuleState(context);
+        const plan = await getDirectorCoreStepRuntime().getStoryMacroPlan(novelId);
+        const workspace = await getDirectorCoreStepRuntime().getVolumeWorkspace(novelId);
+        const hasStoryMacro = Boolean(plan?.decomposition);
+        const hasVolumeStrategy = Boolean(workspace?.strategyPlan) && (workspace?.volumes.length ?? 0) > 0;
+        const hasBeatSheet = Boolean(
+          workspace?.beatSheets?.some((sheet) => sheet.status === "generated" || sheet.status === "revised"),
+        );
+        return hasStoryMacro && hasVolumeStrategy && hasBeatSheet
+          ? completedFact(descriptor.id, {
+            evidence: { artifactType: "story_macro", hasVolumeStrategy, hasBeatSheet },
+          })
+          : pendingFact(descriptor.id, {
+            ratio: (hasStoryMacro ? 0.4 : 0) + (hasVolumeStrategy ? 0.4 : 0) + (hasBeatSheet ? 0.2 : 0),
+            evidence: { artifactType: "story_macro", hasStoryMacro, hasVolumeStrategy, hasBeatSheet },
+          });
+      },
+      buildInput: async (context) => {
+        const { novelId, request } = await loadDirectorModuleState(context);
+        return {
+          taskId: getWorkflowStepDirectorTaskId(context) ?? "",
+          novelId,
+          request: requireDirectorRequest(request),
+        };
+      },
+      validateOutput: async () => ({ valid: true }),
+      commit: async (_output, context) => {
+        const { state, novelId } = await loadDirectorModuleState(context);
+        const producedArtifacts = await getDirectorCoreStepRuntime().collectWrittenArtifacts(
+          novelId,
+          state.task.id,
+          descriptor.writes,
+        );
+        await getDirectorCoreStateCommitter().recordArtifactsIndexed({
+          taskId: state.task.id,
+          novelId,
+          runtimeId: state.runtime?.id ?? null,
+          nodeKey: descriptor.nodeKey,
+          artifacts: producedArtifacts,
+        });
+        return { producedArtifacts };
+      },
+      inspectProgress: async (context) => {
+        const { novelId } = await loadDirectorModuleState(context);
+        const plan = await getDirectorCoreStepRuntime().getStoryMacroPlan(novelId);
+        return plan?.decomposition
+          ? buildSimpleProgress({
+            status: "completed",
+            ratio: 1,
+            label: "基于书析的规划已生成",
+            evidence: { artifactType: "story_macro" },
+          })
+          : buildSimpleProgress({
+            status: "not_started",
+            ratio: 0,
+            label: "等待基于书析生成规划",
+            nextAction: "run_analysis_to_planning_bridge",
+          });
+      },
+      recover: async () => ({
+        recoverable: true,
+        resumeFrom: "analysis_to_planning_bridge",
+        reason: "Bridge can re-run the planning pipeline.",
+      }),
+      completeCriteria: async (_output, context) => {
+        const { novelId } = await loadDirectorModuleState(context);
+        const plan = await getDirectorCoreStepRuntime().getStoryMacroPlan(novelId);
+        const workspace = await getDirectorCoreStepRuntime().getVolumeWorkspace(novelId);
+        const hasStoryMacro = Boolean(plan?.decomposition);
+        const hasVolumeStrategy = Boolean(workspace?.strategyPlan) && (workspace?.volumes.length ?? 0) > 0;
+        const hasBeatSheet = Boolean(
+          workspace?.beatSheets?.some((sheet) => sheet.status === "generated" || sheet.status === "revised"),
+        );
+        return hasStoryMacro && hasVolumeStrategy && hasBeatSheet;
+      },
+    },
+  );
+}
+
 export const DIRECTOR_PLANNING_STEP_MODULES: Record<
   DirectorPlanningStage,
   WorkflowStepModuleDescriptor
@@ -635,6 +736,13 @@ export const DIRECTOR_PLANNING_STEP_MODULES: Record<
     stage: "volume_strategy",
     adapter: getDirectorStageNodeAdapter("volume_strategy"),
   })),
+  analysis_to_planning_bridge: createAnalysisToPlanningBridgeExecutableModule(
+    createWorkflowStepDescriptorFromDirectorAdapter({
+      id: DIRECTOR_PLANNING_STEP_IDS.analysis_to_planning_bridge,
+      stage: "analysis_to_planning_bridge",
+      adapter: getDirectorStageNodeAdapter("analysis_to_planning_bridge"),
+    }),
+  ),
   structured_outline: createStructuredOutlineFactModule({
     step: "beat_sheet",
     descriptor: buildStructuredOutlineStepDescriptor({
