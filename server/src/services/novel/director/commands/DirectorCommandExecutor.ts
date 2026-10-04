@@ -4,8 +4,8 @@ import { NovelWorkflowService } from "../../workflow/NovelWorkflowService";
 import { mergeSeedPayload, parseSeedPayload } from "../../workflow/novelWorkflow.shared";
 import { DirectorCommandInterpreter } from "./DirectorCommandInterpreter";
 import { DirectorCommandService } from "./DirectorCommandService";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { DirectorCommandPayload } from "./DirectorCommandServiceHelpers";
+import { dispatchAnalyzeReferenceBook } from "./analyzeReferenceBookDispatch";
 import { DirectorStateStore } from "../DirectorStateStore";
 import {
   bookAnalysisOrchestration,
@@ -179,23 +179,17 @@ export class DirectorCommandExecutor {
         if (!request) {
           throw new AppError("analyze_reference_book command payload is missing.", 400);
         }
-        const result = await this.bookAnalysisOrchestration.ingestAndAnalyze(
-          request.title ?? "参考资料",
-          request.referenceText,
+        return dispatchAnalyzeReferenceBook(
+          pipelineCommand.taskId,
+          pipelineCommand.id,
+          request,
           {
-            existingDocumentId: request.documentId,
-            provider: request.provider as LLMProvider | undefined,
-            model: request.model,
-            temperature: request.temperature,
+            bookAnalysisOrchestration: this.bookAnalysisOrchestration,
+            recordCommandResult: (taskId, commandId, result, seedPatch, candidateSelectionReady) =>
+              this.recordCommandResult(taskId, commandId, result, seedPatch, candidateSelectionReady),
+            resolveCommandOutcome: (taskId) => this.resolveCommandOutcome(taskId),
           },
         );
-        // Utility command: record the produced analysis/document ids without
-        // creating a checkpoint, enqueuing a continue, or requiring approval.
-        await this.recordCommandResult(pipelineCommand.taskId, pipelineCommand.id, {
-          analysisId: result.analysisId,
-          documentId: result.documentId,
-        });
-        return this.resolveCommandOutcome(pipelineCommand.taskId);
       }
       case "pause_autopilot": {
         await this.commandService.enqueuePauseAutopilotCommand(pipelineCommand.taskId);
