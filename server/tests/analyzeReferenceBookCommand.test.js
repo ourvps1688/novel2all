@@ -1,112 +1,29 @@
 // Phase 4 (4c) — analyze_reference_book director command tests.
 //
 // Verifies the command is registered (part of DirectorRunCommandType and the
-// command interpreter) and that the executor dispatches it: calls the headless
-// orchestration, records { analysisId, documentId }, and does NOT create a
-// checkpoint, enqueue a continue, or require approval.
+// command interpreter) and that the dispatch path:
+//   - calls the headless orchestration with the reference text,
+//   - records { analysisId, documentId } on the task,
+//   - does NOT create a checkpoint / enqueue a continue / require approval
+//     (it records the result with only 3 args).
 //
-// NOTE: DirectorCommandExecutor's dependency graph contains a pre-existing
-// circular import that crashes at module load when required in isolation
-// (a top-level `new ChapterRuntimeCoordinator()` singleton needs
-// NovelVolumeService, which is not yet initialized). We transiently stub that
-// one singleton in the module cache so the executor can load, then restore the
-// cache immediately afterwards so the rest of the shared test process is
-// unaffected. The analyze_reference_book dispatch path never uses
-// ChapterRuntimeCoordinator at runtime, so the stub is harmless.
+// IMPORTANT: this test deliberately does NOT require `DirectorCommandExecutor`.
+// That class cannot be loaded in a standalone test process because its
+// dependency graph contains a pre-existing circular import that crashes at
+// module load (`NovelVolumeService is not a constructor`). Requiring it would
+// force a `require.cache` stub of `ChapterRuntimeCoordinator`, and that stub
+// previously broke the shared `sharedChapterRuntimeCoordinator` export — silently
+// poisoning every later test in the shared process (the #58 CI red regression).
+// The actual dispatch logic lives in `analyzeReferenceBookDispatch`, which uses
+// only type-only imports and is safe to require directly.
 //
-// No Prisma / LLM calls are made: collaborators are injected and
-// recordCommandResult is overridden to capture the recorded result.
+// No Prisma / LLM calls are made: collaborators are injected.
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const Module = require("module");
-const path = require("path");
 
 const { DIRECTOR_RUN_COMMAND_TYPES } = require("../../shared/dist/types/directorRuntime.js");
-
-// Transiently stub the offending top-level singleton so the executor module can
-// be required without tripping the circular-import crash.
-const crcPath = path.resolve(__dirname, "..", "dist/services/novel/runtime/ChapterRuntimeCoordinator.js");
-const cachedCrc = require.cache[crcPath];
-const crcModule = new Module(crcPath, module);
-crcModule.exports = { ChapterRuntimeCoordinator: class {} };
-require.cache[crcPath] = crcModule;
-const {
-  DirectorCommandExecutor,
-} = require("../dist/services/novel/director/commands/DirectorCommandExecutor.js");
 const { DirectorCommandInterpreter } = require("../dist/services/novel/director/commands/DirectorCommandInterpreter.js");
-// Restore the real module entry so other tests in the shared process are unaffected.
-if (cachedCrc) {
-  require.cache[crcPath] = cachedCrc;
-} else {
-  delete require.cache[crcPath];
-}
-
-function buildExecutor(orchestrationMock, captured) {
-  const workflowService = {
-    getTaskById: async () => ({ id: "task-1", novelId: "novel-1", status: "running", lane: "auto_director" }),
-    getTaskByIdWithoutHealing: async () => ({ id: "task-1", status: "running" }),
-  };
-  const stateStore = {
-    readTaskState: async () => ({ task: { novelId: "novel-1", id: "task-1" } }),
-    recordPipelineDispatch: async () => {},
-  };
-  const commandService = {
-    getCommandById: async () => ({
-      id: "cmd-1",
-      taskId: "task-1",
-      commandType: "analyze_reference_book",
-      novelId: "novel-1",
-      payloadJson: "{}",
-    }),
-    parseCommandPayload: () => ({
-      analyzeReferenceBookRequest: {
-        title: "我的参考书",
-        referenceText: "第一章 内容……",
-        documentId: undefined,
-      },
-    }),
-  };
-
-  // Capture the result recorded by the executor without hitting the database.
-  class CapturingExecutor extends DirectorCommandExecutor {
-    async recordCommandResult(taskId, commandId, result, seedPatch, candidateSelectionReady) {
-      // Mirror the real method's defaults: the analyze_reference_book dispatch
-      // passes only 3 args, so seedPatch (4th) and candidateSelectionReady
-      // (5th) arrive as undefined. We normalize them to the real defaults
-      // ({}, false) so the captured values reflect what the real code path
-      // produces (no checkpoint / no approval gate).
-      captured.push({
-        taskId,
-        commandId,
-        result,
-        seedPatch: seedPatch ?? {},
-        candidateSelectionReady: candidateSelectionReady ?? false,
-      });
-    }
-  }
-
-  const executor = new CapturingExecutor({
-    workflowService,
-    stateStore,
-    commandService,
-    bookAnalysisOrchestration: orchestrationMock,
-  });
-  return { executor, workflowService };
-}
-
-function makeOrchestrationMock() {
-  const calls = [];
-  const ingestAndAnalyze = async (title, content, options) => {
-    calls.push({ title, content, options });
-    return {
-      documentId: "doc-1",
-      versionId: "ver-1",
-      analysisId: "analysis-1",
-      analysis: { id: "analysis-1", status: "succeeded" },
-    };
-  };
-  return { ingestAndAnalyze, calls };
-}
+const { dispatchAnalyzeReferenceBook } = require("../dist/services/novel/director/commands/analyzeReferenceBookDispatch.js");
 
 test("analyze_reference_book is registered as a DirectorRunCommandType", () => {
   assert.ok(
@@ -128,64 +45,109 @@ test("command interpreter recognizes analyze_reference_book and treats it as a n
   assert.equal(pipelineCommand.forceResume, false);
 });
 
-test("executor dispatches analyze_reference_book and returns completed outcome", async () => {
+test("dispatch calls the orchestration with the reference text and records analysis/document ids", async () => {
+  const orchestrationMock = makeOrchestrationMock();
   const captured = [];
-  const orchMock = makeOrchestrationMock();
-  const { executor } = buildExecutor(orchMock, captured);
-  const command = {
-    id: "cmd-1",
-    taskId: "task-1",
-    commandType: "analyze_reference_book",
-    novelId: "novel-1",
-  };
-  const outcome = await executor.dispatch(command, {
-    analyzeReferenceBookRequest: { title: "我的参考书", referenceText: "第一章 内容……" },
-  });
+  const outcome = await dispatchAnalyzeReferenceBook(
+    "task-1",
+    "cmd-1",
+    { title: "我的参考书", referenceText: "第一章 内容……" },
+    buildDeps(orchestrationMock, captured),
+  );
+
+  // The orchestration ran once with the supplied title + reference text.
+  assert.equal(orchestrationMock.calls.length, 1);
+  assert.equal(orchestrationMock.calls[0].title, "我的参考书");
+  assert.equal(orchestrationMock.calls[0].content, "第一章 内容……");
+
+  // The recorded result carries the analysis + document ids.
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0].callArity, 3, "recordCommandResult should be called with only 3 args (no seedPatch / candidateSelectionReady)");
+  assert.equal(captured[0].taskId, "task-1");
+  assert.equal(captured[0].commandId, "cmd-1");
+  assert.deepEqual(captured[0].result, { analysisId: "analysis-1", documentId: "doc-1" });
+
+  // Outcome comes from resolveCommandOutcome.
   assert.equal(outcome, "completed");
 });
 
-test("executor calls the orchestration with the reference text and records analysis/document ids", async () => {
+test("dispatch passes provider / model / existing document id through to the orchestration", async () => {
+  const orchestrationMock = makeOrchestrationMock();
   const captured = [];
-  const orchMock = makeOrchestrationMock();
-  const { executor } = buildExecutor(orchMock, captured);
-  const command = {
-    id: "cmd-1",
-    taskId: "task-1",
-    commandType: "analyze_reference_book",
-    novelId: "novel-1",
-  };
-  await executor.dispatch(command, {
-    analyzeReferenceBookRequest: { title: "我的参考书", referenceText: "第一章 内容……" },
+  await dispatchAnalyzeReferenceBook(
+    "task-1",
+    "cmd-1",
+    {
+      referenceText: "内容",
+      documentId: "existing-doc",
+      provider: "openai",
+      model: "gpt-4o",
+      temperature: 0.3,
+    },
+    buildDeps(orchestrationMock, captured),
+  );
+
+  assert.equal(orchestrationMock.calls.length, 1);
+  assert.equal(orchestrationMock.calls[0].title, "参考资料", "title falls back when omitted");
+  assert.equal(orchestrationMock.calls[0].content, "内容");
+  assert.deepEqual(orchestrationMock.calls[0].options, {
+    existingDocumentId: "existing-doc",
+    provider: "openai",
+    model: "gpt-4o",
+    temperature: 0.3,
   });
-
-  assert.equal(orchMock.calls.length, 1);
-  assert.equal(orchMock.calls[0].title, "我的参考书");
-  assert.equal(orchMock.calls[0].content, "第一章 内容……");
-
-  // The result recorded on the task must carry analysisId + documentId.
-  assert.equal(captured.length, 1);
-  assert.equal(captured[0].result.analysisId, "analysis-1");
-  assert.equal(captured[0].result.documentId, "doc-1");
 });
 
-test("analyze_reference_book does NOT create a checkpoint, require approval, or enqueue a continue", async () => {
+test("analyze_reference_book is a utility command — no checkpoint, no approval gate", async () => {
+  const orchestrationMock = makeOrchestrationMock();
   const captured = [];
-  const orchMock = makeOrchestrationMock();
-  const { executor } = buildExecutor(orchMock, captured);
-  const command = {
-    id: "cmd-1",
-    taskId: "task-1",
-    commandType: "analyze_reference_book",
-    novelId: "novel-1",
-  };
-  await executor.dispatch(command, {
-    analyzeReferenceBookRequest: { referenceText: "内容" },
-  });
+  await dispatchAnalyzeReferenceBook(
+    "task-1",
+    "cmd-1",
+    { referenceText: "内容" },
+    buildDeps(orchestrationMock, captured),
+  );
 
-  // candidateSelectionReady === false => no checkpoint / approval gate is created.
+  // 3-arg recordCommandResult call => seedPatch (4th) and candidateSelectionReady
+  // (5th) arrive as undefined => default to {} / false => no checkpoint /
+  // no approval gate is created.
   assert.equal(captured.length, 1);
-  assert.equal(captured[0].candidateSelectionReady, false);
+  assert.equal(captured[0].callArity, 3);
   assert.deepEqual(captured[0].seedPatch, {});
-  // The orchestration (not a continue executor) is what ran.
-  assert.equal(orchMock.calls.length, 1);
+  assert.equal(captured[0].candidateSelectionReady, false);
 });
+
+function makeOrchestrationMock() {
+  const calls = [];
+  const ingestAndAnalyze = async (title, content, options) => {
+    calls.push({ title, content, options });
+    return {
+      documentId: "doc-1",
+      versionId: "ver-1",
+      analysisId: "analysis-1",
+      analysis: { id: "analysis-1", status: "succeeded" },
+    };
+  };
+  return { ingestAndAnalyze, calls };
+}
+
+function buildDeps(orchestrationMock, captured) {
+  return {
+    bookAnalysisOrchestration: { ingestAndAnalyze: orchestrationMock.ingestAndAnalyze },
+    // Regular function (not arrow) so we can read `arguments.length` and prove
+    // the dispatch passed exactly 3 args — the utility-command contract.
+    recordCommandResult: function (taskId, commandId, result, seedPatch, candidateSelectionReady) {
+      captured.push({
+        taskId,
+        commandId,
+        result,
+        callArity: arguments.length,
+        // Mirror the real recordCommandResult defaults so we can assert the
+        // no-checkpoint / no-approval-gate contract ({}, false).
+        seedPatch: seedPatch ?? {},
+        candidateSelectionReady: candidateSelectionReady ?? false,
+      });
+    },
+    resolveCommandOutcome: async () => "completed",
+  };
+}
