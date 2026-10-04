@@ -17,6 +17,7 @@ import {
   type DirectorWorkflowSeedPayload,
 } from "../runtime/novelDirectorHelpers";
 import type { DirectorTakeoverRequest } from "@ai-novel/shared/types/novelDirector";
+import { chapterReverseDecomposition } from "../runtime/chapterReverseDecomposition";
 
 export type DirectorCommandExecutionOutcome = "completed" | "cancelled";
 
@@ -190,6 +191,39 @@ export class DirectorCommandExecutor {
             resolveCommandOutcome: (taskId) => this.resolveCommandOutcome(taskId),
           },
         );
+      }
+      case "decompose_written_chapter": {
+        const request = pipelineCommand.payload.decomposeWrittenChapterRequest;
+        const targetNovelId = request?.novelId ?? pipelineCommand.novelId ?? state.task.novelId;
+        if (!targetNovelId) {
+          throw new AppError("Reverse-decompose written chapter requires a novelId.", 400);
+        }
+        const decomposeOptions = {
+          provider: request?.provider,
+          model: request?.model,
+          temperature: request?.temperature,
+          force: request?.force ?? false,
+        };
+        let decomposedChapters: string[] = [];
+        let skippedChapters: string[] = [];
+        const chapterId = request?.chapterId ?? null;
+        if (chapterId) {
+          const singleResult = await chapterReverseDecomposition.decompose(targetNovelId, chapterId, decomposeOptions);
+          if (singleResult.skipped) {
+            skippedChapters = [singleResult.chapterId];
+          } else {
+            decomposedChapters = [singleResult.chapterId];
+          }
+        } else {
+          const novelResult = await chapterReverseDecomposition.decomposeNovel(targetNovelId, decomposeOptions);
+          decomposedChapters = novelResult.decomposed;
+          skippedChapters = novelResult.skipped;
+        }
+        await this.recordCommandResult(pipelineCommand.taskId, pipelineCommand.id, {
+          decomposedChapters,
+          skippedChapters,
+        });
+        return this.resolveCommandOutcome(pipelineCommand.taskId);
       }
       case "pause_autopilot": {
         await this.commandService.enqueuePauseAutopilotCommand(pipelineCommand.taskId);

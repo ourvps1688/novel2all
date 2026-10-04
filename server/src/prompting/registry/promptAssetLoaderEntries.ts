@@ -186,6 +186,10 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/directorStateProposalResolution.prompts").directorStateProposalResolutionPrompt as UnknownPromptAsset,
   },
   {
+    key: "novel.reverse_decompose_chapter@v1",
+    load: () => require("../prompts/novel/reverseDecomposeChapter.prompts").reverseDecomposeChapterPrompt as UnknownPromptAsset,
+  },
+  {
     key: "novel.story_macro.decomposition@v1",
     load: () => require("../prompts/novel/storyMacro.prompts").storyMacroDecompositionPrompt as UnknownPromptAsset,
   },
