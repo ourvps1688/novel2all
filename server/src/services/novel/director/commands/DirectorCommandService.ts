@@ -59,6 +59,7 @@ const EXECUTION_COMMAND_TYPES: DirectorRunCommandType[] = [
   "accept_manual_changes_and_continue",
   "repair_chapter_titles",
   "backfill_execution_contracts",
+  "analyze_reference_book",
 ];
 
 export type DirectorRunCommandRow = Awaited<ReturnType<DirectorCommandService["getCommandById"]>>;
@@ -555,6 +556,39 @@ export class DirectorCommandService {
         backfillExecutionContractsRequest: {
           novelId: input.novelId?.trim() || null,
           options: input.options ?? {},
+        },
+      },
+    });
+  }
+
+  /**
+   * Phase 4 (4c) — utility command to ingest reference text as a knowledge
+   * document and run a book analysis on it (headless orchestration).
+   *
+   * Like `backfill_execution_contracts`, this is a utility/control-style command:
+   * it does NOT create a checkpoint, does NOT enqueue a continue, and does NOT
+   * require user approval. The resulting analysis id is recorded on the task so
+   * downstream stages (candidate injection / reference resolution) can pick it up.
+   */
+  async enqueueAnalyzeReferenceBookCommand(taskId: string, input: {
+    title?: string;
+    referenceText: string;
+    documentId?: string | null;
+    provider?: string;
+    model?: string;
+    temperature?: number;
+  }): Promise<DirectorCommandAcceptedResponse> {
+    return this.enqueueExecutionCommand({
+      taskId,
+      commandType: "analyze_reference_book",
+      payload: {
+        analyzeReferenceBookRequest: {
+          title: input.title?.trim() || undefined,
+          referenceText: input.referenceText,
+          documentId: input.documentId?.trim() || undefined,
+          provider: input.provider?.trim() || undefined,
+          model: input.model?.trim() || undefined,
+          temperature: input.temperature,
         },
       },
     });

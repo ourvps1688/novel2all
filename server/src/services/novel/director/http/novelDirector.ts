@@ -332,6 +332,14 @@ const appendCommandSchema = z.discriminatedUnion("commandType", [
   z.object({ commandType: z.literal("pause_autopilot"), payload: z.object({
     reason: z.string().trim().optional(),
   }).optional() }),
+  z.object({ commandType: z.literal("analyze_reference_book"), payload: z.object({
+    title: z.string().trim().optional(),
+    referenceText: z.string().trim().min(1),
+    documentId: z.string().trim().optional(),
+    provider: z.string().trim().optional(),
+    model: z.string().trim().optional(),
+    temperature: z.number().min(0).max(2).optional(),
+  }).optional() }),
 ]);
 
 function accepted<T>(data: T, message: string) {
@@ -476,6 +484,16 @@ router.post("/tasks/:taskId/commands", validate({ params: taskParamsSchema, body
         break;
       case "pause_autopilot":
         data = await commandService.enqueuePauseAutopilotCommand(taskId);
+        break;
+      case "analyze_reference_book":
+        data = await commandService.enqueueAnalyzeReferenceBookCommand(taskId, {
+          title: body.payload?.title,
+          referenceText: body.payload?.referenceText ?? "",
+          documentId: body.payload?.documentId,
+          provider: body.payload?.provider,
+          model: body.payload?.model,
+          temperature: body.payload?.temperature,
+        });
         break;
       default:
         throw new Error("Unsupported director command type.");

@@ -21,6 +21,7 @@ export type DirectorPipelineCommandIntent =
   | "accept_manual_changes_and_continue"
   | "repair_chapter_titles"
   | "backfill_execution_contracts"
+  | "analyze_reference_book"
   | "pause_autopilot"
   | "cancel";
 
@@ -53,6 +54,7 @@ const SUPPORTED_COMMANDS = new Set<DirectorPipelineCommandIntent>([
   "accept_manual_changes_and_continue",
   "repair_chapter_titles",
   "backfill_execution_contracts",
+  "analyze_reference_book",
   "pause_autopilot",
   "cancel",
 ]);
