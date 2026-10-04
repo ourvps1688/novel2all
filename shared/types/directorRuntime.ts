@@ -1067,6 +1067,7 @@ export const DIRECTOR_RUN_COMMAND_TYPES = [
   "repair_chapter_titles",
   "backfill_execution_contracts",
   "analyze_reference_book",
+  "decompose_written_chapter",
   "pause_autopilot",
   "cancel",
 ] as const;

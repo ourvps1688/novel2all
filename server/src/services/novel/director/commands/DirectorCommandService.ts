@@ -60,6 +60,7 @@ const EXECUTION_COMMAND_TYPES: DirectorRunCommandType[] = [
   "repair_chapter_titles",
   "backfill_execution_contracts",
   "analyze_reference_book",
+  "decompose_written_chapter",
 ];
 
 export type DirectorRunCommandRow = Awaited<ReturnType<DirectorCommandService["getCommandById"]>>;
@@ -588,6 +589,41 @@ export class DirectorCommandService {
           documentId: input.documentId?.trim() || undefined,
           provider: input.provider?.trim() || undefined,
           model: input.model?.trim() || undefined,
+          temperature: input.temperature,
+        },
+      },
+    });
+  }
+
+  /**
+   * Phase 4 T4.2 — reverse-decompose already-written chapters (utility command).
+   *
+   * No checkpoint / no continue-enqueue / no approval: it simply enqueues a
+   * `decompose_written_chapter` pipeline command that reconstructs each target
+   * chapter's task sheet + scene cards from the finished prose (plus the novel's
+   * book analysis as evidence) and reuses the existing execution-contract
+   * generator. Idempotent: chapters already holding both artifacts are skipped.
+   */
+  async enqueueDecomposeWrittenChapterCommand(taskId: string, input: {
+    novelId?: string | null;
+    chapterId?: string | null;
+    allChapters?: boolean;
+    force?: boolean;
+    provider?: string;
+    model?: string;
+    temperature?: number;
+  } = {}): Promise<DirectorCommandAcceptedResponse> {
+    return this.enqueueExecutionCommand({
+      taskId,
+      commandType: "decompose_written_chapter",
+      payload: {
+        decomposeWrittenChapterRequest: {
+          novelId: input.novelId?.trim() || null,
+          chapterId: input.chapterId?.trim() || null,
+          allChapters: input.allChapters ?? false,
+          force: input.force ?? false,
+          provider: input.provider,
+          model: input.model,
           temperature: input.temperature,
         },
       },

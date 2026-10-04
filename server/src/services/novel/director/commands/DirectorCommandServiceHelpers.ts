@@ -66,6 +66,15 @@ export interface DirectorCommandPayload {
     model?: string;
     temperature?: number;
   };
+  decomposeWrittenChapterRequest?: {
+    novelId?: string | null;
+    chapterId?: string | null;
+    allChapters?: boolean;
+    force?: boolean;
+    provider?: string;
+    model?: string;
+    temperature?: number;
+  };
 }
 
 export function stableJson(value: unknown): string {

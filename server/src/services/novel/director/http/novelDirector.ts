@@ -329,6 +329,15 @@ const appendCommandSchema = z.discriminatedUnion("commandType", [
       taskStyleProfileId: z.string().trim().optional(),
     }).optional(),
   }).optional() }),
+  z.object({ commandType: z.literal("decompose_written_chapter"), payload: z.object({
+    novelId: z.string().trim().optional(),
+    chapterId: z.string().trim().optional(),
+    allChapters: z.boolean().optional(),
+    force: z.boolean().optional(),
+    provider: z.string().trim().optional(),
+    model: z.string().trim().optional(),
+    temperature: z.number().optional(),
+  }).optional() }),
   z.object({ commandType: z.literal("pause_autopilot"), payload: z.object({
     reason: z.string().trim().optional(),
   }).optional() }),
@@ -480,6 +489,17 @@ router.post("/tasks/:taskId/commands", validate({ params: taskParamsSchema, body
         data = await commandService.enqueueBackfillExecutionContractsCommand(taskId, {
           novelId: body.payload?.novelId ?? undefined,
           options: body.payload?.options,
+        });
+        break;
+      case "decompose_written_chapter":
+        data = await commandService.enqueueDecomposeWrittenChapterCommand(taskId, {
+          novelId: body.payload?.novelId ?? undefined,
+          chapterId: body.payload?.chapterId ?? undefined,
+          allChapters: body.payload?.allChapters ?? undefined,
+          force: body.payload?.force ?? undefined,
+          provider: body.payload?.provider,
+          model: body.payload?.model,
+          temperature: body.payload?.temperature,
         });
         break;
       case "pause_autopilot":
